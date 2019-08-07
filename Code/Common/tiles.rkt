@@ -1,8 +1,19 @@
 #lang racket/gui
 
+(provide
+ TILE-SIZE
+
+ all-tile-types
+ 
+ configuration->pict
+ )
+
+;; ---------------------------------------------------------------------------------------------------
 ;; how many unique tiles are there, and what do they look like 
 
 (require Tsuro/Code/Lib/or)
+(require Tsuro/Code/Lib/finder)
+(require pict)
 
 ;; ---------------------------------------------------------------------------------------------------
 ;; data representation of tiles
@@ -127,92 +138,77 @@
 (unless (= (set-count all-tile-types) 35)
   (error 'tiles "wrong number of tiles generated: ~a" (set-count all-tile-types)))
 
+(define one (set-first all-tile-types))
+(define two (set-first (set-rest all-tile-types)))
+
 ;; ---------------------------------------------------------------------------------------------------
+;; converting a configuration into a pict: make every size depend on the TILE-SIZE
 
-(require pict)
-
-;; ---------------------------------------------------------------------------------------------------
-;; converting a configuration into a pict 
-
-(define TILE-WIDTH 90)
-(define TILE-HEIGHT TILE-WIDTH)
+(define TILE-SIZE 90) (unless (= (remainder TILE-SIZE 30) 0) (error 'TILE-SIZE "bad choice for size"))
+(define TILE (rectangle TILE-SIZE TILE-SIZE))
 
 (define PORT-COLOR "red")
-(define TILE (rectangle TILE-WIDTH TILE-HEIGHT))
+(define PORT-RADIUS (/ TILE-SIZE 30))
+(define PORT-DIAMETER (* PORT-RADIUS 2))
+(define (PORT) (filled-ellipse PORT-DIAMETER PORT-DIAMETER #:color PORT-COLOR))
 
-(define PORTS-LOCATIONS ;; somehow connect to PORTS
-  '((28 00)
-    (58 00)
-    (86 28)
-    (86 58)
-    (58 86)
-    (28 86)
-    (00 58)
-    (00 28)))
+(define 0-THIRD 0)
+(define 1-THIRD (/ TILE-SIZE 3))
+(define 2-THIRD (* 2 1-THIRD))
+(define 3-THIRD TILE-SIZE )
+
+(define PORT-LOCATIONS
+  `((,(- 1-THIRD PORT-RADIUS) ,(- 0-THIRD PORT-RADIUS))
+    (,(- 2-THIRD PORT-RADIUS) ,(- 0-THIRD PORT-RADIUS))
+    (,(- 3-THIRD PORT-RADIUS) ,(- 1-THIRD PORT-RADIUS))
+    (,(- 3-THIRD PORT-RADIUS) ,(- 2-THIRD PORT-RADIUS))
+    (,(- 2-THIRD PORT-RADIUS) ,(- 3-THIRD PORT-RADIUS))
+    (,(- 1-THIRD PORT-RADIUS) ,(- 3-THIRD PORT-RADIUS))
+    (,(- 0-THIRD PORT-RADIUS) ,(- 2-THIRD PORT-RADIUS))
+    (,(- 0-THIRD PORT-RADIUS) ,(- 1-THIRD PORT-RADIUS))))
+
+(define EDGE-COLORS
+  (for/list ((___e (configuration-lo4edges one)) (j(in-naturals)))
+    (define i (+ j 1)) ;; these numbers might as well be random 
+    (make-color (modulo (* i 111) 256) (modulo (* i 77) 256) (modulo (* i 33) 256))))
 
 #; {Configuration -> Pict}
 (define (configuration->pict c0)
   (define-values (sq dots) (make-tile-with-ports))
-  (for/fold ((sq sq)) ((edge (configuration-lo4edges c0)))
+  (for/fold ((sq sq)) ((edge (configuration-lo4edges c0)) (color EDGE-COLORS))
     (define from (edge-from edge))
     (define to   (edge-to edge))
     (define dot1 (list-ref dots from))
     (define dot2 (list-ref dots to))
-    (pin-curve sq dot1 dot2)))
+    (pin-curve sq dot1 dot2 color)))
 
-(define (d+ pict sub-pict finder dx dy)
-  (define-values (x y) (finder pict sub-pict))
-  (values (+ dx x) (+ dy y)))
-
-#; {Pict Pict Pict -> Pict}
-(define (pin-curve sq dot1 dot2)
-  (cc-superimpose sq
-                  (dc (λ (dc dx dy)
-                        (define-values (x1 y1) (d+ sq dot1 cc-find dx dy))
-                        (define-values (x2 y2) (d+ sq dot2 cc-find dx dy))
-                        (define-values (xc yc) (d+ sq sq cc-find dx dy))
-                        (define old-pen (send dc get-pen))
-                        ;; ------------------------------------------------------------------
-                        (send dc set-pen (new pen% [width 3] [color "blue"]))
-                        (send dc draw-spline x1 y1 xc yc x2 y2)
-                        ;; ------------------------------------------------------------------
-                        (send dc set-pen old-pen))
-                      TILE-WIDTH TILE-HEIGHT)))
+#; {Pict Pict Pict (Instanceof Color%) -> Pict}
+(define (pin-curve sq dot1 dot2 color)
+  #; { (Instanceof DC<%) Integer Integer -> Void }
+  ;; add a spline from dot1 to dot2 via the center of sq 
+  (define (draw-connections dc dx dy)
+    (define old-pen (send dc get-pen))
+    ;; --------------------------------------------------
+    (define-values (x1 y1) (d+ sq dot1 cc-find dx dy))
+    (define-values (x2 y2) (d+ sq dot2 cc-find dx dy))
+    (define-values (xc yc) (d+ sq sq cc-find dx dy))
+    (send dc set-pen (new pen% [width 3] [color color]))
+    (send dc draw-spline x1 y1 xc yc x2 y2)
+    ;; --------------------------------------------------
+    (send dc set-pen old-pen))
+  (define connections (dc draw-connections TILE-SIZE TILE-SIZE))
+  (cc-superimpose sq connections))
 
 #; {-> (values Pict [Listof Pict])}
-;; compute the tile with unique port points 
+;; generate the tile with unique port points 
 (define (make-tile-with-ports)
-  (define (dt) (filled-rectangle 4 4 #:color PORT-COLOR))
-  (for/fold ((sq TILE) (dots '())) ((x-y (reverse PORTS-LOCATIONS)))
+  (for/fold ((sq TILE) (dots '())) ((x-y (reverse PORT-LOCATIONS)))
     (match-define `(,x ,y) x-y)
-    (define dot (dt))
+    (define dot (PORT))
     (values (pin-over sq x y dot) (cons dot dots))))
 
 ;; ---------------------------------------------------------------------------------------------------
-;; drawing all tiles in a set into a drawing context 
-
-(define INSET  (+ 20 TILE-WIDTH))
-(define WIDTH  (+ INSET (* 10 TILE-WIDTH) INSET))
-(define HEIGHT (+ INSET (* 10 TILE-HEIGHT) INSET))
-
-#;{ [Setof Configuration] (Instanceof Canvas%) -> Void }
-(define (draw-tiles soc:config dc)
-  (define loc:pict (for/list ((c (in-set soc:config))) (scale (configuration->pict c) 1.0)))
-  (define one (colorize (first loc:pict) "red"))  (draw-pict one dc 10 150)
-  (define two (colorize (second loc:pict) "red")) (draw-pict one dc (- WIDTH TILE-WIDTH 10) 150)
-  (define full
-    (let loop ([l loc:pict][n (length loc:pict)])
-      (cond
-        [(< n 9) (apply hc-append l)]
-        [else (vl-append (apply hc-append (take l 10)) (loop (drop l 10) (- n 10)))])))
-  (draw-pict full dc INSET INSET))
-
-(define (main)
-  (define frame (new frame% [label "hello"][width WIDTH][height HEIGHT]))
-  (define canvas
-    (new canvas%
-         [parent frame]
-         [paint-callback (λ (e dc) (draw-tiles all-tile-types dc))]))
-  (send frame show #t))
-
-(main)
+;; visualize 
+(vc-append 
+ (apply hc-append (map (λ (c) (scale (configuration->pict c) 3.0)) (list one two one)))
+ (apply hc-append (map (λ (c) (scale (configuration->pict c) 3.0)) (list one two one))))
