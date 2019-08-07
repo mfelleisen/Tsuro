@@ -2,15 +2,17 @@
 
 (provide
  TILE-SIZE
-
- all-tile-types
+ PORTS
  
- configuration->pict
- )
+ configuration
+ edge
+ 
+ configuration->pict)
 
 ;; ---------------------------------------------------------------------------------------------------
 ;; how many unique tiles are there, and what do they look like 
 
+(require Tsuro/Code/Common/port-alphabetic) #;(require Tsuro/Code/Common/port-digits)
 (require Tsuro/Code/Lib/or)
 (require Tsuro/Code/Lib/finder)
 (require pict)
@@ -32,7 +34,8 @@
     +---|----|---+
         5    4
 
-   Each labeled line crossing a border is a _port_.
+   Each labeled line crossing a border is a _port_. Ports can be called anything; see port-signature. 
+
    A complete configuration connects four pairs of disttinct ports with each other:
 
     +---|----|---+    
@@ -54,8 +57,6 @@
    |   |    |   |
    +---|----|---+
 |#
-
-(define PORTS (build-list 8 identity))
 
 #; {Port   = [0 .. 7]}
 #; {Config = [config [List Edge Edge Edge Edge]]
@@ -79,22 +80,17 @@
 
 #; {Configuration -> Configuration}
 (define (rotate c0)
-  (match-define (configuration (list e1 e2 e3 e4)) c0)
-  (create-configuration (map rotate-edge (list e1 e2 e3 e4))))
+  (create-configuration (map rotate-edge (configuration-lo4edges c0))))
 
 #; {[List Edge Edge Edge Edge] -> Configuration}
 (define (create-configuration edges)
-  (configuration (sort edges < #:key edge-from)))
+  (configuration (sort edges <-port #:key edge-from)))
 
 #; {Edge -> Edge}
 (define (rotate-edge e)
   (define 90from (90degrees (edge-from e)))
   (define 90to   (90degrees (edge-to e)))
-  (if (< 90from 90to) (edge 90from 90to) (edge 90to 90from)))
-
-#; {Port -> Port}
-(define (90degrees x)
-  (modulo (+ x 2) 8))
+  (if (<-port 90from 90to) (edge 90from 90to) (edge 90to 90from)))
 
 (struct configuration [lo4edges]
   #:transparent
@@ -103,43 +99,28 @@
    (define hash-proc  (λ _ 42))  ;; consistent with equal 
    (define hash2-proc (λ _ 42))])
 
-; (struct edge (from to) #:transparent)
+#; {simulate (struct edge (from to) #:prefab)}
 (define edge list)
 (define edge-from first)
 (define edge-to second)
 
-;; ---------------------------------------------------------------------------------------------------
-;; generate all unique tlle configurations
+;; two unique examples
+(define one-from (map index->port '(0 2 4 6)))
+(define one-to   (map index->port '(1 3 5 7)))
+(define one (configuration (map list one-from one-to)))
 
-;; see https://math.stackexchange.com/questions/1088313/how-many-different-tsuro-tiles-can-exist
-;; for a group-theoretic justification of this number 
-;; see https://en.wikipedia.org/wiki/Group_(mathematics)#Second_example:_a_symmetry_group
-;; for some basic background on symmetric groups (which is what these tiles are called)
+(define two-from (map index->port '(0 1 2 4)))
+(define two-to   (map index->port '(6 7 3 5)))
+(define two (configuration (map list two-from two-to)))
 
-#; {-> [Setof Config]}
-;; create the set of distinnct tile configurations 
-(define (all-configs)
-  #; {[Listof Port] -> [Setof Config]}
-  ;; for the given 2 * N ports, sorted in ascending order, create partial with N edges
-  ;; GENERATIVE by removing 2 ports, we get closer to the empty case 
-  (define (all ports)
-    (cond
-      [(empty? ports) '(())]
-      [else
-       (define head (first ports))
-       (define tail (rest ports))
-       (append-map (λ (next) (map (curry cons (edge head next)) (all (remove next tail)))) tail)]))
-  
-  (for/set ((lc (all PORTS)))
-    (configuration lc)))
+(define 90two-from (map index->port '(0 1 4 6)))
+(define 90two-to   (map index->port '(2 3 5 7)))
+(define 90two (configuration (map list 90two-from 90two-to)))
 
-(define all-tile-types (all-configs))
+(equal? 90two two)
 
-(unless (= (set-count all-tile-types) 35)
-  (error 'tiles "wrong number of tiles generated: ~a" (set-count all-tile-types)))
-
-(define one (set-first all-tile-types))
-(define two (set-first (set-rest all-tile-types)))
+90two
+two
 
 ;; ---------------------------------------------------------------------------------------------------
 ;; converting a configuration into a pict: make every size depend on the TILE-SIZE
@@ -176,8 +157,8 @@
 (define (configuration->pict c0)
   (define-values (sq dots) (make-tile-with-ports))
   (for/fold ((sq sq)) ((edge (configuration-lo4edges c0)) (color EDGE-COLORS))
-    (define from (edge-from edge))
-    (define to   (edge-to edge))
+    (define from (port->index (edge-from edge)))
+    (define to   (port->index (edge-to edge)))
     (define dot1 (list-ref dots from))
     (define dot2 (list-ref dots to))
     (pin-curve sq dot1 dot2 color)))
@@ -208,7 +189,11 @@
     (values (pin-over sq x y dot) (cons dot dots))))
 
 ;; ---------------------------------------------------------------------------------------------------
-;; visualize 
+;; visualize
+#;
 (vc-append 
  (apply hc-append (map (λ (c) (scale (configuration->pict c) 3.0)) (list one two one)))
  (apply hc-append (map (λ (c) (scale (configuration->pict c) 3.0)) (list one two one))))
+
+
+(map (λ (c) (scale (configuration->pict c) 3.0)) (list two 90two))
