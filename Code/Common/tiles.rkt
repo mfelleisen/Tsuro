@@ -22,10 +22,26 @@
         5    4
 
    Each labeled line crossing a border is a _port_.
-   A complete configuration connects four pairs of disttinct ports with each other.
+   A complete configuration connects four pairs of disttinct ports with each other:
 
+    +---|----|---+    
+    |  /     |   |    
+    --      +-----    
+    |      / |   |    
+    ------/--|----    
+    |    /   |   |    
+    +---|----|---+    
+   
    When two tile configurations are the same after a rotation of 90, 180, or 270 degrees,
-   they are considered equivalent. 
+   they are considered equivalent. Here is a 90 degree rotation of the above configuration: 
+
+   +---|----|---+
+   |   |     \  |
+   ----|-      --
+   |   |  \     |
+   ----|---\-----
+   |   |    |   |
+   +---|----|---+
 |#
 
 (define PORTS (build-list 8 identity))
