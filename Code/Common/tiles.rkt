@@ -2,7 +2,7 @@
 
 ;; how many unique tiles are there, and what do they look like 
 
-(require Tsuro/Lib/or)
+(require Tsuro/Code/Lib/or)
 
 ;; ---------------------------------------------------------------------------------------------------
 ;; data representation of tiles
@@ -35,7 +35,7 @@
            where
            (1) every Port occurs once and no Port occurs twice
            (2) the four Edges are sorted according in ascending order according to their from Port}
-#; {Edge   = (edge Port Port)
+#; {Edge   = (list Port Port)
            where
            (*) the first Port is strictly smaller than the second}
 
@@ -61,9 +61,8 @@
 
 #; {Edge -> Edge}
 (define (rotate-edge e)
-  (match-define (edge from to) e)
-  (define 90from (90degrees from))
-  (define 90to   (90degrees to))
+  (define 90from (90degrees (edge-from e)))
+  (define 90to   (90degrees (edge-to e)))
   (if (< 90from 90to) (edge 90from 90to) (edge 90to 90from)))
 
 #; {Port -> Port}
@@ -77,7 +76,10 @@
    (define hash-proc  (λ _ 42))  ;; consistent with equal 
    (define hash2-proc (λ _ 42))])
 
-(struct edge (from to) #:transparent)
+; (struct edge (from to) #:transparent)
+(define edge list)
+(define edge-from first)
+(define edge-to second)
 
 ;; ---------------------------------------------------------------------------------------------------
 ;; generate all unique tlle configurations
@@ -134,13 +136,32 @@
 
 #; {Configuration -> Pict}
 (define (configuration->pict c0)
-  (match-define (configuration (list (edge a b) (edge c d) (edge e f) (edge g h))) c0)
   (define-values (sq dots) (make-tile-with-ports))
-  (for/fold ((sq sq)) ((from-to (list (list a b) (list c d) (list e f) (list g h))))
-    (match-define `(,from ,to) from-to)
+  (for/fold ((sq sq)) ((edge (configuration-lo4edges c0)))
+    (define from (edge-from edge))
+    (define to   (edge-to edge))
     (define dot1 (list-ref dots from))
     (define dot2 (list-ref dots to))
-    (pin-line sq dot1 cc-find dot2 cc-find #:color "blue")))
+    (pin-curve sq dot1 dot2)))
+
+(define (d+ pict sub-pict finder dx dy)
+  (define-values (x y) (finder pict sub-pict))
+  (values (+ dx x) (+ dy y)))
+
+#; {Pict Pict Pict -> Pict}
+(define (pin-curve sq dot1 dot2)
+  (cc-superimpose sq
+                  (dc (λ (dc dx dy)
+                        (define-values (x1 y1) (d+ sq dot1 cc-find dx dy))
+                        (define-values (x2 y2) (d+ sq dot2 cc-find dx dy))
+                        (define-values (xc yc) (d+ sq sq cc-find dx dy))
+                        (define old-pen (send dc get-pen))
+                        ;; ------------------------------------------------------------------
+                        (send dc set-pen (new pen% [width 3] [color "blue"]))
+                        (send dc draw-spline x1 y1 xc yc x2 y2)
+                        ;; ------------------------------------------------------------------
+                        (send dc set-pen old-pen))
+                      TILE-WIDTH TILE-HEIGHT)))
 
 #; {-> (values Pict [Listof Pict])}
 ;; compute the tile with unique port points 
@@ -163,17 +184,19 @@
   (define loc:pict (for/list ((c (in-set soc:config))) (scale (configuration->pict c) 1.0)))
   (define one (colorize (first loc:pict) "red"))  (draw-pict one dc 10 150)
   (define two (colorize (second loc:pict) "red")) (draw-pict one dc (- WIDTH TILE-WIDTH 10) 150)
-  (let loop ([l loc:pict][i 0][x INSET][y INSET])
-    (unless (empty? l)
-      (draw-pict (first l) dc x y)
-      (define x-next (+ x TILE-WIDTH))
-      (if (< i 9)
-          (loop (rest l) (+ i 1) x-next y)
-          (loop (rest l) 0       INSET  (+ y TILE-HEIGHT))))))
+  (define full
+    (let loop ([l loc:pict][n (length loc:pict)])
+      (cond
+        [(< n 9) (apply hc-append l)]
+        [else (vl-append (apply hc-append (take l 10)) (loop (drop l 10) (- n 10)))])))
+  (draw-pict full dc INSET INSET))
 
-(define frame (new frame% [label "hello"][width WIDTH][height HEIGHT]))
-(define canvas
-  (new canvas%
-       [parent frame]
-       [paint-callback (λ (e dc) (draw-tiles all-tile-types dc))]))
-(send frame show #t)
+(define (main)
+  (define frame (new frame% [label "hello"][width WIDTH][height HEIGHT]))
+  (define canvas
+    (new canvas%
+         [parent frame]
+         [paint-callback (λ (e dc) (draw-tiles all-tile-types dc))]))
+  (send frame show #t))
+
+(main)
