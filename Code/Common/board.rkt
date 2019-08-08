@@ -33,6 +33,24 @@
 (struct next [port x y] #:transparent)
 
 ;; ---------------------------------------------------------------------------------------------------
+;; data examples
+
+(define matrix0
+  (build-matrix 20 20
+                (lambda (i j)
+                  (node (if (= i 0) 'wall 'open)
+                        (if (= j 0) 'wall 'open)))))
+
+(define matrix3
+  (let* ([m matrix0]
+         [m (matrix-set m 0 0 (node configuration1 (create-portmap 0 0)))]
+         [m (matrix-set m 0 2 (node configuration2 (create-portmap 0 2)))]
+         [m (matrix-set m 2 0 (node 90configuration2 (create-portmap 2 0)))])
+    m))
+(define players3 `(,(player 2 0 0) ,(player 3 0 2) ,(player 3 2 0)))
+(define init-board-3-players (board matrix3 players3))
+
+;; ---------------------------------------------------------------------------------------------------
 ;; initialize a board from a list of (initial) Placements0
 #; { [Listof Placement0] -> Board }
 (define (initialize lo-placements)
@@ -43,29 +61,14 @@
       (matrix-set m x y (node c (create-portmap x y)))))
   (board matrix players))
 
-(define matrix0
-  (build-matrix 20 20
-                (lambda (i j)
-                  (node (if (= i 0) 'wall 'open)
-                        (if (= j 0) 'wall 'open)))))
-
 (module+ test
   (define 00-tile (node configuration1 (create-portmap 0 0)))
   (define matrix1 (matrix-set matrix0 0 0 00-tile))
 
   (check-equal? (initialize (list (list configuration1 2 0 0))) (board matrix1 (list (player 2 0 0))))
   
-  (define matrix2
-    (let* ([m matrix1]
-           [m (matrix-set m 0 2 (node configuration2 (create-portmap 0 2)))]
-           [m (matrix-set m 2 0 (node 90configuration2 (create-portmap 2 0)))])
-      m))
-  (define inits2
-    `((,configuration1 2 0 0)
-      (,configuration2 3 0 2)
-      (,90configuration2 3 2 0)))
-  (define players2 `(,(player 2 0 0) ,(player 3 0 2) ,(player 3 2 0)))
-  (check-equal? (initialize inits2) (board matrix2 players2)))
+  (define inits2 `((,configuration1 2 0 0) (,configuration2 3 0 2) (,90configuration2 3 2 0)))
+  (check-equal? (initialize inits2) init-board-3-players))
 
 ;; ---------------------------------------------------------------------------------------------------
 ;; create a portmap for the given indicies 
@@ -91,6 +94,8 @@
     [(n (?? SIZE))         any-south ]
     [(n k)                 any-any   ]))
 
+;; ---------------- ports:   0     1     2     3     4     5     6     7 ---
+;;                            north       east        south       west  
 [define west-north (vector ----- ----- |   | |   | |   | |   | ----- -----)]
 [define west-south (vector |   | |   | |   | |   | ----- ----- ----- -----)]
 [define east-north (vector ----- ----- ----- ----- |   | |   | |   | |   |)]
