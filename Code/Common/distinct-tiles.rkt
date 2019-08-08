@@ -1,5 +1,7 @@
 #lang racket
 
+;; determine the set of unique Tsuro tiles 
+
 (provide
  all-tile-types)
 
