@@ -2,8 +2,22 @@
 
 ;; a data representation for game boards, plus basic functions for manipulating them
 
+;; TODO
+;; - render a board as a pict
+;; - factor out matrix, in case it needs to be replaced 
+;; - add configured tile T for player P: find place, revise portmap, move all players
+
+;; safety
+;; - contract for initialize and add?
+
+;; legality checks: 
+;; - determine whether the addition of a tile for a player P forces P to commit suicide
+;; - determine whether the addition of a tile adds a cyclic path 
+
 (provide
- ;; type Board 
+ ;; type Board
+
+ #; {-> Board}
  init-board-3-players
 
  #; {Placement0 = [List Configuration PortIndex Index Index]
@@ -17,8 +31,14 @@
 
 ;; ---------------------------------------------------------------------------------------------------
 (require Tsuro/Code/Common/tiles)
+(require Tsuro/Code/Common/port-alphabetic)
+(require Tsuro/Code/Lib/or)
 (require htdp/matrix)
-(module+ test (require rackunit))
+(require pict)
+
+(module+ test
+  (require rackunit)
+  (require racket/gui))
 
 ;; ---------------------------------------------------------------------------------------------------
 ;; data representation of the game board 
@@ -28,9 +48,11 @@
 (define WALL 'wall)
 (define OPEN 'open)
 
+(define BLANK #false)
+
 #; {Board   = (board [Matrixof Node] [Listof Player])}
 #; {Player  = (player String p x y)}
-#; {Node    = (node Tile PortMap)}
+#; {Node    = (U False (node Tile PortMap))}
 #; {PortMap = (Vectorof Connect) :: [Port ->f Connect]}
 #; {Connect = (connect Next Next)}
 #; {Next    = (U WALL OPEN (next Port Index Index))}
@@ -45,11 +67,9 @@
 ;; ---------------------------------------------------------------------------------------------------
 ;; data examples
 
-(define matrix0
-  (build-matrix 20 20
-                (lambda (i j)
-                  (node (if (= i 0) 'wall 'open)
-                        (if (= j 0) 'wall 'open)))))
+(define matrix0 (build-matrix SIZE SIZE (λ (_i _j) BLANK)))
+
+(match-define `(,p2 ,p3) (map index->port '(2 3)))
 
 (define (init-board-3-players)
   (define matrix3
@@ -58,8 +78,61 @@
            [m (matrix-set m 0 2 (node configuration2 (create-portmap 0 2)))]
            [m (matrix-set m 2 0 (node 90configuration2 (create-portmap 2 0)))])
       m))
-  (define players3 `(,(player "red" 2 0 0) ,(player "white" 3 0 2) ,(player "blue" 3 2 0)))
+  (define players3 `(,(player "red" p2 0 0) ,(player "white" p3 0 2) ,(player "blue" p3 2 0)))
   (board matrix3 players3))
+
+;; ---------------------------------------------------------------------------------------------------
+;; drawing all tiles in a set into a drawing context
+
+(define PLAYER-SIZE (quotient TILE-SIZE 5)) 
+
+(define INSET  (+ 20 TILE-SIZE))
+(define WIDTH  (+ INSET (* 10 TILE-SIZE) INSET))
+(define HEIGHT (+ INSET (* 10 TILE-SIZE) INSET))
+
+#; {Board (Instanceof DC<%>) -> Pict}
+(define (draw-board b dc)
+  (match-define (board nodes players) b)
+  (define board-as-pict
+    (let loop ([l (matrix->rectangle nodes)][y 0])
+      (cond
+        [(empty? l) (blank)]
+        [else
+         (define row (first l))
+         (define picts
+           (for/list ((n row) (x (in-naturals)))
+             (define config   (or (and n (node-tile n)) blank-tile))
+             (define pict     (configuration->pict config))
+             (define p-on-x-y (is-player-on players x y))
+             (cond
+               [(boolean? p-on-x-y) pict]
+               [else
+                (define color (player-name p-on-x-y))
+                (define port  (player-port p-on-x-y))
+                (add-player pict (jack-o-lantern PLAYER-SIZE color) port)])))
+         (vl-append (apply hc-append picts) (loop (rest l) (+ y 1)))])))
+  (draw-pict board-as-pict dc INSET INSET))
+
+#; {[Listof Player] Natural Natural -> (U False Player)}
+(define (is-player-on players x y)
+  (define p (memf (λ (p) (match-define (player _ _ x0 y0) p) (and (= x x0) (= y y0))) players))
+  (if (boolean? p) p (first p)))
+  
+
+#; {PortIndex Natural Natural -> (values Natural Natural)}
+(define (logical-coordinates->geometry port x y)
+  (values (* x TILE-SIZE)) (* TILE-SIZE y))
+
+(module+ test
+  
+  (define frame (new frame% [label "hello"][width WIDTH][height HEIGHT]))
+  
+  (define canvas
+    (new canvas%
+         [parent frame]
+         [paint-callback (λ (e dc) (draw-board (init-board-3-players) dc))]))
+  
+  (send frame show #t))
 
 ;; ---------------------------------------------------------------------------------------------------
 ;; initialize a board from a list of (initial) Placements0
@@ -79,7 +152,9 @@
   (check-equal? (initialize `((,configuration1 "x" 2 0 0))) (board matrix1 `(,(player "x" 2 0 0))))
   
   (define inits2
-    `((,configuration1 "red" 2 0 0) (,configuration2 "white" 3 0 2) (,90configuration2 "blue" 3 2 0)))
+    `((,configuration1 "red" ,p2 0 0)
+      (,configuration2 "white" ,p3 0 2)
+      (,90configuration2 "blue" ,p3 2 0)))
   (check-equal? (initialize inits2) (init-board-3-players)))
 
 ;; ---------------------------------------------------------------------------------------------------
