@@ -1,6 +1,21 @@
 #lang racket
 
+;; a data representation for game boards, plus basic functions for manipulating them
 
+(provide
+ ;; type Board 
+ init-board-3-players
+
+ #; {Placement0 = [List Configuration PortIndex Index Index]
+                where (list c p x y) must satisfy the following conditions: 
+                1. (x,y) must describe a position at the periphery of the board 
+                2. p must be a port that faces an empty square}
+
+ #; { [Listof Placement0] -> Board }
+ initialize)
+
+
+;; ---------------------------------------------------------------------------------------------------
 (require Tsuro/Code/Common/tiles)
 (require htdp/matrix)
 (module+ test (require rackunit))
@@ -14,20 +29,15 @@
 (define OPEN 'open)
 
 #; {Board   = (board [Matrixof Node] [Listof Player])}
-#; {Player  = (player p x y)}
+#; {Player  = (player String p x y)}
 #; {Node    = (node Tile PortMap)}
 #; {PortMap = (Vectorof Connect) :: [Port ->f Connect]}
 #; {Connect = (connect Next Next)}
 #; {Next    = (U WALL OPEN (next Port Index Index))}
 #; {Index   = [0 .. SIZE]}
 
-#; {Placement0 = [List Configuration PortIndex Index Index]
-               where (list c p x y) must satisfy the following conditions: 
-               1. (x,y) must describe a position at the periphery of the board 
-               2. p must be a port that faces an empty square}
-
 (struct board [nodes players] #:transparent)
-(struct player [port x y] #:transparent)
+(struct player [name port x y] #:transparent)
 (struct node [tile map] #:transparent)
 (struct connect [one two] #:transparent)
 (struct next [port x y] #:transparent)
@@ -41,23 +51,24 @@
                   (node (if (= i 0) 'wall 'open)
                         (if (= j 0) 'wall 'open)))))
 
-(define matrix3
-  (let* ([m matrix0]
-         [m (matrix-set m 0 0 (node configuration1 (create-portmap 0 0)))]
-         [m (matrix-set m 0 2 (node configuration2 (create-portmap 0 2)))]
-         [m (matrix-set m 2 0 (node 90configuration2 (create-portmap 2 0)))])
-    m))
-(define players3 `(,(player 2 0 0) ,(player 3 0 2) ,(player 3 2 0)))
-(define init-board-3-players (board matrix3 players3))
+(define (init-board-3-players)
+  (define matrix3
+    (let* ([m matrix0]
+           [m (matrix-set m 0 0 (node configuration1 (create-portmap 0 0)))]
+           [m (matrix-set m 0 2 (node configuration2 (create-portmap 0 2)))]
+           [m (matrix-set m 2 0 (node 90configuration2 (create-portmap 2 0)))])
+      m))
+  (define players3 `(,(player "red" 2 0 0) ,(player "white" 3 0 2) ,(player "blue" 3 2 0)))
+  (board matrix3 players3))
 
 ;; ---------------------------------------------------------------------------------------------------
 ;; initialize a board from a list of (initial) Placements0
-#; { [Listof Placement0] -> Board }
+
 (define (initialize lo-placements)
   (define players (for/list ([p lo-placements]) (apply player (rest p))))
   (define matrix
     (for/fold ((m matrix0)) ((p lo-placements))
-      (match-define `(,c ,_ ,x ,y) p)
+      (match-define `(,c ,_  ,_ ,x ,y) p)
       (matrix-set m x y (node c (create-portmap x y)))))
   (board matrix players))
 
@@ -65,13 +76,14 @@
   (define 00-tile (node configuration1 (create-portmap 0 0)))
   (define matrix1 (matrix-set matrix0 0 0 00-tile))
 
-  (check-equal? (initialize (list (list configuration1 2 0 0))) (board matrix1 (list (player 2 0 0))))
+  (check-equal? (initialize `((,configuration1 "x" 2 0 0))) (board matrix1 `(,(player "x" 2 0 0))))
   
-  (define inits2 `((,configuration1 2 0 0) (,configuration2 3 0 2) (,90configuration2 3 2 0)))
-  (check-equal? (initialize inits2) init-board-3-players))
+  (define inits2
+    `((,configuration1 "red" 2 0 0) (,configuration2 "white" 3 0 2) (,90configuration2 "blue" 3 2 0)))
+  (check-equal? (initialize inits2) (init-board-3-players)))
 
 ;; ---------------------------------------------------------------------------------------------------
-;; create a portmap for the given indicies 
+;; create an initial portmap for the given indicies 
 #; { Index Index -> PortMap }
 
 (define-match-expander ??
