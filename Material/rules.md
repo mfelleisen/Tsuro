@@ -19,7 +19,7 @@ placed.
 A _player avatar_ is a token that represents a player. 
 
 An _occupied tile_ is a configured tile on the game board with an avatar on
-a port that borders an empty game-board square.
+a port. 
 
 ### The Goal of the Game 
 
@@ -28,10 +28,15 @@ the game board.
 
 ### Starting the Game 
 
+The board is initially empty. 
+
 Each player, starting with the oldest one, places one occupied tile on the
-empty board. The tiles must border empty squares. As soon as a player adds
-an occupied tile on the board, the other players find out where this tile
-has been placed. 
+board. The tile must touch the periphery of the board on at least one side
+and empty squares on the others. The occupied port must face an empty board
+square.
+
+As soon as a player adds an initial tile to the board, the other players
+find out where this tile has been placed.
 
 ### Playing A Turn 
 
@@ -41,7 +46,7 @@ avatar's port on the currently occupied tile to another port on the new
 tile and, perhaps transitively, to already placed tiles that border the new
 tile.  The avatar is moved as far as possible until 
 
- - it gets to a port on a tile that is on a border to an empty square 
+ - it gets to a port on a tile that is on a border to an empty board square 
  - it reaches the periphery of the game board, in which case it is eliminated. 
 
 ### Scoring a Game 
