@@ -19,4 +19,7 @@
 
       #; {Port -> Port}
       ;; rotate a port by 90 degrees
-      90degrees)))
+      90degrees
+
+      #; {Port -> Port}
+      facing-port)))
