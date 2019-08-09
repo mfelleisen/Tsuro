@@ -122,7 +122,7 @@
   (define node3   (node configuration2 (update-portmap board3 1 0)))
   (define player3 "red")
 
-  (define *pm0 (create-portmap 1 0)) ;; DISCOVERY: vectors are shared 
+  m(define *pm0 (create-portmap 1 0)) m
   (vector-set! *pm0 2 (connect (next 6 2 0) (next 3 1 0))) ;; DISCOVERY: ports always connect to SELF tile 
   (vector-set! *pm0 3 (connect WALL WALL))
   *pm0
@@ -173,41 +173,41 @@
 
 (define (create-portmap x y)
   (match* (x y)
-    [(0  0)                west-north]
-    [(0 (?? SIZE))         west-south]
-    [((?? SIZE) 0)         east-north]
-    [((?? SIZE) (?? SIZE)) east-south]
-    [(0  n)                west-any  ]
-    [((?? SIZE) n)         east-any  ]
-    [(n 0)                 any-north ]
-    [(n (?? SIZE))         any-south ]
-    [(n k)                 any-any   ]))
+    [(0  0)                (west-north)]
+    [(0 (?? SIZE))         (west-south)]
+    [((?? SIZE) 0)         (east-north)]
+    [((?? SIZE) (?? SIZE)) (east-south)]
+    [(0  n)                (west-any)  ]
+    [((?? SIZE) n)         (east-any)  ]
+    [(n 0)                 (any-north) ]
+    [(n (?? SIZE))         (any-south) ]
+    [(n k)                 (any-any)   ]))
 
 ;; ---------------- ports:   0     1     2     3     4     5     6     7 ---
 ;;                            north       east        south       west  
-[define west-north (vector ----- ----- |   | |   | |   | |   | ----- -----)]
-[define west-south (vector |   | |   | |   | |   | ----- ----- ----- -----)]
-[define east-north (vector ----- ----- ----- ----- |   | |   | |   | |   |)]
-[define east-south (vector |   | |   | ----- ----- ----- ----- |   | |   |)]
-[define west-any   (vector |   | |   | |   | |   | |   | |   | ----- -----)]
-[define east-any   (vector |   | |   | ----- ----- |   | |   | |   | |   |)]
-[define any-north  (vector ----- ----- |   | |   | |   | |   | |   | |   |)]
-[define any-south  (vector |   | |   | |   | |   | ----- ----- |   | |   |)]
-[define any-any    (vector |   | |   | |   | |   | |   | |   | |   | |   |)]
+[define (west-north) (vector ----- ----- |   | |   | |   | |   | ----- -----)]
+[define (west-south) (vector |   | |   | |   | |   | ----- ----- ----- -----)]
+[define (east-north) (vector ----- ----- ----- ----- |   | |   | |   | |   |)]
+[define (east-south) (vector |   | |   | ----- ----- ----- ----- |   | |   |)]
+[define (west-any)   (vector |   | |   | |   | |   | |   | |   | ----- -----)]
+[define (east-any)   (vector |   | |   | ----- ----- |   | |   | |   | |   |)]
+[define (any-north)  (vector ----- ----- |   | |   | |   | |   | |   | |   |)]
+[define (any-south)  (vector |   | |   | |   | |   | ----- ----- |   | |   |)]
+[define (any-any)    (vector |   | |   | |   | |   | |   | |   | |   | |   |)]
     
 (module+ test
   (define s-1 (- SIZE 1))
   (define ran (λ () (+ (random (- SIZE 2)) 1))) ;; in [1,s-1)
 
-  (check-equal? (create-portmap 0     0   )  west-north)
-  (check-equal? (create-portmap 0     s-1)   west-south)
-  (check-equal? (create-portmap s-1   0)     east-north)
-  (check-equal? (create-portmap s-1   s-1)   east-south)
-  (check-equal? (create-portmap 0     (ran)) west-any)
-  (check-equal? (create-portmap s-1   (ran)) east-any)
-  (check-equal? (create-portmap (ran) 0)     any-north)
-  (check-equal? (create-portmap (ran) s-1)   any-south)
-  (check-equal? (create-portmap (ran) (ran)) any-any))
+  (check-equal? (create-portmap 0     0   )  (west-north))
+  (check-equal? (create-portmap 0     s-1)   (west-south))
+  (check-equal? (create-portmap s-1   0)     (east-north))
+  (check-equal? (create-portmap s-1   s-1)   (east-south))
+  (check-equal? (create-portmap 0     (ran)) (west-any))
+  (check-equal? (create-portmap s-1   (ran)) (east-any))
+  (check-equal? (create-portmap (ran) 0)     (any-north))
+  (check-equal? (create-portmap (ran) s-1)   (any-south))
+  (check-equal? (create-portmap (ran) (ran)) (any-any)))
 
 ;; ---------------------------------------------------------------------------------------------------
 ;; drawing all tiles in a set into a drawing context
