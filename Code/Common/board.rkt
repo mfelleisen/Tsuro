@@ -69,71 +69,50 @@
 
 (define matrix0 (build-matrix SIZE SIZE (λ (_i _j) BLANK)))
 
-(match-define `(,p2 ,p3) (map index->port '(2 3)))
+(match-define `(,p2 ,p3 ,p4) (map index->port '(2 3 4)))
 
 (define (init-board-3-players)
   (define matrix3
     (let* ([m matrix0]
            [m (matrix-set m 0 0 (node configuration1 (create-portmap 0 0)))]
-           [m (matrix-set m 0 2 (node configuration2 (create-portmap 0 2)))]
-           [m (matrix-set m 2 0 (node 90configuration2 (create-portmap 2 0)))])
+           [m (matrix-set m 2 0 (node configuration1 (create-portmap 0 2)))]
+           [m (matrix-set m 0 2 (node 90configuration2 (create-portmap 2 0)))])
       m))
-  (define players3 `(,(player "red" p2 0 0) ,(player "white" p3 0 2) ,(player "blue" p3 2 0)))
+  (define players3 `(,(player "red" p2 0 0) ,(player "white" p3 0 2) ,(player "blue" p4 2 0)))
   (board matrix3 players3))
 
 ;; ---------------------------------------------------------------------------------------------------
-;; drawing all tiles in a set into a drawing context
+;; adding a tile T for a player P
 
-(define PLAYER-SIZE (quotient TILE-SIZE 5)) 
+#; {Board PlayerName Configuration -> Board}
+;; assume p is on (board-players b)
+(define (add-tile b t p)
+  (match-define (player _ port x y) (first (memf (finder p) (board-players b))))
+  (define-values (x-new y-new) (looking-at port x y))
+  b)
 
-(define INSET  (+ 20 TILE-SIZE))
-(define WIDTH  (+ INSET (* 10 TILE-SIZE) INSET))
-(define HEIGHT (+ INSET (* 10 TILE-SIZE) INSET))
+#; {PlayerName -> (Player -> Boolean)}
+(define (finder p)
+  (compose (curry equal? p) player-name))
 
-#; {Board (Instanceof DC<%>) -> Pict}
-(define (draw-board b dc)
-  (match-define (board nodes players) b)
-  (define board-as-pict
-    (let loop ([l (matrix->rectangle nodes)][y 0])
-      (cond
-        [(empty? l) (blank)]
-        [else
-         (define row (first l))
-         (define picts
-           (for/list ((n row) (x (in-naturals)))
-             (define config   (or (and n (node-tile n)) blank-tile))
-             (define pict     (configuration->pict config))
-             (define p-on-x-y (is-player-on players x y))
-             (cond
-               [(boolean? p-on-x-y) pict]
-               [else
-                (define color (player-name p-on-x-y))
-                (define port  (player-port p-on-x-y))
-                (add-player pict (jack-o-lantern PLAYER-SIZE color) port)])))
-         (vl-append (apply hc-append picts) (loop (rest l) (+ y 1)))])))
-  (draw-pict board-as-pict dc INSET INSET))
-
-#; {[Listof Player] Natural Natural -> (U False Player)}
-(define (is-player-on players x y)
-  (define p (memf (λ (p) (match-define (player _ _ x0 y0) p) (and (= x x0) (= y y0))) players))
-  (if (boolean? p) p (first p)))
-  
-
-#; {PortIndex Natural Natural -> (values Natural Natural)}
-(define (logical-coordinates->geometry port x y)
-  (values (* x TILE-SIZE)) (* TILE-SIZE y))
+#; {Port Nat Nat -> (values Nat Nat)}
+(define (looking-at port x y)
+  (values x y))
 
 (module+ test
-  
-  (define frame (new frame% [label "hello"][width WIDTH][height HEIGHT]))
-  
-  (define canvas
-    (new canvas%
-         [parent frame]
-         [paint-callback (λ (e dc) (draw-board (init-board-3-players) dc))]))
-  
-  (send frame show #t))
 
+  ;; given 
+  (define board3  (init-board-3-players))
+  (define node3   (node configuration2 (create-portmap 1 0)))
+  (define player3 "red")
+
+  ;; expected 
+  (define matrix3    (matrix-set (board-nodes board3) 0 1 node3))
+  (define players3   (remf (finder player3) (board-players board3)))
+  (define board3-red (board matrix3 players3))
+  
+  (check-equal? (add-tile board3 node3 player3) board3-red "drive red player off"))
+  
 ;; ---------------------------------------------------------------------------------------------------
 ;; initialize a board from a list of (initial) Placements0
 
@@ -142,7 +121,7 @@
   (define matrix
     (for/fold ((m matrix0)) ((p lo-placements))
       (match-define `(,c ,_  ,_ ,x ,y) p)
-      (matrix-set m x y (node c (create-portmap x y)))))
+      (matrix-set m y x (node c (create-portmap x y)))))
   (board matrix players))
 
 (module+ test
@@ -152,9 +131,9 @@
   (check-equal? (initialize `((,configuration1 "x" 2 0 0))) (board matrix1 `(,(player "x" 2 0 0))))
   
   (define inits2
-    `((,configuration1 "red" ,p2 0 0)
-      (,configuration2 "white" ,p3 0 2)
-      (,90configuration2 "blue" ,p3 2 0)))
+    `((,configuration1   "red"   ,p2 0 0)
+      (,configuration1   "white" ,p3 0 2)
+      (,90configuration2 "blue"  ,p4 2 0)))
   (check-equal? (initialize inits2) (init-board-3-players)))
 
 ;; ---------------------------------------------------------------------------------------------------
@@ -206,3 +185,60 @@
   (check-equal? (create-portmap (ran) 0)     any-north)
   (check-equal? (create-portmap (ran) s-1)   any-south)
   (check-equal? (create-portmap (ran) (ran)) any-any))
+
+;; ---------------------------------------------------------------------------------------------------
+;; drawing all tiles in a set into a drawing context
+
+(define PLAYER-SIZE (quotient TILE-SIZE 5)) 
+
+(define INSET  (+ 20 TILE-SIZE))
+(define WIDTH  (+ INSET (* 10 TILE-SIZE) INSET))
+(define HEIGHT (+ INSET (* 10 TILE-SIZE) INSET))
+
+#; {Board (Instanceof DC<%>) -> Pict}
+(define (draw-board b dc)
+  (match-define (board nodes players) b)
+  (define board-as-pict
+    (let loop ([l (matrix->rectangle nodes)][y 0])
+      (cond
+        [(empty? l) (blank)]
+        [else
+         (define row (first l))
+         (define picts
+           (for/list ((n row) (x (in-naturals)))
+             (define config   (or (and n (node-tile n)) blank-tile))
+             (define pict     (configuration->pict config))
+             (define p-on-x-y (is-player-on players x y))
+             (cond
+               [(boolean? p-on-x-y) pict]
+               [else
+                (define color (player-name p-on-x-y))
+                (define port  (player-port p-on-x-y))
+                (add-player pict (jack-o-lantern PLAYER-SIZE color) port)])))
+         (vl-append (apply hc-append picts) (loop (rest l) (+ y 1)))])))
+  (draw-pict board-as-pict dc INSET INSET))
+
+#; {[Listof Player] Natural Natural -> (U False Player)}
+(define (is-player-on players x y)
+  (define p (memf (λ (p) (match-define (player _ _ x0 y0) p) (and (= x x0) (= y y0))) players))
+  (if (boolean? p) p (first p)))
+  
+
+#; {PortIndex Natural Natural -> (values Natural Natural)}
+(define (logical-coordinates->geometry port x y)
+  (values (* x TILE-SIZE)) (* TILE-SIZE y))
+
+(module+ test
+
+  (define (main init-board-3-players)
+  (define frame (new frame% [label "hello"][width WIDTH][height HEIGHT]))
+  
+  (define canvas
+    (new canvas%
+         [parent frame]
+         [paint-callback (λ (e dc) (draw-board (init-board-3-players) dc))]))
+  
+  (send frame show #t))
+
+  (main init-board-3-players)
+  (main (λ () board3-red)))
