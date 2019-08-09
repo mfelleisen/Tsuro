@@ -88,27 +88,46 @@
 ;; ---------------------------------------------------------------------------------------------------
 ;; adding a tile T for a player P
 
-#; {Board PlayerName Configuration -> Board}
+#; {Board Configuration PlayerName -> Board}
 ;; assume p is on (board-players b)
-(define (add-tile b t p)
+;; the neighbor of p
+(define (add-tile b c p)
   (match-define (player _ port x y) (first (memf (finder p) (board-players b))))
   (define-values (x-new y-new) (looking-at port x y))
-  b)
+  (define new-nodes (matrix-set (board-nodes b) y-new x-new (node c (create-portmap x-new y-new))))
+  (board new-nodes (board-players b)))
+
+#; {Port Nat Nat -> (values Nat Nat)}
+(define (looking-at port x y)
+  (case (port->index port)
+    [(0 1) (values x (- y 1))]
+    [(2 3) (values (+ x 1) y)]
+    [(4 5) (values x (+ y 1))]
+    [(6 7) (values (- x 1) y)]))
+
+#; {Board Index Index -> Portmap}
+(define (update-portmap b x y)
+  (define pm0 (create-portmap x y))
+  pm0)
 
 #; {PlayerName -> (Player -> Boolean)}
 (define (finder p)
   (compose (curry equal? p) player-name))
 
-#; {Port Nat Nat -> (values Nat Nat)}
-(define (looking-at port x y)
-  (values x y))
-
 (module+ test
-
+  
   ;; given 
   (define board3  (init-board-3-players))
-  (define node3   (node configuration2 (create-portmap 1 0)))
+  (define pm3     (update-portmap board3 1 0))
+  (define node3   (node configuration2 (update-portmap board3 1 0)))
   (define player3 "red")
+
+  (define *pm0 (create-portmap 1 0)) ;; DISCOVERY: vectors are shared 
+  (vector-set! *pm0 2 (connect (next 6 2 0) (next 3 1 0))) ;; DISCOVERY: ports always connect to SELF tile 
+  (vector-set! *pm0 3 (connect WALL WALL))
+  *pm0
+  pm3
+  (check-equal? pm3 *pm0)
 
   ;; expected 
   (define matrix3    (matrix-set (board-nodes board3) 0 1 node3))
