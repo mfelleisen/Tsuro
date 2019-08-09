@@ -50,13 +50,17 @@
 
 (define BLANK #false)
 
-#; {Board   = (board [Matrixof Node] [Listof Player])}
+#; {Board   = (board Nodes* [Listof Player])}
 #; {Player  = (player String p x y)}
+#; {Nodes*  = [Matrixof Node] :: {Index x Index}}
+#; {Index   = [0 .. SIZE]}
 #; {Node    = (U False (node Tile PortMap))}
+
+;; the portmap tells us to which two nodes this node connects 
 #; {PortMap = (Vectorof Connect) :: [Port ->f Connect]}
 #; {Connect = (connect Next Next)}
 #; {Next    = (U WALL OPEN (next Port Index Index))}
-#; {Index   = [0 .. SIZE]}
+;; Wall means periphery of board, OPEN means no connection yet, a next denotes port on (x,y)
 
 (struct board [nodes players] #:transparent)
 (struct player [name port x y] #:transparent)
