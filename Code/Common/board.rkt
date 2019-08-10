@@ -31,7 +31,7 @@
 ;; ---------------------------------------------------------------------------------------------------
 (require Tsuro/Code/Common/tiles)
 (require Tsuro/Code/Common/port-alphabetic)
-(require htdp/matrix)
+(require Tsuro/Code/Common/matrix)
 (require pict)
 
 (module+ test
@@ -99,8 +99,8 @@
   (define boatd3
     (let* ([m the-empty-board]
            [m (matrix-set m 0 0 square-00)]
-           [m (matrix-set m 2 0 square-02)]
-           [m (matrix-set m 0 2 square-20)])
+           [m (matrix-set m 0 2 square-02)]
+           [m (matrix-set m 2 0 square-20)])
       m))
   (define players3 (map (λ (init) (apply player (rest init))) inits-for-board-3-players))
   (define the-board (state boatd3 players3))
@@ -152,20 +152,22 @@
 
 (define (add-new-square-update-neighbors board config x y)
   (define-values (x-n* y-n*) (neighbors* board x y))
-  (for/fold ((m (matrix-set board y x (create-square board config x y)))) ((x-n x-n*) (y-n y-n*))
-    (matrix-set m y-n x-n (update-square (matrix-ref m y-n x-n) x-n y-n x y))))
+  (for/fold ((m (matrix-set board x y (create-square board config x y)))) ((x-n x-n*) (y-n y-n*))
+    (matrix-set m x-n y-n (update-square (matrix-ref m x-n y-n) x-n y-n x y))))
 
 (module+ test
   (define nu-square  (create-square board-3-players config-to-be-added-to-board-with-3 1 0))
   (define nu-board (let* ([m board-3-players]
-                          [m (matrix-set m 0 1 nu-square)]
+                          [m (matrix-set m 1 0 nu-square)]
                           [m (matrix-set m 0 0 (update-square square-00 0 0 1 0))]
-                          [m (matrix-set m 0 2 (update-square square-20 2 0 1 0))])
+                          [m (matrix-set m 2 0 (update-square square-20 2 0 1 0))])
                      m))
   
   (check-equal?
-   (add-new-square-update-neighbors board-3-players config-to-be-added-to-board-with-3 1 0)
-   nu-board))
+   (matrix->rectangle 
+    (add-new-square-update-neighbors board-3-players config-to-be-added-to-board-with-3 1 0))
+   (matrix->rectangle 
+   nu-board)))
 
 ;; ---------------------------------------------------------------------------------------------------
 ;; creating and updatiing squares 
@@ -203,9 +205,9 @@
 (define (initialize lo-placements)
   (define players (for/list ([p lo-placements]) (apply player (rest p))))
   (define board
-    (for/fold ((m the-empty-board)) ((p lo-placements))
-      (match-define `(,c ,_  ,_ ,x ,y) p)
-      (matrix-set m y x (square c (create-portmap c x y)))))
+    (for/fold ((m the-empty-board)) ((place lo-placements))
+      (match-define `(,config ,_  ,_ ,x ,y) place)
+      (matrix-set m x y (square config (create-portmap config x y)))))
   (state board players))
 
 (module+ test
@@ -306,7 +308,7 @@
 (define (neighbors* board x y)
   (define all `((,x ,(- y 1)) (,x ,(+ y 1)) (,(- x 1) ,y) (,(+ x 1) ,y)))
   (define good-ones
-    (filter (match-lambda [`(,x ,y) (and (in-size x) (in-size y) (matrix-ref board y x))]) all))
+    (filter (match-lambda [`(,x ,y) (and (in-size x) (in-size y) (matrix-ref board x y))]) all))
   (values (map first good-ones) (map second good-ones)))
 
 
