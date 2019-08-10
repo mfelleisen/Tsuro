@@ -45,11 +45,13 @@
 
 ;; the game state itself 
 ;; ------------------------------------------------------------------
-#; {State  = (State Board [Listof Player])}
-#; {Player = (player String p x y)}
-#; {Board  = [Matrixof square] :: {Index x Index}}
-#; {Index  = [0 .. SIZE]}
-#; {Square = (U BLANK  ;; an unoccupied, blank square 
+#; {State   = (state Board Player*)}
+#; {Player* = [Listof Player]}
+#; {Player  = (player PlayerName p x y)}
+#; {PlayerName = String}
+#; {Board   = [Matrixof square] :: {Index x Index}}
+#; {Index   = [0 .. SIZE]}
+#; {Square  = (U BLANK                  ;; an unoccupied, blank square 
                 (square Tile PortMap))} ;; a configured tile with connections to neighbors cached 
 
 (struct state  [board players] #:transparent)
@@ -62,8 +64,8 @@
 #; {PortMap = (Vectorof Connect) :: [Port ->f Connect]}
 #; {Connect = (connect Next Next)}
 #; {Next    = (U
-               WALL      ;; periphery of board 
-               OPEN      ;; no neighboring tile yet 
+               WALL                      ;; periphery of board 
+               OPEN                      ;; no neighboring tile yet 
                (next Port Index Index))} ;; points to a port on this or a neigboring square 
 
 (struct connect [internal external] #:transparent)
@@ -79,18 +81,18 @@
 
 (match-define `(,port-2 ,port-3 ,port-4) (map index->port '(2 3 4)))
 
-(define player-00 "red")
-(define player-02 "white")
-(define player-20 "blue")
+(define player-red   "red")
+(define player-white "white")
+(define player-blue  "blue")
 
 (define config-00 configuration1)
 (define config-02 configuration1)
 (define config-20 90configuration2)
 
 (define inits-for-board-3-players
-  `((,config-00 ,player-00 ,port-2 0 0)
-    (,config-02 ,player-02 ,port-3 0 2)
-    (,config-20 ,player-20 ,port-4 2 0)))
+  `((,config-00 ,player-red   ,port-2 0 0)
+    (,config-02 ,player-white ,port-3 0 2)
+    (,config-20 ,player-blue  ,port-4 2 0)))
 
 (define 3players (map (λ (init) (apply player (rest init))) inits-for-board-3-players))
 (define red-player (first 3players))
@@ -113,7 +115,26 @@
 (module+ test ;; additional data samples 
   (define-values (state-3-players square-00 square-02 square-20) (state-with-3-players #:with #true))
   (define board-3-players (state-board state-3-players))
-  (define config-to-be-added-to-board-with-3 configuration2))
+  (define config-to-add-to-board-3 configuration2))
+
+;; ---------------------------------------------------------------------------------------------------
+;; initialize a State from a list of (initial) Placements0
+
+(define (initialize lo-placements)
+  (define players (for/list ([p lo-placements]) (apply player (rest p))))
+  (define board
+    (for/fold ((m the-empty-board)) ((place lo-placements))
+      (match-define `(,config ,_  ,_ ,x ,y) place)
+      (matrix-set m x y (square config (create-portmap config x y)))))
+  (state board players))
+
+(module+ test
+  (define board1
+    (let* ([square-00 (square configuration1 (create-portmap configuration1 0 0))])
+      (matrix-set the-empty-board 0 0 square-00)))
+  (check-equal? (initialize `((,configuration1 "x" 2 0 0))) (state board1 `(,(player "x" 2 0 0))))
+
+  (check-equal? (initialize inits-for-board-3-players) (state-with-3-players)))
 
 ;; ---------------------------------------------------------------------------------------------------
 ;; adding a tile T for a player P
@@ -123,12 +144,14 @@
 ;; -- p is on (board-players b)
 ;; -- the neighbor of p is unoccupied
 ;; assume: legality 
-(define (add-tile s c pn)
-  (match-define  (state board players) s)
-  (match-define  (player _ port x y) (find-player players pn))
+(define (add-tile state0 config player-name)
+  (match-define  (state board players) state0)
+  (match-define  (player _ port x y) (find-player players player-name))
   (define-values (x-new y-new) (looking-at port x y))
-  (define nu-board (add-new-square-update-neighbors board c x-new y-new))
-  (state nu-board players))
+  (define nu-board (add-new-square-update-neighbors board config x-new y-new))
+  (define-values (moved __eliminated) (move-players nu-board players x-new y-new))
+  ;; what to do with eliminated ones 
+  (state nu-board moved))
 
 #; {(Listof Player) PlayerName -> Player}
 (define (find-player players p)
@@ -138,31 +161,64 @@
 (define (finder pn)
   (compose (curry equal? pn) player-name))
 
-#; {(Listof Player) Index Index -> (Cons Player (Listof Player))}
-;; there is at least one because a player must add the configured tile 
-(define (players-looking-at-added-square players x y)
-  (for*/list ((p* players)
-              (x-p  (in-value (player-x p*)))
-              (y-p  (in-value (player-y p*)))
-              (port (in-value (player-port p*)))
-              #:when (let-values ([(x-at y-at) (looking-at port x-p y-p)])
-                       (and (= x-at x) (= y-at y))))
-    p*))
-
 (module+ test ;; add-tile 
-  
-  (check-equal? (players-looking-at-added-square 3players 1 0) (list red-player) "red is placing")
-
-  (define nu-state
-    (state
-     (add-new-square-update-neighbors board-3-players config-to-be-added-to-board-with-3 1 0)
-     (remf (finder player-00) (state-players state-3-players))))
-  
-  (check-equal? (add-tile state-3-players config-to-be-added-to-board-with-3 player-00) nu-state
+  (define board+ (add-new-square-update-neighbors board-3-players config-to-add-to-board-3 1 0))
+  (define state+ (state board+ (remf (finder player-red) (state-players state-3-players))))
+  (check-equal? (add-tile state-3-players config-to-add-to-board-3 player-red) state+
                 "drive red player off"))
 
 ;; ---------------------------------------------------------------------------------------------------
-;; updadting the matrix
+;; moving players 
+
+#; {Board Player* Index Index -> (values Player* [Listof Player])}
+;; move players facing (x,y), detrmine survivors, return those as the first list;
+;; the second list are the drop-outs that run into walls 
+(define (move-players board players x y)
+  (define-values (moved out)
+    (for/fold ((moved '()) (out '())) ((p players))
+      (match-define  (player name port x-p y-p) p)
+      (define-values (x-at y-at) (looking-at port x-p y-p))
+      (cond
+        [(and (= x-at x) (= y-at y))
+         (define p-moved (move-one-player board p))
+         (if (out? p-moved)
+             (values moved (cons p-moved out))
+             (values (cons p-moved moved) out))]
+        [else (values (cons p moved) out)])))
+  (values (reverse moved) out))
+
+(struct out [player] #:transparent)
+
+#; {Board Player -> (U Player (out Player))}
+(define (move-one-player board the-player)
+  ;; start player on (port-p, x-p, y-p) that look at an occupied neighboring square
+  (match-define (player name port-p x-p y-p) the-player)
+  (let move-one-player ([port-p port-p][x-p x-p][y-p y-p])
+    (match-define (list port x y external) (move-one-square board port-p x-p y-p))
+    (cond
+      [(equal? WALL external) (out (player name port x y))]
+      [(equal? OPEN external) (player name port x y)]
+      [else (move-one-player port x y)])))
+
+#; {Board Port Index Index -> [List Index Index Next]}
+(define (move-one-square board port x-p y-p)
+  (match-define (square _ map-p)                         (matrix-ref board x-p y-p))
+  (match-define (connect _ (next port-in x-next y-next)) (vector-ref map-p (port->index port)))
+  (match-define (square _ map-next)                      (matrix-ref board x-next y-next))
+  (match-define (connect (next port-out x-out y-out) _)  (vector-ref map-next (port->index port-in)))
+  (match-define (connect _ external)                     (vector-ref map-next (port->index port-out)))
+  (list port-out x-next y-next external))
+
+(module+ test ;; move player  
+  (define red-player (find-player 3players player-red))
+  (check-equal? (move-one-square board+ (player-port red-player) 0 0) (list (index->port 1) 1 0 WALL)
+                "moved red player 1 step")
+
+  (check-equal? (move-one-player board+ red-player) (out (player player-red (index->port 1) 1 0))
+                "move red player all the way"))
+
+;; ---------------------------------------------------------------------------------------------------
+;; updadting the board
 
 #; {Board Confguration Index Index -> Matrix}
 
@@ -172,7 +228,7 @@
     (matrix-set m x-n y-n (update-square (matrix-ref m x-n y-n) x-n y-n x y))))
 
 (module+ test
-  (define nu-square  (create-square board-3-players config-to-be-added-to-board-with-3 1 0))
+  (define nu-square  (create-square board-3-players config-to-add-to-board-3 1 0))
   (define nu-board (let* ([m board-3-players]
                           [m (matrix-set m 1 0 nu-square)]
                           [m (matrix-set m 0 0 (update-square square-00 0 0 1 0))]
@@ -181,9 +237,9 @@
   
   (check-equal?
    (matrix->rectangle 
-    (add-new-square-update-neighbors board-3-players config-to-be-added-to-board-with-3 1 0))
+    (add-new-square-update-neighbors board-3-players config-to-add-to-board-3 1 0))
    (matrix->rectangle 
-   nu-board)))
+    nu-board)))
 
 ;; ---------------------------------------------------------------------------------------------------
 ;; creating and updatiing squares 
@@ -208,31 +264,12 @@
                                [pm (update-portmap pm 0 0 1 0)])
                           pm)))
 
-  (check-equal? (create-square board-3-players config-to-be-added-to-board-with-3 1 0)
-                (square config-to-be-added-to-board-with-3
-                        (let* ([pm (create-portmap config-to-be-added-to-board-with-3 1 0)]
+  (check-equal? (create-square board-3-players config-to-add-to-board-3 1 0)
+                (square config-to-add-to-board-3
+                        (let* ([pm (create-portmap config-to-add-to-board-3 1 0)]
                                [pm (update-portmap pm 1 0 2 0)]
                                [pm (update-portmap pm 1 0 0 0)])
                           pm))))
-
-;; ---------------------------------------------------------------------------------------------------
-;; initialize a State from a list of (initial) Placements0
-
-(define (initialize lo-placements)
-  (define players (for/list ([p lo-placements]) (apply player (rest p))))
-  (define board
-    (for/fold ((m the-empty-board)) ((place lo-placements))
-      (match-define `(,config ,_  ,_ ,x ,y) place)
-      (matrix-set m x y (square config (create-portmap config x y)))))
-  (state board players))
-
-(module+ test
-  (define board1
-    (let* ([square-00 (square configuration1 (create-portmap configuration1 0 0))])
-      (matrix-set the-empty-board 0 0 square-00)))
-  (check-equal? (initialize `((,configuration1 "x" 2 0 0))) (state board1 `(,(player "x" 2 0 0))))
-
-  (check-equal? (initialize inits-for-board-3-players) (state-with-3-players)))
 
 ;; ---------------------------------------------------------------------------------------------------
 ;; creating a portmap, adding external connects to portmap
@@ -250,7 +287,7 @@
 
 (module+ test ;; adding external connections to a portmap 
   (define nu-pm
-    (let* ([pm (create-portmap config-to-be-added-to-board-with-3 1 0)]
+    (let* ([pm (create-portmap config-to-add-to-board-3 1 0)]
            [pm (update-portmap pm 1 0 2 0)]
            [pm (update-portmap pm 1 0 0 0)])
       pm))
@@ -371,7 +408,7 @@
          (vl-append (apply hc-append picts) (loop (rest l) (+ y 1)))])))
   (draw-pict board-as-pict dc INSET INSET))
 
-#; {[Listof Player] Natural Natural -> (U False Player)}
+#; {Player* Natural Natural -> (U False Player)}
 (define (is-player-on players x y)
   (define p (memf (λ (p) (match-define (player _ _ x0 y0) p) (and (= x x0) (= y y0))) players))
   (if (boolean? p) p (first p)))
@@ -394,4 +431,4 @@
     (send frame show #t))
 
   (main state-with-3-players)
-  (main (λ () nu-state)))
+  (main (λ () state+)))
