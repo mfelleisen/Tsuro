@@ -427,7 +427,9 @@
       (new canvas%
            [parent frame]
            [paint-callback (λ (e dc) (draw-board (init-board-3-players) dc))]))
-  
+
+    (void)
+    #;
     (send frame show #t))
 
   (main state-with-3-players)
