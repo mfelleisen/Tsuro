@@ -92,6 +92,9 @@
     (,config-02 ,player-02 ,port-3 0 2)
     (,config-20 ,player-20 ,port-4 2 0)))
 
+(define 3players (map (λ (init) (apply player (rest init))) inits-for-board-3-players))
+(define red-player (first 3players))
+
 (define (state-with-3-players #:with (with #false))
   (define square-00 (square config-00 (create-portmap config-00 0 0)))
   (define square-02 (square config-02 (create-portmap config-02 0 2)))
@@ -102,8 +105,7 @@
            [m (matrix-set m 0 2 square-02)]
            [m (matrix-set m 2 0 square-20)])
       m))
-  (define players3 (map (λ (init) (apply player (rest init))) inits-for-board-3-players))
-  (define the-board (state boatd3 players3))
+  (define the-board (state boatd3 3players))
   (if with
       (values the-board square-00 square-02 square-20)
       the-board))
@@ -121,22 +123,36 @@
 ;; -- p is on (board-players b)
 ;; -- the neighbor of p is unoccupied
 ;; assume: legality 
-(define (add-tile s c p)
-  (match-define (player _ port x y) (find-player s p))
+(define (add-tile s c pn)
+  (match-define  (state board players) s)
+  (match-define  (player _ port x y) (find-player players pn))
   (define-values (x-new y-new) (looking-at port x y))
-  (define nu-board (add-new-square-update-neighbors (state-board s) c x-new y-new))
-  (state nu-board (state-players s)))
+  (define nu-board (add-new-square-update-neighbors board c x-new y-new))
+  (state nu-board players))
 
-#; {State PlayerName -> Player}
-(define (find-player state p)
-  (first (memf (finder p) (state-players state))))
+#; {(Listof Player) PlayerName -> Player}
+(define (find-player players p)
+  (first (memf (finder p) players)))
 
 #; {PlayerName -> (Player -> Boolean)}
-(define (finder p)
-  (compose (curry equal? p) player-name))
+(define (finder pn)
+  (compose (curry equal? pn) player-name))
+
+#; {(Listof Player) Index Index -> (Cons Player (Listof Player))}
+;; there is at least one because a player must add the configured tile 
+(define (players-looking-at-added-square players x y)
+  (for*/list ((p* players)
+              (x-p  (in-value (player-x p*)))
+              (y-p  (in-value (player-y p*)))
+              (port (in-value (player-port p*)))
+              #:when (let-values ([(x-at y-at) (looking-at port x-p y-p)])
+                       (and (= x-at x) (= y-at y))))
+    p*))
 
 (module+ test ;; add-tile 
   
+  (check-equal? (players-looking-at-added-square 3players 1 0) (list red-player) "red is placing")
+
   (define nu-state
     (state
      (add-new-square-update-neighbors board-3-players config-to-be-added-to-board-with-3 1 0)
