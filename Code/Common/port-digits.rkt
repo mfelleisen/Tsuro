@@ -5,11 +5,19 @@
 (require Tsuro/Code/Common/port-signature) (provide-port-signature)
 
 ;; -----------------------------------------------------------------------------
-(define PORTS (build-list 8 identity))
+(define PORTS (build-list PORT# identity))
+(define (port? x) (< -1 x PORT#))
 (define index->port values)
 (define port->index values)
 (define <-port <)
 (define (90degrees x) (modulo (+ x 2) 8))
+
+(define (port->direction p)
+  (case p
+    [(0 1) 'NORTH]
+    [(2 3) 'EAST]
+    [(4 5) 'SOUTH]
+    [(6 7) 'WEST]))
 
 (define (facing-port p)
   (case p

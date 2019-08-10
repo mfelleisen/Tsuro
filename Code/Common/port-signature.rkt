@@ -1,18 +1,30 @@
 #lang racket
 
-(provide provide-port-signature)
+(provide
+ PORT#
+ provide-port-signature)
+
+(define PORT# 8)
 
 (define-syntax (provide-port-signature stx)
   (datum->syntax stx 
    '(provide
+     ;; type Port 
+     
       ;; [Listof Portlabels]
       PORTS
+
+      #; {Any -> Boolean : member of PORTS}
+      port?
 
       #; {Nat -> Port}
       index->port
 
       #; {Port -> Nat}
       port->index
+
+      #; {Port -> (U 'NORTH 'EAST 'SOUTH 'WEST)}
+      port->direction 
 
       #; {Port Port -> Boolean}
       <-port

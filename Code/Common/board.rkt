@@ -3,34 +3,83 @@
 ;; a data representation for game States, plus basic functions for manipulating them
 
 ;; TODO
-;; - factor out matrix, in case it needs to be replaced 
-;; - add configured tile T for player P: move all players
+;; -- split portmap: the tiles know their internal organization 
 
 ;; safety
 ;; - contract for initialize and add?
 
 ;; legality checks: 
 ;; - determine whether the addition of a tile for a player P forces P to commit suicide
-;; - determine whether the addition of a tile adds a cyclic path 
+;; - determine whether the addition of a tile adds a cyclic path
+
+;; ---------------------------------------------------------------------------------------------------
+;; contrat section
+
+(require (only-in Tsuro/Code/Common/port-alphabetic port?))
+(require (only-in Tsuro/Code/Common/tiles configuration?))
+
+(define SIZE 10) ; Tsuro is played on a board with SIZE x SIZE configured tiles
+
+#; {Nat -> Boolean : Index}
+(define (index? z) (< -1 z SIZE))
+
+#; {Placement0 = [List Configuration PlayerName PortIndex Index Index] with constraints}
+               
+#; { Placement0 -> Boolean : (x,y) describe a square position near the peruphery }
+(define (x-and-y-on-periphery? l)
+  (match-define (list c name p x y) l)
+  (or (= x 0) (= x SIZE) (= y 0) (= y SIZE)))
+
+#; { Placement0 -> Boolean : port element faces inside }
+(define (port-facing-inward? l)
+  (match-define (list c name p x y) l)
+  (define-values (x-look y-look) (looking-at p x y))
+  (and (index? x) (index? y)))
+
+;; contratc combinator 
+(define placement0/c
+  (and/c 
+   (list/c configuration? string? port? index? index?)
+   x-and-y-on-periphery?
+   port-facing-inward?))
+
+#; { [Listof Placement0] -> Boolean : all distinct locations}
+(define (all-locations-distinct? l)
+  (= (length l) (set-count (apply set (map cddr l)))))
+
+;; contract combinator 
+(define placements0*/c
+  (and/c 
+   (listof placement0/c)
+   all-locations-distinct?))
+
+#; { State -> (-> PlayerName Boolean : the player is on the list of players)}
+(define ((part-of s) pname)
+  (cons? (memf (finder pname) (state-players s))))
+
+;; for tests of contracts, see below data examples 
 
 (provide
  ;; type State
+ ;; all players are on ports that face empty squares on the board 
+ state?
 
- #; {-> State}
- state-with-3-players
-
- #; {Placement0 = [List Configuration PortIndex Index Index]
-                where (list c p x y) must satisfy the following conditions: 
-                1. (x,y) must describe a position at the periphery of the State 
-                2. p must be a port that faces an empty square}
-
- #; { [Listof Placement0] -> State }
- initialize)
-
+ (contract-out 
+  [state-with-3-players
+   ;; creates a sample state 
+   (-> state?)]
+  
+  [initialize
+   ;; creates a state from a list of initial placements 
+   (-> placements0*/c state?)]
+  
+  [add-tile
+   ;; place a configured tile on the empty square that the player pn neighbors
+   (->i ([s state?][c configuration?][pn (s) (and/c string? (part-of s))]) [result state?])]))
 
 ;; ---------------------------------------------------------------------------------------------------
-(require Tsuro/Code/Common/tiles)
-(require Tsuro/Code/Common/port-alphabetic)
+(require (except-in Tsuro/Code/Common/tiles configuration?))
+(require (except-in Tsuro/Code/Common/port-alphabetic port?))
 (require Tsuro/Code/Common/matrix)
 (require pict)
 
@@ -41,8 +90,6 @@
 ;; ---------------------------------------------------------------------------------------------------
 ;; data representation of the game state: the board, the players  
 
-(define SIZE 10) ; Tsuro is played on a board with SIZE x SIZE configured tiles
-
 ;; the game state itself 
 ;; ------------------------------------------------------------------
 #; {State   = (state Board Player*)}
@@ -52,7 +99,7 @@
 #; {Board   = [Matrixof square] :: {Index x Index}}
 #; {Index   = [0 .. SIZE]}
 #; {Square  = (U BLANK                  ;; an unoccupied, blank square 
-                (square Tile PortMap))} ;; a configured tile with connections to neighbors cached 
+                 (square Tile PortMap))} ;; a configured tile with connections to neighbors cached 
 
 (struct state  [board players] #:transparent)
 (struct player [name port x y] #:transparent)
@@ -89,12 +136,12 @@
 (define config-02 configuration1)
 (define config-20 90configuration2)
 
-(define inits-for-board-3-players
+(define inits-for-state-with-3-players
   `((,config-00 ,player-red   ,port-2 0 0)
     (,config-02 ,player-white ,port-3 0 2)
     (,config-20 ,player-blue  ,port-4 2 0)))
 
-(define 3players (map (λ (init) (apply player (rest init))) inits-for-board-3-players))
+(define 3players (map (λ (init) (apply player (rest init))) inits-for-state-with-3-players))
 (define red-player (first 3players))
 
 (define (state-with-3-players #:with (with #false))
@@ -115,7 +162,13 @@
 (module+ test ;; additional data samples 
   (define-values (state-3-players square-00 square-02 square-20) (state-with-3-players #:with #true))
   (define board-3-players (state-board state-3-players))
-  (define config-to-add-to-board-3 configuration2))
+  (define config-to-add-to-board-3 configuration2)
+  (define placement1 (first inits-for-state-with-3-players)))
+
+(module+ test ;; contracts
+  (check-true (placement0/c placement1))
+  (check-true (placements0*/c inits-for-state-with-3-players))
+  (check-true ((part-of (state-with-3-players)) player-red)))
 
 ;; ---------------------------------------------------------------------------------------------------
 ;; initialize a State from a list of (initial) Placements0
@@ -134,16 +187,11 @@
       (matrix-set the-empty-board 0 0 square-00)))
   (check-equal? (initialize `((,configuration1 "x" 2 0 0))) (state board1 `(,(player "x" 2 0 0))))
 
-  (check-equal? (initialize inits-for-board-3-players) (state-with-3-players)))
+  (check-equal? (initialize inits-for-state-with-3-players) (state-with-3-players)))
 
 ;; ---------------------------------------------------------------------------------------------------
 ;; adding a tile T for a player P
 
-#; {State Configuration PlayerName -> State}
-;; contract:
-;; -- p is on (board-players b)
-;; -- the neighbor of p is unoccupied
-;; assume: legality 
 (define (add-tile state0 config player-name)
   (match-define  (state board players) state0)
   (match-define  (player _ port x y) (find-player players player-name))
@@ -361,20 +409,16 @@
 (define (neighbors* board x y)
   (define all `((,x ,(- y 1)) (,x ,(+ y 1)) (,(- x 1) ,y) (,(+ x 1) ,y)))
   (define good-ones
-    (filter (match-lambda [`(,x ,y) (and (in-size x) (in-size y) (matrix-ref board x y))]) all))
+    (filter (match-lambda [`(,x ,y) (and (index? x) (index? y) (matrix-ref board x y))]) all))
   (values (map first good-ones) (map second good-ones)))
 
-
-#; {Nat -> Boolean : Index}
-(define (in-size z) (< -1 z SIZE))
-
-#; {Port Nat Nat -> (values Nat Nat)}
+#; {Port Index Index -> (values Integer Integer)}
 (define (looking-at port x y)
-  (case (port->index port)
-    [(0 1) (values x (- y 1))]
-    [(2 3) (values (+ x 1) y)]
-    [(4 5) (values x (+ y 1))]
-    [(6 7) (values (- x 1) y)]))
+  (case (port->direction port)
+    [(NORTH) (values x (- y 1))]
+    [(EAST)  (values (+ x 1) y)]
+    [(SOUTH) (values x (+ y 1))]
+    [(WEST)  (values (- x 1) y)]))
 
 ;; ---------------------------------------------------------------------------------------------------
 ;; drawing all tiles in a set into a drawing context
