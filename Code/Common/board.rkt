@@ -3,6 +3,7 @@
 ;; a data representation for game States, plus basic functions for manipulating them
 
 ;; TODO
+;; -- catch infinitely looping player 
 ;; -- JSON de/serialozation 
 
 ;; safety
@@ -135,7 +136,7 @@
 (struct square [tile map] #:transparent)
 (define BLANK #false)
 
-;; the portmap is a fast means for looking up the neighboring squares
+;; a fast means for looking up the "bridges" to neighboring squares
 ;; ------------------------------------------------------------------
 #; {PortMap = (Vectorof Next) :: [Port ->f Next]}
 #; {Next    = (U
@@ -310,12 +311,12 @@
     (matrix-set m x-n y-n updated-neighbor-sq)))
 
 (module+ test
-  (define nu-square  (create-square board-3-players tile-to-add-to-board-3 1 0))
-  (define nu-board (let* ([m board-3-players]
-                          [m (matrix-set m 1 0 nu-square)]
-                          [m (matrix-set m 0 0 (update-square square-00 0 0 1 0))]
-                          [m (matrix-set m 2 0 (update-square square-20 2 0 1 0))])
-                     m))
+  (define nu-square (create-square board-3-players tile-to-add-to-board-3 1 0))
+  (define nu-board  (let* ([m board-3-players]
+                           [m (matrix-set m 1 0 nu-square)]
+                           [m (matrix-set m 0 0 (update-square square-00 0 0 1 0))]
+                           [m (matrix-set m 2 0 (update-square square-20 2 0 1 0))])
+                      m))
   
   (check-equal?
    (matrix->rectangle 
