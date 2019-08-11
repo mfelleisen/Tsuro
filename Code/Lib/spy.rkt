@@ -1,5 +1,7 @@
 #lang racket
 
+(provide spy)
+
 (define-syntax spy
   (lambda (exp)
     (syntax-case exp ()
@@ -15,5 +17,3 @@
                     (quote the-loc)
                     val)
             val)))])))
-
-(+ 4 (spy (+ 1 2)))
