@@ -8,6 +8,8 @@
 ;; ---------------------------------------------------------------------------------------------------
 (require Tsuro/Code/Common/tiles)
 
+(module+ test (require rackunit))
+
 ;; ---------------------------------------------------------------------------------------------------
 ;; generate all unique tlle configurations
 
@@ -31,12 +33,9 @@
        (append-map (λ (next) (map (curry cons (edge head next)) (all (remove next tail)))) tail)]))
   
   (for/set ((lc (all PORTS)))
-    (configuration lc)))
+    (create-tile lc)))
 
 (define all-tile-types (all-configs))
 
-(unless (= (set-count all-tile-types) 35)
-  (pretty-print all-tile-types)
-  (error 'tiles "wrong number of tiles generated: ~a" (set-count all-tile-types)))
-
-; all-tile-types
+(module+ test 
+  (check-equal? (set-count all-tile-types) 35 "wrong number of tiles generated: ~a"))

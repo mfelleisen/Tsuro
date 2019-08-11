@@ -16,7 +16,7 @@
 ;; contrat section
 
 (require (only-in Tsuro/Code/Common/port-alphabetic port?))
-(require (only-in Tsuro/Code/Common/tiles configuration?))
+(require (only-in Tsuro/Code/Common/tiles tile?))
 
 (define SIZE 10) ; Tsuro is played on a board with SIZE x SIZE configured tiles
 
@@ -26,7 +26,7 @@
 ;; -----------------------------------------------------------------------------
 ;; placements
 
-#; {Placement0 = [List Configuration PlayerName PortIndex Index Index] subjectto}
+#; {Placement0 = [List Tile PlayerName PortIndex Index Index] subjectto}
                
 #; { Placement0 -> Boolean : (x,y) describe a square position near the peruphery }
 (define (x-and-y-on-periphery? l)
@@ -42,7 +42,7 @@
 ;; contratc combinator 
 (define placement0/c
   (and/c 
-   (list/c configuration? string? port? index? index?)
+   (list/c tile? string? port? index? index?)
    x-and-y-on-periphery?
    port-facing-inward?))
 
@@ -102,11 +102,11 @@
   
   [add-tile
    ;; place a configured tile on the empty square that the player pn neighbors
-   (->i ([s state?][c configuration?][pn (s) (and/c string? (part-of s))])
+   (->i ([s state?][c tile?][pn (s) (and/c string? (part-of s))])
         [result (and/c state? every-player-faces-open-square)])]))
 
 ;; ---------------------------------------------------------------------------------------------------
-(require (except-in Tsuro/Code/Common/tiles configuration?))
+(require (except-in Tsuro/Code/Common/tiles tile?))
 (require (except-in Tsuro/Code/Common/port-alphabetic port?))
 (require Tsuro/Code/Common/matrix)
 (require pict)
@@ -161,22 +161,22 @@
 (define player-white "white")
 (define player-blue  "blue")
 
-(define config-00 configuration1)
-(define config-02 configuration1)
-(define config-20 90configuration2)
+(define tile-00 tile1)
+(define tile-02 tile1)
+(define tile-20 90tile2)
 
 (define inits-for-state-with-3-players
-  `((,config-00 ,player-red   ,port-2 0 0)
-    (,config-02 ,player-white ,port-3 0 2)
-    (,config-20 ,player-blue  ,port-4 2 0)))
+  `((,tile-00 ,player-red   ,port-2 0 0)
+    (,tile-02 ,player-white ,port-3 0 2)
+    (,tile-20 ,player-blue  ,port-4 2 0)))
 
 (define 3players (map (λ (init) (apply player (rest init))) inits-for-state-with-3-players))
 (define red-player (first 3players))
 
 (define (state-with-3-players #:with (with #false))
-  (define square-00 (square config-00 (create-portmap config-00 0 0)))
-  (define square-02 (square config-02 (create-portmap config-02 0 2)))
-  (define square-20 (square config-20 (create-portmap config-20 2 0)))
+  (define square-00 (square tile-00 (create-portmap tile-00 0 0)))
+  (define square-02 (square tile-02 (create-portmap tile-02 0 2)))
+  (define square-20 (square tile-20 (create-portmap tile-20 2 0)))
   (define boatd3
     (let* ([m the-empty-board]
            [m (matrix-set m 0 0 square-00)]
@@ -191,7 +191,7 @@
 (module+ test ;; additional data samples 
   (define-values (state-3-players square-00 square-02 square-20) (state-with-3-players #:with #true))
   (define board-3-players (state-board state-3-players))
-  (define config-to-add-to-board-3 configuration2)
+  (define tile-to-add-to-board-3 tile2)
   (define placement1 (first inits-for-state-with-3-players)))
 
 (module+ test ;; contracts
@@ -206,26 +206,26 @@
   (define players (for/list ([p lo-placements]) (apply player (rest p))))
   (define board
     (for/fold ((m the-empty-board)) ((placement lo-placements))
-      (match-define `(,config ,_  ,_ ,x ,y) placement)
-      (matrix-set m x y (square config (create-portmap config x y)))))
+      (match-define `(,tile ,_  ,_ ,x ,y) placement)
+      (matrix-set m x y (square tile (create-portmap tile x y)))))
   (state board players))
 
 (module+ test
   (define board1
-    (let* ([square-00 (square configuration1 (create-portmap configuration1 0 0))])
+    (let* ([square-00 (square tile1 (create-portmap tile1 0 0))])
       (matrix-set the-empty-board 0 0 square-00)))
-  (check-exn exn:fail:contract? (λ () (initialize `((,configuration1 "x" 2 0 0)))) "port, not index")
+  (check-exn exn:fail:contract? (λ () (initialize `((,tile1 "x" 2 0 0)))) "port, not index")
 
   (check-equal? (initialize inits-for-state-with-3-players) (state-with-3-players)))
 
 ;; ---------------------------------------------------------------------------------------------------
 ;; adding a tile T for a player P
 
-(define (add-tile state0 config player-name)
+(define (add-tile state0 tile player-name)
   (match-define  (state board players) state0)
   (match-define  (player _ port x y) (find-player players player-name))
   (define-values (x-new y-new) (looking-at port x y))
-  (define nu-board (add-new-square-update-neighbors board config x-new y-new))
+  (define nu-board (add-new-square-update-neighbors board tile x-new y-new))
   (define-values (moved __eliminated) (move-players nu-board players x-new y-new))
   ;; what to do with eliminated ones 
   (state nu-board moved))
@@ -239,9 +239,9 @@
   (compose (curry equal? pn) player-name))
 
 (module+ test ;; add-tile 
-  (define board+ (add-new-square-update-neighbors board-3-players config-to-add-to-board-3 1 0))
+  (define board+ (add-new-square-update-neighbors board-3-players tile-to-add-to-board-3 1 0))
   (define state+ (state board+ (remf (finder player-red) (state-players state-3-players))))
-  (check-equal? (add-tile state-3-players config-to-add-to-board-3 player-red) state+
+  (check-equal? (add-tile state-3-players tile-to-add-to-board-3 player-red) state+
                 "drive red player off"))
 
 ;; ---------------------------------------------------------------------------------------------------
@@ -299,13 +299,13 @@
 
 #; {Board Confguration Index Index -> Matrix}
 
-(define (add-new-square-update-neighbors board config x y)
-  (for*/fold ((m (matrix-set board x y (create-square board config x y))))
+(define (add-new-square-update-neighbors board tile x y)
+  (for*/fold ((m (matrix-set board x y (create-square board tile x y))))
              ((g (neighbors* board x y)) (x-n (in-value (first g))) (y-n (in-value (second g))))
     (matrix-set m x-n y-n (update-square (matrix-ref m x-n y-n) x-n y-n x y))))
 
 (module+ test
-  (define nu-square  (create-square board-3-players config-to-add-to-board-3 1 0))
+  (define nu-square  (create-square board-3-players tile-to-add-to-board-3 1 0))
   (define nu-board (let* ([m board-3-players]
                           [m (matrix-set m 1 0 nu-square)]
                           [m (matrix-set m 0 0 (update-square square-00 0 0 1 0))]
@@ -314,21 +314,21 @@
   
   (check-equal?
    (matrix->rectangle 
-    (add-new-square-update-neighbors board-3-players config-to-add-to-board-3 1 0))
+    (add-new-square-update-neighbors board-3-players tile-to-add-to-board-3 1 0))
    (matrix->rectangle 
     nu-board)))
 
 ;; ---------------------------------------------------------------------------------------------------
 ;; creating and updatiing squares 
 
-#; {Board Configuration Index Index -> square}
-;; create a square at (x,y) from configuration with current matrix n*
-(define (create-square board config x y)
+#; {Board Tile Index Index -> square}
+;; create a square at (x,y) from Tile with current matrix n*
+(define (create-square board tile x y)
   (define pm
-    (for*/fold ((pm (create-portmap config x y)))
+    (for*/fold ((pm (create-portmap tile x y)))
                ((g (neighbors* board x y)) (x-n (in-value (first g))) (y-n (in-value (second g))))
       (update-portmap pm x y x-n y-n)))
-  (square config pm))
+  (square tile pm))
 
 #; {Square Index Index Index Index -> square}
 (define (update-square old x-old y-old x-new y-new)
@@ -336,14 +336,14 @@
 
 (module+ test ;; operating on squares
   (check-equal? (update-square square-00 0 0 1 0)
-                (square config-00
+                (square tile-00
                         (let* ([pm (square-map square-00)]
                                [pm (update-portmap pm 0 0 1 0)])
                           pm)))
 
-  (check-equal? (create-square board-3-players config-to-add-to-board-3 1 0)
-                (square config-to-add-to-board-3
-                        (let* ([pm (create-portmap config-to-add-to-board-3 1 0)]
+  (check-equal? (create-square board-3-players tile-to-add-to-board-3 1 0)
+                (square tile-to-add-to-board-3
+                        (let* ([pm (create-portmap tile-to-add-to-board-3 1 0)]
                                [pm (update-portmap pm 1 0 2 0)]
                                [pm (update-portmap pm 1 0 0 0)])
                           pm))))
@@ -364,7 +364,7 @@
 
 (module+ test ;; adding external connections to a portmap 
   (define nu-pm
-    (let* ([pm (create-portmap config-to-add-to-board-3 1 0)]
+    (let* ([pm (create-portmap tile-to-add-to-board-3 1 0)]
            [pm (update-portmap pm 1 0 2 0)]
            [pm (update-portmap pm 1 0 0 0)])
       pm))
@@ -378,9 +378,9 @@
           
   (check-equal? (update-portmap nu-pm 1 0 2 0) pm3+))
 
-#; {Configuration Index Index -> PortMap }
-(define (create-portmap config x y)
-  (for/vector ((e (in-list (configuration->list-map config))) (c (in-vector (create-portmap0 x y))))
+#; {Tile Index Index -> PortMap }
+(define (create-portmap tile x y)
+  (for/vector ((e (in-list (tile->list-map tile))) (c (in-vector (create-portmap0 x y))))
     (match-define (connect internal external) c)
     (match-define `(,from ,to) e)
     (connect (next to x y) external)))
@@ -467,8 +467,8 @@
          (define row (first l))
          (define picts
            (for/list ((n row) (x (in-naturals)))
-             (define config   (or (and (not (eq? BLANK n)) (square-tile n)) blank-tile))
-             (define pict     (configuration->pict config))
+             (define tile   (or (and (not (eq? BLANK n)) (square-tile n)) blank-tile))
+             (define pict     (tile->pict tile))
              (define p-on-x-y (is-player-on players x y))
              (cond
                [(boolean? p-on-x-y) pict]
