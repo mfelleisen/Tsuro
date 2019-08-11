@@ -278,11 +278,14 @@
       [else (move-one-player port x y)])))
 
 #; {Board Port Index Index -> [List Index Index Next]}
+;; move player at (x-p, y-p) on port port-p "thru" the tile of the next square
+;; ASSUME the square is occupired with a tile 
 (define (move-one-square board port x-p y-p)
-  (match-define (square _ map-p)                         (matrix-ref board x-p y-p))
+  (match-define (square tile-p map-p)                    (matrix-ref board x-p y-p))
   (match-define (connect _ (next port-in x-next y-next)) (vector-ref map-p (port->index port)))
-  (match-define (square _ map-next)                      (matrix-ref board x-next y-next))
-  (match-define (connect (next port-out x-out y-out) _)  (vector-ref map-next (port->index port-in)))
+  (match-define (square tile-next map-next)              (matrix-ref board x-next y-next))
+  (define port-out (tile-next port-in))
+  ;(match-define (connect (next port-out _x-out _y-out) _)(vector-ref map-next (port->index port-in)))
   (match-define (connect _ external)                     (vector-ref map-next (port->index port-out)))
   (list port-out x-next y-next external))
 
