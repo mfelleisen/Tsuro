@@ -137,14 +137,12 @@
 
 ;; the portmap is a fast means for looking up the neighboring squares
 ;; ------------------------------------------------------------------
-#; {PortMap = (Vectorof Connect) :: [Port ->f Connect]}
-#; {Connect = (connect Next Next)}
+#; {PortMap = (Vectorof Next) :: [Port ->f Next]}
 #; {Next    = (U
                WALL                      ;; periphery of board 
                OPEN                      ;; no neighboring tile yet 
                (next Port Index Index))} ;; points to a port on this or a neigboring square 
 
-(struct connect [internal external] #:transparent)
 (struct next [port x y] #:transparent)
 
 (define WALL "wall") 
@@ -174,9 +172,9 @@
 (define red-player (first 3players))
 
 (define (state-with-3-players #:with (with #false))
-  (define square-00 (square tile-00 (create-portmap tile-00 0 0)))
-  (define square-02 (square tile-02 (create-portmap tile-02 0 2)))
-  (define square-20 (square tile-20 (create-portmap tile-20 2 0)))
+  (define square-00 (square tile-00 (create-portmap 0 0)))
+  (define square-02 (square tile-02 (create-portmap 0 2)))
+  (define square-20 (square tile-20 (create-portmap 2 0)))
   (define boatd3
     (let* ([m the-empty-board]
            [m (matrix-set m 0 0 square-00)]
@@ -207,12 +205,12 @@
   (define board
     (for/fold ((m the-empty-board)) ((placement lo-placements))
       (match-define `(,tile ,_  ,_ ,x ,y) placement)
-      (matrix-set m x y (square tile (create-portmap tile x y)))))
+      (matrix-set m x y (square tile (create-portmap x y)))))
   (state board players))
 
 (module+ test
   (define board1
-    (let* ([square-00 (square tile1 (create-portmap tile1 0 0))])
+    (let* ([square-00 (square tile1 (create-portmap 0 0))])
       (matrix-set the-empty-board 0 0 square-00)))
   (check-exn exn:fail:contract? (λ () (initialize `((,tile1 "x" 2 0 0)))) "port, not index")
 
@@ -281,12 +279,11 @@
 ;; move player at (x-p, y-p) on port port-p "thru" the tile of the next square
 ;; ASSUME the square is occupired with a tile 
 (define (move-one-square board port x-p y-p)
-  (match-define (square tile-p map-p)                    (matrix-ref board x-p y-p))
-  (match-define (connect _ (next port-in x-next y-next)) (vector-ref map-p (port->index port)))
-  (match-define (square tile-next map-next)              (matrix-ref board x-next y-next))
+  (match-define (square tile-p map-p)        (matrix-ref board x-p y-p))
+  (match-define (next port-in x-next y-next) (vector-ref map-p (port->index port)))
+  (match-define (square tile-next map-next)  (matrix-ref board x-next y-next))
   (define port-out (tile-next port-in))
-  ;(match-define (connect (next port-out _x-out _y-out) _)(vector-ref map-next (port->index port-in)))
-  (match-define (connect _ external)                     (vector-ref map-next (port->index port-out)))
+  (define external (vector-ref map-next (port->index port-out)))
   (list port-out x-next y-next external))
 
 (module+ test ;; move player  
@@ -328,7 +325,7 @@
 ;; create a square at (x,y) from Tile with current matrix n*
 (define (create-square board tile x y)
   (define pm
-    (for*/fold ((pm (create-portmap tile x y)))
+    (for*/fold ((pm (create-portmap x y)))
                ((g (neighbors* board x y)) (x-n (in-value (first g))) (y-n (in-value (second g))))
       (update-portmap pm x y x-n y-n)))
   (square tile pm))
@@ -346,13 +343,13 @@
 
   (check-equal? (create-square board-3-players tile-to-add-to-board-3 1 0)
                 (square tile-to-add-to-board-3
-                        (let* ([pm (create-portmap tile-to-add-to-board-3 1 0)]
+                        (let* ([pm (create-portmap 1 0)]
                                [pm (update-portmap pm 1 0 2 0)]
                                [pm (update-portmap pm 1 0 0 0)])
                           pm))))
 
 ;; ---------------------------------------------------------------------------------------------------
-;; creating a portmap, adding external connects to portmap
+;; creating a portmap, adding external connections to portmap
 
 #; {PortMap Index Index Index Index -> PortMap}
 ;; update the external parts of the portmap at (x-pm,y-pm) to connect with neighbors on n at (x-n,y-n)
@@ -361,39 +358,31 @@
     (define p (index->port pi))
     (define-values (x-look y-look) (looking-at p x-pm y-pm))
     (cond
-      [(and (eq? x-look x-n) (eq? y-look y-n))
-       (connect (connect-internal c) (next (facing-port p) x-n y-n))]
+      [(and (eq? x-look x-n) (eq? y-look y-n)) (next (facing-port p) x-n y-n)]
       [else c])))
 
 (module+ test ;; adding external connections to a portmap 
   (define nu-pm
-    (let* ([pm (create-portmap tile-to-add-to-board-3 1 0)]
+    (let* ([pm (create-portmap 1 0)]
            [pm (update-portmap pm 1 0 2 0)]
            [pm (update-portmap pm 1 0 0 0)])
       pm))
   (define pm3+
     (let ([v (vector-copy nu-pm)])
-      (define 2-external (next (facing-port (index->port 2)) 2 0))
-      (define 3-external (next (facing-port (index->port 3)) 2 0))
-      (vector-set! v 2 (connect (connect-internal (vector-ref v 2)) 2-external))
-      (vector-set! v 3 (connect (connect-internal (vector-ref v 3)) 3-external))
+      (vector-set! v 2 (next (facing-port (index->port 2)) 2 0))
+      (vector-set! v 3 (next (facing-port (index->port 3)) 2 0))
       v))
           
   (check-equal? (update-portmap nu-pm 1 0 2 0) pm3+))
 
 #; {Tile Index Index -> PortMap }
-(define (create-portmap tile x y)
-  (for/vector ((e (in-list (tile->list-map tile))) (c (in-vector (create-portmap0 x y))))
-    (match-define (connect internal external) c)
-    (match-define `(,from ,to) e)
-    (connect (next to x y) external)))
-
+;; create the default portmap for a square 
 (define-match-expander ??
   (λ (stx)
     (syntax-case stx ()
       [(_ w) #'(? (curry = (- w 1)))])))
 
-(define (create-portmap0 x y)
+(define (create-portmap x y)
   (match* (x y)
     [(0  0)                (west-north)]
     [(0 (?? SIZE))         (west-south)]
@@ -405,8 +394,8 @@
     [(n (?? SIZE))         (any-south) ]
     [(n k)                 (any-any)   ]))
 
-(define ----- (connect WALL WALL))
-(define |   | (connect OPEN OPEN))
+(define ----- WALL)
+(define |   | OPEN)
 
 ;; ---------------- ports:   0     1     2     3     4     5     6     7 ---
 ;;                            north       east        south       west  
@@ -424,15 +413,15 @@
   (define s-1 (- SIZE 1))
   (define ran (λ () (+ (random (- SIZE 2)) 1))) ;; in [1,s-1)
 
-  (check-equal? (create-portmap0 0     0   )  (west-north))
-  (check-equal? (create-portmap0 0     s-1)   (west-south))
-  (check-equal? (create-portmap0 s-1   0)     (east-north))
-  (check-equal? (create-portmap0 s-1   s-1)   (east-south))
-  (check-equal? (create-portmap0 0     (ran)) (west-any))
-  (check-equal? (create-portmap0 s-1   (ran)) (east-any))
-  (check-equal? (create-portmap0 (ran) 0)     (any-north))
-  (check-equal? (create-portmap0 (ran) s-1)   (any-south))
-  (check-equal? (create-portmap0 (ran) (ran)) (any-any)))
+  (check-equal? (create-portmap 0     0   )  (west-north))
+  (check-equal? (create-portmap 0     s-1)   (west-south))
+  (check-equal? (create-portmap s-1   0)     (east-north))
+  (check-equal? (create-portmap s-1   s-1)   (east-south))
+  (check-equal? (create-portmap 0     (ran)) (west-any))
+  (check-equal? (create-portmap s-1   (ran)) (east-any))
+  (check-equal? (create-portmap (ran) 0)     (any-north))
+  (check-equal? (create-portmap (ran) s-1)   (any-south))
+  (check-equal? (create-portmap (ran) (ran)) (any-any)))
 
 ;; ---------------------------------------------------------------------------------------------------
 ;; determine (occupied) neighbors of the square at (x,y)
@@ -503,7 +492,6 @@
            [paint-callback (λ (e dc) (draw-board (init-board-3-players) dc))]))
 
     (void)
-    #;
     (send frame show #t))
 
   (main state-with-3-players)
