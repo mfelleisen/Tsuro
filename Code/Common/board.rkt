@@ -302,9 +302,12 @@
 #; {Board Confguration Index Index -> Matrix}
 
 (define (add-new-square-update-neighbors board tile x y)
-  (for*/fold ((m (matrix-set board x y (create-square board tile x y))))
-             ((g (neighbors* board x y)) (x-n (in-value (first g))) (y-n (in-value (second g))))
-    (matrix-set m x-n y-n (update-square (matrix-ref m x-n y-n) x-n y-n x y))))
+  (define new-square (create-square board tile x y))
+  (for*/fold ((m (matrix-set board x y new-square))) ((g (neighbors* board x y)))
+    (match-define (list x-n y-n) g)
+    (define old-neighbor-square  (matrix-ref m x-n y-n))
+    (define updated-neighbor-sq  (update-square old-neighbor-square x-n y-n x y))
+    (matrix-set m x-n y-n updated-neighbor-sq)))
 
 (module+ test
   (define nu-square  (create-square board-3-players tile-to-add-to-board-3 1 0))
@@ -349,6 +352,51 @@
 ;; ---------------------------------------------------------------------------------------------------
 ;; creating a portmap, adding external connections to portmap
 
+#; {Index Index -> PortMap }
+;; create the default portmap for a square 
+(define-match-expander ??
+  (λ (stx)
+    (syntax-case stx ()
+      [(_ w) #'(? (curry = (- w 1)))])))
+
+(define (create-portmap x y)
+  (match* (x y)
+    [(0  0)                (west-north)]
+    [(0 (?? SIZE))         (west-south)]
+    [((?? SIZE) 0)         (east-north)]
+    [((?? SIZE) (?? SIZE)) (east-south)]
+    [(0  n)                (west-any)  ]
+    [((?? SIZE) n)         (east-any)  ]
+    [(n 0)                 (any-north) ]
+    [(n (?? SIZE))         (any-south) ]
+    [(n k)                 (any-any)   ]))
+
+;; ---------------- ports:    0   1   2    3    4    5    6    7 ---
+;;                            north    east      south     west  
+[define (west-north) (vector WALL WALL OPEN OPEN OPEN OPEN WALL WALL)]
+[define (west-south) (vector OPEN OPEN OPEN OPEN WALL WALL WALL WALL)]
+[define (east-north) (vector WALL WALL WALL WALL OPEN OPEN OPEN OPEN)]
+[define (east-south) (vector OPEN OPEN WALL WALL WALL WALL OPEN OPEN)]
+[define (west-any)   (vector OPEN OPEN OPEN OPEN OPEN OPEN WALL WALL)]
+[define (east-any)   (vector OPEN OPEN WALL WALL OPEN OPEN OPEN OPEN)]
+[define (any-north)  (vector WALL WALL OPEN OPEN OPEN OPEN OPEN OPEN)]
+[define (any-south)  (vector OPEN OPEN OPEN OPEN WALL WALL OPEN OPEN)]
+[define (any-any)    (vector OPEN OPEN OPEN OPEN OPEN OPEN OPEN OPEN)]
+    
+(module+ test ;; creating a basic portmap 
+  (define s-1 (- SIZE 1))
+  (define ran (λ () (+ (random (- SIZE 2)) 1))) ;; in [1,s-1)
+
+  (check-equal? (create-portmap 0     0   )  (west-north))
+  (check-equal? (create-portmap 0     s-1)   (west-south))
+  (check-equal? (create-portmap s-1   0)     (east-north))
+  (check-equal? (create-portmap s-1   s-1)   (east-south))
+  (check-equal? (create-portmap 0     (ran)) (west-any))
+  (check-equal? (create-portmap s-1   (ran)) (east-any))
+  (check-equal? (create-portmap (ran) 0)     (any-north))
+  (check-equal? (create-portmap (ran) s-1)   (any-south))
+  (check-equal? (create-portmap (ran) (ran)) (any-any)))
+
 #; {PortMap Index Index Index Index -> PortMap}
 ;; update the external parts of the portmap at (x-pm,y-pm) to connect with neighbors on n at (x-n,y-n)
 (define (update-portmap portmap x-pm y-pm x-new y-nnew)
@@ -373,53 +421,6 @@
           
   (check-equal? (update-portmap nu-pm 1 0 2 0) pm3+))
 
-#; {Tile Index Index -> PortMap }
-;; create the default portmap for a square 
-(define-match-expander ??
-  (λ (stx)
-    (syntax-case stx ()
-      [(_ w) #'(? (curry = (- w 1)))])))
-
-(define (create-portmap x y)
-  (match* (x y)
-    [(0  0)                (west-north)]
-    [(0 (?? SIZE))         (west-south)]
-    [((?? SIZE) 0)         (east-north)]
-    [((?? SIZE) (?? SIZE)) (east-south)]
-    [(0  n)                (west-any)  ]
-    [((?? SIZE) n)         (east-any)  ]
-    [(n 0)                 (any-north) ]
-    [(n (?? SIZE))         (any-south) ]
-    [(n k)                 (any-any)   ]))
-
-(define ----- WALL)
-(define |   | OPEN)
-
-;; ---------------- ports:   0     1     2     3     4     5     6     7 ---
-;;                            north       east        south       west  
-[define (west-north) (vector ----- ----- |   | |   | |   | |   | ----- -----)]
-[define (west-south) (vector |   | |   | |   | |   | ----- ----- ----- -----)]
-[define (east-north) (vector ----- ----- ----- ----- |   | |   | |   | |   |)]
-[define (east-south) (vector |   | |   | ----- ----- ----- ----- |   | |   |)]
-[define (west-any)   (vector |   | |   | |   | |   | |   | |   | ----- -----)]
-[define (east-any)   (vector |   | |   | ----- ----- |   | |   | |   | |   |)]
-[define (any-north)  (vector ----- ----- |   | |   | |   | |   | |   | |   |)]
-[define (any-south)  (vector |   | |   | |   | |   | ----- ----- |   | |   |)]
-[define (any-any)    (vector |   | |   | |   | |   | |   | |   | |   | |   |)]
-    
-(module+ test ;; creating a basic portmap 
-  (define s-1 (- SIZE 1))
-  (define ran (λ () (+ (random (- SIZE 2)) 1))) ;; in [1,s-1)
-
-  (check-equal? (create-portmap 0     0   )  (west-north))
-  (check-equal? (create-portmap 0     s-1)   (west-south))
-  (check-equal? (create-portmap s-1   0)     (east-north))
-  (check-equal? (create-portmap s-1   s-1)   (east-south))
-  (check-equal? (create-portmap 0     (ran)) (west-any))
-  (check-equal? (create-portmap s-1   (ran)) (east-any))
-  (check-equal? (create-portmap (ran) 0)     (any-north))
-  (check-equal? (create-portmap (ran) s-1)   (any-south))
-  (check-equal? (create-portmap (ran) (ran)) (any-any)))
 
 ;; ---------------------------------------------------------------------------------------------------
 ;; determine (occupied) neighbors of the square at (x,y)
