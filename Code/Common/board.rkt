@@ -3,7 +3,7 @@
 ;; a data representation for game States, plus basic functions for manipulating them
 
 ;; TODO
-;; -- split portmap: the tiles know their internal organization 
+;; -- JSON de/serialozation 
 
 ;; safety
 ;; - contract for initialize and add?
@@ -127,7 +127,7 @@
 #; {PlayerName = String}
 #; {Board   = [Matrixof square] :: {Index x Index}}
 #; {Index   = [0 .. SIZE]}
-#; {Square  = (U BLANK                  ;; an unoccupied, blank square 
+#; {Square  = (U BLANK                   ;; an unoccupied, blank square 
                  (square Tile PortMap))} ;; a configured tile with connections to neighbors cached 
 
 (struct state  [board players] #:transparent)
@@ -326,11 +326,10 @@
 #; {Board Tile Index Index -> square}
 ;; create a square at (x,y) from Tile with current matrix n*
 (define (create-square board tile x y)
-  (define pm
-    (for*/fold ((pm (create-portmap x y)))
-               ((g (neighbors* board x y)) (x-n (in-value (first g))) (y-n (in-value (second g))))
-      (update-portmap pm x y x-n y-n)))
-  (square tile pm))
+  (define portmap
+    (for*/fold ((portmap (create-portmap x y))) ((g (neighbors* board x y)))
+      (apply update-portmap portmap x y g)))
+  (square tile portmap))
 
 #; {Square Index Index Index Index -> square}
 (define (update-square old x-old y-old x-new y-new)
@@ -338,10 +337,7 @@
 
 (module+ test ;; operating on squares
   (check-equal? (update-square square-00 0 0 1 0)
-                (square tile-00
-                        (let* ([pm (square-map square-00)]
-                               [pm (update-portmap pm 0 0 1 0)])
-                          pm)))
+                (square tile-00 (update-portmap (square-map square-00) 0 0 1 0)))
 
   (check-equal? (create-square board-3-players tile-to-add-to-board-3 1 0)
                 (square tile-to-add-to-board-3
@@ -355,11 +351,13 @@
 
 #; {PortMap Index Index Index Index -> PortMap}
 ;; update the external parts of the portmap at (x-pm,y-pm) to connect with neighbors on n at (x-n,y-n)
-(define (update-portmap pm x-pm y-pm x-n y-n)
-  (for/vector ((c (in-vector pm)) (pi (in-naturals)))
-    (define p (index->port pi))
-    (define-values (x-look y-look) (looking-at p x-pm y-pm))
-    (if (and (eq? x-look x-n) (eq? y-look y-n)) (next (facing-port p) x-n y-n) c)))
+(define (update-portmap portmap x-pm y-pm x-new y-nnew)
+  (for/vector ((pi (in-range (vector-length portmap))))
+    (define port (index->port pi))
+    (define-values (x-look y-look) (looking-at port x-pm y-pm))
+    (if (and (eq? x-look x-new) (eq? y-look y-nnew))
+        (next (facing-port port) x-new y-nnew)
+        (vector-ref portmap pi))))
 
 (module+ test ;; adding external connections to a portmap 
   (define nu-pm
