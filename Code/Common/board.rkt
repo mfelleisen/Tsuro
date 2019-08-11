@@ -57,9 +57,9 @@
 
 #; { [Listof (List Index Index)] -> Boolean : locations are not neighboring }
 (define (not-neighboring locations)
-  (for/and ((loc locations))
+  (for/and ((loc (in-list locations)))
     (define all-but (remove loc locations))
-    (for/and ((n (apply neighbors* the-empty-board loc)))
+    (for/and ((n (in-list (apply neighbors* the-empty-board loc))))
       (not (member n all-but)))))
 
 ;; contract combinator 
@@ -201,9 +201,11 @@
 ;; initialize a State from a list of (initial) Placements0
 
 (define (initialize lo-placements)
-  (define players (for/list ([p lo-placements]) (apply player (rest p))))
+  (define players
+    (for/list ([p (in-list lo-placements)])
+      (apply player (rest p))))
   (define board
-    (for/fold ((m the-empty-board)) ((placement lo-placements))
+    (for/fold ((m the-empty-board)) ((placement (in-list lo-placements)))
       (match-define `(,tile ,_  ,_ ,x ,y) placement)
       (matrix-set m x y (square tile (create-portmap x y)))))
   (state board players))
@@ -250,7 +252,7 @@
 ;; the second list are the drop-outs that run into walls 
 (define (move-players board players x y)
   (define-values (moved out)
-    (for/fold ((moved '()) (out '())) ((p players))
+    (for/fold ((moved '()) (out '())) ((p (in-list players)))
       (match-define  (player name port x-p y-p) p)
       (define-values (x-at y-at) (looking-at port x-p y-p))
       (cond
@@ -357,9 +359,7 @@
   (for/vector ((c (in-vector pm)) (pi (in-naturals)))
     (define p (index->port pi))
     (define-values (x-look y-look) (looking-at p x-pm y-pm))
-    (cond
-      [(and (eq? x-look x-n) (eq? y-look y-n)) (next (facing-port p) x-n y-n)]
-      [else c])))
+    (if (and (eq? x-look x-n) (eq? y-look y-n)) (next (facing-port p) x-n y-n) c)))
 
 (module+ test ;; adding external connections to a portmap 
   (define nu-pm
@@ -458,7 +458,7 @@
         [else
          (define row (first l))
          (define picts
-           (for/list ((n row) (x (in-naturals)))
+           (for/list ((n (in-list row)) (x (in-naturals)))
              (define tile   (or (and (not (eq? BLANK n)) (square-tile n)) blank-tile))
              (define pict     (tile->pict tile))
              (define p-on-x-y (is-player-on players x y))
@@ -492,6 +492,7 @@
            [paint-callback (λ (e dc) (draw-board (init-board-3-players) dc))]))
 
     (void)
+    #;
     (send frame show #t))
 
   (main state-with-3-players)
