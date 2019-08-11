@@ -23,7 +23,10 @@
 #; {Nat -> Boolean : Index}
 (define (index? z) (< -1 z SIZE))
 
-#; {Placement0 = [List Configuration PlayerName PortIndex Index Index] with constraints}
+;; -----------------------------------------------------------------------------
+;; placements
+
+#; {Placement0 = [List Configuration PlayerName PortIndex Index Index] subjectto}
                
 #; { Placement0 -> Boolean : (x,y) describe a square position near the peruphery }
 (define (x-and-y-on-periphery? l)
@@ -43,19 +46,43 @@
    x-and-y-on-periphery?
    port-facing-inward?))
 
-#; { [Listof Placement0] -> Boolean : all distinct locations}
-(define (all-locations-distinct? l)
-  (= (length l) (set-count (apply set (map cddr l)))))
+#; { [Listof Placement0] -> Boolean : locations are distinct and not neighboring }
+(define (locations-distinct-and-not-neighboring l)
+  (define locations (map cdddr l))
+  (and (locations-distinct locations) (not-neighboring locations)))
+
+#; { [Listof (List Index Index)] -> Boolean : locations are distinct }
+(define (locations-distinct locations)
+  (= (length locations) (set-count (apply set locations))))
+
+#; { [Listof (List Index Index)] -> Boolean : locations are not neighboring }
+(define (not-neighboring locations)
+  (for/and ((loc locations))
+    (define all-but (remove loc locations))
+    (for/and ((n (apply neighbors* the-empty-board loc)))
+      (not (member n all-but)))))
 
 ;; contract combinator 
 (define placements0*/c
-  (and/c 
-   (listof placement0/c)
-   all-locations-distinct?))
+  (and/c (listof placement0/c)
+         locations-distinct-and-not-neighboring))
 
+;; -----------------------------------------------------------------------------
+;; add tile 
 #; { State -> (-> PlayerName Boolean : the player is on the list of players)}
 (define ((part-of s) pname)
   (cons? (memf (finder pname) (state-players s))))
+
+;; -----------------------------------------------------------------------------
+;; state
+
+#; { State -> Boolean : every player faces an open square }
+(define (every-player-faces-open-square s)
+  (match-define (state board players) s)
+  (for/and ((p players))
+    (match-define (player name port x y) p)
+    (define-values (x-look y-look) (looking-at port x y))
+    (boolean? (matrix-ref board x-look y-look))))
 
 ;; for tests of contracts, see below data examples 
 
@@ -64,18 +91,19 @@
  ;; all players are on ports that face empty squares on the board 
  state?
 
+ ; (-> state?)
+ ;; creates a sample state 
+ state-with-3-players
+ 
  (contract-out 
-  [state-with-3-players
-   ;; creates a sample state 
-   (-> state?)]
-  
   [initialize
    ;; creates a state from a list of initial placements 
-   (-> placements0*/c state?)]
+   (-> placements0*/c (and/c state? every-player-faces-open-square))]
   
   [add-tile
    ;; place a configured tile on the empty square that the player pn neighbors
-   (->i ([s state?][c configuration?][pn (s) (and/c string? (part-of s))]) [result state?])]))
+   (->i ([s state?][c configuration?][pn (s) (and/c string? (part-of s))])
+        [result (and/c state? every-player-faces-open-square)])]))
 
 ;; ---------------------------------------------------------------------------------------------------
 (require (except-in Tsuro/Code/Common/tiles configuration?))
@@ -84,6 +112,7 @@
 (require pict)
 
 (module+ test
+  (require (submod ".."))
   (require rackunit)
   (require racket/gui))
 
@@ -176,8 +205,8 @@
 (define (initialize lo-placements)
   (define players (for/list ([p lo-placements]) (apply player (rest p))))
   (define board
-    (for/fold ((m the-empty-board)) ((place lo-placements))
-      (match-define `(,config ,_  ,_ ,x ,y) place)
+    (for/fold ((m the-empty-board)) ((placement lo-placements))
+      (match-define `(,config ,_  ,_ ,x ,y) placement)
       (matrix-set m x y (square config (create-portmap config x y)))))
   (state board players))
 
@@ -185,7 +214,7 @@
   (define board1
     (let* ([square-00 (square configuration1 (create-portmap configuration1 0 0))])
       (matrix-set the-empty-board 0 0 square-00)))
-  (check-equal? (initialize `((,configuration1 "x" 2 0 0))) (state board1 `(,(player "x" 2 0 0))))
+  (check-exn exn:fail:contract? (λ () (initialize `((,configuration1 "x" 2 0 0)))) "port, not index")
 
   (check-equal? (initialize inits-for-state-with-3-players) (state-with-3-players)))
 
@@ -271,8 +300,8 @@
 #; {Board Confguration Index Index -> Matrix}
 
 (define (add-new-square-update-neighbors board config x y)
-  (define-values (x-n* y-n*) (neighbors* board x y))
-  (for/fold ((m (matrix-set board x y (create-square board config x y)))) ((x-n x-n*) (y-n y-n*))
+  (for*/fold ((m (matrix-set board x y (create-square board config x y))))
+             ((g (neighbors* board x y)) (x-n (in-value (first g))) (y-n (in-value (second g))))
     (matrix-set m x-n y-n (update-square (matrix-ref m x-n y-n) x-n y-n x y))))
 
 (module+ test
@@ -295,9 +324,9 @@
 #; {Board Configuration Index Index -> square}
 ;; create a square at (x,y) from configuration with current matrix n*
 (define (create-square board config x y)
-  (define-values (x-n* y-n*) (neighbors* board x y))
   (define pm
-    (for/fold ((pm (create-portmap config x y))) ((x-n x-n*)[y-n y-n*])
+    (for*/fold ((pm (create-portmap config x y)))
+               ((g (neighbors* board x y)) (x-n (in-value (first g))) (y-n (in-value (second g))))
       (update-portmap pm x y x-n y-n)))
   (square config pm))
 
@@ -405,12 +434,10 @@
 ;; ---------------------------------------------------------------------------------------------------
 ;; determine (occupied) neighbors of the square at (x,y)
 
-#; {Board Index Index -> [Listof [List Index Index]]}
+#; {Board Index Index -> [values [Listof Index] [Listof Index]]}
 (define (neighbors* board x y)
   (define all `((,x ,(- y 1)) (,x ,(+ y 1)) (,(- x 1) ,y) (,(+ x 1) ,y)))
-  (define good-ones
-    (filter (match-lambda [`(,x ,y) (and (index? x) (index? y) (matrix-ref board x y))]) all))
-  (values (map first good-ones) (map second good-ones)))
+  (filter (match-lambda [`(,x ,y) (and (index? x) (index? y) (matrix-ref board x y))]) all))
 
 #; {Port Index Index -> (values Integer Integer)}
 (define (looking-at port x y)
