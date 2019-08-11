@@ -6,10 +6,14 @@ This directory implements a distributed Tsuro game
 
 [x] tiles, rendering tiles 
 [x] unique tile configs 
-[ ] map of tiles with:
-  - adding a new one 
+[x] map of tiles with:
+  - initialize 
+  - adding a new one (no legality check) 
   - moving a token to end of path 
 
+[ ] JSON de/serialization of map 	  
+[ ] batch test harness 
+  
 [ ] legal move: suicide, circular paths? 
 
 [ ] the referee 
