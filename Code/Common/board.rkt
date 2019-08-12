@@ -38,9 +38,18 @@
 (define (port-facing-inward? l)
   (match-define (list c name p x y) l)
   (define-values (x-look y-look) (looking-at p x y))
-  (and (index? x) (index? y)))
+  (and (index? x-look) (index? y-look)))
 
-;; contratc combinator 
+;; contratc combinator
+#;
+[list/dc
+  [t tile?]
+  [n string?]
+  [p port?]
+  [x index?]
+  [y index?]
+  #:post (x y) (or (= x 0) (= x SIZE) (= y 0) (= y SIZE))
+  #:post (p x y) (let-values ([(x-look y-look) (looking-at p x y)]) (and (index? x-look) (index? y-look)))]
 (define placement0/c
   (and/c 
    (list/c tile? string? port? index? index?)
