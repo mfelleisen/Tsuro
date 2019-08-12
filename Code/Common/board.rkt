@@ -3,7 +3,6 @@
 ;; a data representation for game States, plus basic functions for manipulating them
 
 ;; TODO
-;; -- catch infinitely looping player 
 ;; -- JSON de/serialozation 
 
 ;; safety
@@ -81,6 +80,8 @@
     (define-values (x-look y-look) (looking-at port x y))
     (boolean? (matrix-ref board x-look y-look))))
 
+(struct exn:infinite exn (player))
+
 ;; for tests of contracts, see below data examples 
 
 (provide
@@ -99,6 +100,7 @@
   
   [add-tile
    ;; place a configured tile on the empty square that the player pn neighbors
+   ;; EFFECT may raise (exn:finite String CMS Player) to signal an infinite loop
    (->i ([s state?][c tile?][pn (s) (and/c string? (part-of s))])
         [result (and/c state? every-player-faces-open-square)])]))
 
@@ -223,8 +225,10 @@
   (match-define  (player _ port x y) (find-player players player-name))
   (define-values (x-new y-new) (looking-at port x y))
   (define nu-board (add-new-square-update-neighbors board tile x-new y-new))
-  (define-values (moved __eliminated) (move-players nu-board players x-new y-new))
-  ;; what to do with eliminated ones 
+  (define-values (moved out* inf*) (move-players nu-board players x-new y-new))
+  (when (cons? inf*) (raise (exn:infinite "hello" (current-continuation-marks) (first inf*))))
+  ;; what to do with eliminated ones
+  ;; (displayln `(player was thrown out ,out*))
   (state nu-board moved))
 
 #; {(Listof Player) PlayerName -> Player}
@@ -241,6 +245,12 @@
   (check-equal? (add-tile state-3-players tile-to-add-to-board-3 player-red) state+
                 "drive red player off"))
 
+(module+ test ;; add-tile that causes an infinite loop 
+
+  (define inf-tile-to-add-to-board-3 tile1)
+  (check-exn exn:infinite? (λ () (add-tile state-3-players inf-tile-to-add-to-board-3 player-red))
+             "drive red player into infinite loop"))
+
 ;; ---------------------------------------------------------------------------------------------------
 ;; moving players 
 
@@ -248,31 +258,34 @@
 ;; move players facing (x,y), detrmine survivors, return those as the first list;
 ;; the second list are the drop-outs that run into walls 
 (define (move-players board players x y)
-  (define-values (moved out)
-    (for/fold ((moved '()) (out '())) ((p (in-list players)))
+  (define-values (moved out inf)
+    (for/fold ((moved '()) (out '()) (inf '())) ((p (in-list players)))
       (match-define  (player name port x-p y-p) p)
       (define-values (x-at y-at) (looking-at port x-p y-p))
       (cond
         [(and (= x-at x) (= y-at y))
          (define p-moved (move-one-player board p))
-         (if (out? p-moved)
-             (values moved (cons p-moved out))
-             (values (cons p-moved moved) out))]
-        [else (values (cons p moved) out)])))
-  (values (reverse moved) out))
+         (cond
+           [(out? p-moved) (values moved (cons p-moved out) inf)]
+           [(inf? p-moved) (values moved out (cons p-moved inf))]
+           [else (values (cons p-moved moved) out inf)])]
+        [else (values (cons p moved) out inf)])))
+  (values (reverse moved) out inf))
 
 (struct out [player] #:transparent)
+(struct inf [player] #:transparent)
 
-#; {Board Player -> (U Player (out Player))}
+#; {Board Player -> (U Player (out Player) (inf Player))}
 (define (move-one-player board the-player)
   ;; start player on (port-p, x-p, y-p) that look at an occupied neighboring square
   (match-define (player name port-p x-p y-p) the-player)
-  (let move-one-player ([port-p port-p][x-p x-p][y-p y-p])
+  (let move-one-player ([port-p port-p][x-p x-p][y-p y-p][seen `((,x-p ,y-p))])
     (match-define (list port x y external) (move-one-square board port-p x-p y-p))
     (cond
+      [(member `(,x ,y) seen) (inf (player name port x y))]
       [(equal? WALL external) (out (player name port x y))]
       [(equal? OPEN external) (player name port x y)]
-      [else (move-one-player port x y)])))
+      [else (move-one-player port x y (cons `(,x ,y) seen))])))
 
 #; {Board Port Index Index -> [List Index Index Next]}
 ;; move player at (x-p, y-p) on port port-p "thru" the tile of the next square
