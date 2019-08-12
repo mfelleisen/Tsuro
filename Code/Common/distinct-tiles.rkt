@@ -7,6 +7,7 @@
 
 ;; ---------------------------------------------------------------------------------------------------
 (require Tsuro/Code/Common/tiles)
+(require Tsuro/Code/Common/port-alphabetic)
 
 (module+ test (require rackunit))
 
