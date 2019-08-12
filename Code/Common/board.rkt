@@ -18,6 +18,7 @@
 
 (require (only-in Tsuro/Code/Common/port-alphabetic port?))
 (require (only-in Tsuro/Code/Common/tiles tile?))
+(require Tsuro/Code/Lib/or)
 
 (define SIZE 10) ; Tsuro is played on a board with SIZE x SIZE configured tiles
 
@@ -27,35 +28,20 @@
 ;; -----------------------------------------------------------------------------
 ;; placements
 
-#; {Placement0 = [List Tile PlayerName PortIndex Index Index] subjectto}
-               
-#; { Placement0 -> Boolean : (x,y) describe a square position near the peruphery }
-(define (x-and-y-on-periphery? l)
-  (match-define (list c name p x y) l)
-  (or (= x 0) (= x SIZE) (= y 0) (= y SIZE)))
-
-#; { Placement0 -> Boolean : port element faces inside }
-(define (port-facing-inward? l)
-  (match-define (list c name p x y) l)
-  (define-values (x-look y-look) (looking-at p x y))
-  (and (index? x-look) (index? y-look)))
+#; {Placements* = [Listof Placements0] s.t. constraints}
+#; {Placement0  = [List Tile PlayerName PortIndex Index Index] s.t. constraints}
 
 ;; contratc combinator
-#;
-[list/dc
-  [t tile?]
-  [n string?]
-  [p port?]
-  [x index?]
-  [y index?]
-  #;(lambda (l) (match-define (t n p x y) l) ...)
-  #:post (x y) (or (= x 0) (= x SIZE) (= y 0) (= y SIZE))
-  #:post (p x y) (let-values ([(x-look y-look) (looking-at p x y)]) (and (index? x-look) (index? y-look)))]
 (define placement0/c
-  (and/c 
-   (list/c tile? string? port? index? index?)
-   x-and-y-on-periphery?
-   port-facing-inward?))
+  [list/dc
+   [t tile?] [n string?] [p port?] [x index?] [y index?]
+   #:post at-periphery-facing-inward (p x y)
+   (and
+    ;; describe a square position near the periphery:
+    (or (= x 0) (= x SIZE) (= y 0) (= y SIZE))
+    ;; port element faces inside:
+    (let-values ([(x-facing y-facing) (looking-at p x y)])
+      (and (index? x-facing) (index? y-facing))))])
 
 #; { [Listof Placement0] -> Boolean : locations are distinct and not neighboring }
 (define (locations-distinct-and-not-neighboring l)
