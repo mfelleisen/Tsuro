@@ -48,6 +48,7 @@
   [p port?]
   [x index?]
   [y index?]
+  #;(lambda (l) (match-define (t n p x y) l) ...)
   #:post (x y) (or (= x 0) (= x SIZE) (= y 0) (= y SIZE))
   #:post (p x y) (let-values ([(x-look y-look) (looking-at p x y)]) (and (index? x-look) (index? y-look)))]
 (define placement0/c
