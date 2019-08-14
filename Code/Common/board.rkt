@@ -13,21 +13,21 @@
 ;; - determine whether the addition of a tile for a player P forces P to commit suicide
 ;; - determine whether the addition of a tile adds a cyclic path
 
-;                                                   
-;                                                   
-;                                        ;          
-;                                        ;          
-;    ;;;   ;   ;  ;;;;    ;;;    ;;;;  ;;;;;   ;;;  
-;   ;;  ;   ; ;   ;; ;;  ;; ;;   ;;  ;   ;    ;   ; 
-;   ;   ;;  ;;;   ;   ;  ;   ;   ;       ;    ;     
-;   ;;;;;;   ;    ;   ;  ;   ;   ;       ;     ;;;  
-;   ;       ;;;   ;   ;  ;   ;   ;       ;        ; 
-;   ;       ; ;   ;; ;;  ;; ;;   ;       ;    ;   ; 
-;    ;;;;  ;   ;  ;;;;    ;;;    ;       ;;;   ;;;  
-;                 ;                                 
-;                 ;                                 
-;                 ;                                 
-
+;                                                                 
+;                                                                 
+;                          ;                           ;          
+;                          ;                           ;          
+;    ;;;    ;;;   ; ;;   ;;;;;   ;;;;  ;;;;    ;;;   ;;;;;   ;;;  
+;   ;;  ;  ;; ;;  ;;  ;    ;     ;;  ;     ;  ;;  ;    ;    ;   ; 
+;   ;      ;   ;  ;   ;    ;     ;         ;  ;        ;    ;     
+;   ;      ;   ;  ;   ;    ;     ;      ;;;;  ;        ;     ;;;  
+;   ;      ;   ;  ;   ;    ;     ;     ;   ;  ;        ;        ; 
+;   ;;     ;; ;;  ;   ;    ;     ;     ;   ;  ;;       ;    ;   ; 
+;    ;;;;   ;;;   ;   ;    ;;;   ;      ;;;;   ;;;;    ;;;   ;;;  
+;                                                                 
+;                                                                 
+;                                                                 
+  
 (require (only-in Tsuro/Code/Common/port-alphabetic port?))
 (require (only-in Tsuro/Code/Common/tiles tile?))
 (require Tsuro/Code/Lib/or)
@@ -131,7 +131,7 @@
 ;; a consistent state
 
 #; { State -> Boolean : every player faces an open square }
-;; for initialize and add-tile 
+;; for initialize and add-tile and intermediate 
 (define (every-player-faces-open-square s)
   (match-define (state board players) s)
   (for/and ((p players))
@@ -139,14 +139,34 @@
     (define-values (x-look y-look) (looking-at port x y))
     (boolean? (matrix-ref board x-look y-look))))
 
-#: {State -> Boolean : every player can go backwatds to an outside port}
+#; {State -> Boolean : every player can go backwatds to an outside port}
 ;; for intermediate, though it also holds for initialize and add-tile
 (define (every-player-can-leave-going-backwards s)
-  #false)
+  (match-define (state board players) s)
+  (for/and ((p players))
+    (match-define (player name port x y) p)
+    (match-define (list tile _portmap)   (matrix-ref board x y))
+    (define player-moved-to-exit-port    (player name (tile port) x y))
+    (out? (move-one-player board player-moved-to-exit-port))))
 
 ;; for tests of contracts, see below data examples 
 
-;; -----------------------------------------------------------------------------
+
+;                                                   
+;                                                   
+;                                        ;          
+;                                        ;          
+;    ;;;   ;   ;  ;;;;    ;;;    ;;;;  ;;;;;   ;;;  
+;   ;;  ;   ; ;   ;; ;;  ;; ;;   ;;  ;   ;    ;   ; 
+;   ;   ;;  ;;;   ;   ;  ;   ;   ;       ;    ;     
+;   ;;;;;;   ;    ;   ;  ;   ;   ;       ;     ;;;  
+;   ;       ;;;   ;   ;  ;   ;   ;       ;        ; 
+;   ;       ; ;   ;; ;;  ;; ;;   ;       ;    ;   ; 
+;    ;;;;  ;   ;  ;;;;    ;;;    ;       ;;;   ;;;  
+;                 ;                                 
+;                 ;                                 
+;                 ;
+
 (provide
  ;; type State
  ;; all players are on ports that face empty squares on the board 
@@ -217,7 +237,7 @@
 #; {Player* = [Listof Player]}
 #; {Player  = (player PlayerName p x y)}
 #; {PlayerName = String}
-#; {Board   = [Matrixof square] :: {Index x Index}}
+#; {Board   = [Matrixof Square] :: {Index x Index}}
 #; {Index   = [0 .. SIZE]}
 #; {Square  = (U BLANK                   ;; an unoccupied, blank square 
                  (square Tile PortMap))} ;; a configured tile with connections to neighbors cached 
