@@ -3,6 +3,7 @@
 ;; a data representation for game States, plus basic functions for manipulating them
 
 ;; TODO
+;; -- lgelaity of an intermediate state creation 
 ;; -- JSON de/serialozation 
 
 ;; safety
@@ -12,8 +13,20 @@
 ;; - determine whether the addition of a tile for a player P forces P to commit suicide
 ;; - determine whether the addition of a tile adds a cyclic path
 
-;; ---------------------------------------------------------------------------------------------------
-;; contrat section
+;                                                   
+;                                                   
+;                                        ;          
+;                                        ;          
+;    ;;;   ;   ;  ;;;;    ;;;    ;;;;  ;;;;;   ;;;  
+;   ;;  ;   ; ;   ;; ;;  ;; ;;   ;;  ;   ;    ;   ; 
+;   ;   ;;  ;;;   ;   ;  ;   ;   ;       ;    ;     
+;   ;;;;;;   ;    ;   ;  ;   ;   ;       ;     ;;;  
+;   ;       ;;;   ;   ;  ;   ;   ;       ;        ; 
+;   ;       ; ;   ;; ;;  ;; ;;   ;       ;    ;   ; 
+;    ;;;;  ;   ;  ;;;;    ;;;    ;       ;;;   ;;;  
+;                 ;                                 
+;                 ;                                 
+;                 ;                                 
 
 (require (only-in Tsuro/Code/Common/port-alphabetic port?))
 (require (only-in Tsuro/Code/Common/tiles tile?))
@@ -25,7 +38,7 @@
 (define (index? z) (< -1 z SIZE))
 
 ;; -----------------------------------------------------------------------------
-;; placements
+;; initial placements
 
 #; {Placements* = [Listof Placements0] s.t. constraints}
 #; {Placement0  = [List Tile PlayerName PortIndex Index Index] s.t. constraints}
@@ -104,7 +117,21 @@
    (->i ([s state?][c tile?][pn (s) (and/c string? (part-of s))])
         [result (and/c state? every-player-faces-open-square)])]))
 
-;; ---------------------------------------------------------------------------------------------------
+;                                                                                      
+;       ;                                  ;                                           
+;       ;                                  ;                          ;                
+;       ;                                  ;                                           
+;    ;;;;   ;;;   ;;;;    ;;;   ; ;;    ;;;;   ;;;   ; ;;    ;;;    ;;;    ;;;    ;;;  
+;   ;; ;;  ;;  ;  ;; ;;  ;;  ;  ;;  ;  ;; ;;  ;;  ;  ;;  ;  ;;  ;     ;   ;;  ;  ;   ; 
+;   ;   ;  ;   ;; ;   ;  ;   ;; ;   ;  ;   ;  ;   ;; ;   ;  ;         ;   ;   ;; ;     
+;   ;   ;  ;;;;;; ;   ;  ;;;;;; ;   ;  ;   ;  ;;;;;; ;   ;  ;         ;   ;;;;;;  ;;;  
+;   ;   ;  ;      ;   ;  ;      ;   ;  ;   ;  ;      ;   ;  ;         ;   ;          ; 
+;   ;; ;;  ;      ;; ;;  ;      ;   ;  ;; ;;  ;      ;   ;  ;;        ;   ;      ;   ; 
+;    ;;;;   ;;;;  ;;;;    ;;;;  ;   ;   ;;;;   ;;;;  ;   ;   ;;;;   ;;;;;  ;;;;   ;;;  
+;                 ;                                                                    
+;                 ;                                                                    
+;                 ;                                                                    
+
 (require (except-in Tsuro/Code/Common/tiles tile?))
 (require (except-in Tsuro/Code/Common/port-alphabetic port?))
 (require Tsuro/Code/Common/matrix)
@@ -115,7 +142,21 @@
   (require rackunit)
   (require racket/gui))
 
-;; ---------------------------------------------------------------------------------------------------
+;                                                                 
+;       ;                                                         
+;       ;           ;                                             
+;       ;           ;                                             
+;    ;;;;  ;;;;   ;;;;;  ;;;;           ;;;;   ;;;   ;;;;         
+;   ;; ;;      ;    ;        ;          ;;  ; ;;  ;  ;; ;;        
+;   ;   ;      ;    ;        ;          ;     ;   ;; ;   ;        
+;   ;   ;   ;;;;    ;     ;;;;          ;     ;;;;;; ;   ;        
+;   ;   ;  ;   ;    ;    ;   ;          ;     ;      ;   ;        
+;   ;; ;;  ;   ;    ;    ;   ;          ;     ;      ;; ;;   ;;   
+;    ;;;;   ;;;;    ;;;   ;;;;          ;      ;;;;  ;;;;    ;;   
+;                                                    ;            
+;                                                    ;            
+;                                                    ;            
+
 ;; data representation of the game state: the board, the players  
 
 ;; the game state itself 
@@ -196,7 +237,21 @@
   (check-true (placements0*/c inits-for-state-with-3-players))
   (check-true ((part-of (state-with-3-players)) player-red)))
 
-;; ---------------------------------------------------------------------------------------------------
+;                                                                        
+;                                                                        
+;      ;             ;     ;       ;          ;;;       ;                
+;                          ;                    ;                        
+;    ;;;   ; ;;    ;;;   ;;;;;   ;;;   ;;;;     ;     ;;;   ;;;;;   ;;;  
+;      ;   ;;  ;     ;     ;       ;       ;    ;       ;       ;  ;;  ; 
+;      ;   ;   ;     ;     ;       ;       ;    ;       ;      ;   ;   ;;
+;      ;   ;   ;     ;     ;       ;    ;;;;    ;       ;     ;    ;;;;;;
+;      ;   ;   ;     ;     ;       ;   ;   ;    ;       ;    ;     ;     
+;      ;   ;   ;     ;     ;       ;   ;   ;    ;       ;   ;      ;     
+;    ;;;;; ;   ;   ;;;;;   ;;;   ;;;;;  ;;;;     ;;   ;;;;; ;;;;;   ;;;; 
+;                                                                        
+;                                                                        
+;                                                                        
+
 ;; initialize a State from a list of (initial) Placements0
 
 (define (initialize lo-placements)
@@ -217,7 +272,21 @@
 
   (check-equal? (initialize inits-for-state-with-3-players) (state-with-3-players)))
 
-;; ---------------------------------------------------------------------------------------------------
+;                                                                        
+;              ;      ;                                                  
+;              ;      ;                         ;       ;   ;;;          
+;              ;      ;                         ;             ;          
+;   ;;;;    ;;;;   ;;;;         ;;;;          ;;;;;   ;;;     ;     ;;;  
+;       ;  ;; ;;  ;; ;;             ;           ;       ;     ;    ;;  ; 
+;       ;  ;   ;  ;   ;             ;           ;       ;     ;    ;   ;;
+;    ;;;;  ;   ;  ;   ;          ;;;;           ;       ;     ;    ;;;;;;
+;   ;   ;  ;   ;  ;   ;         ;   ;           ;       ;     ;    ;     
+;   ;   ;  ;; ;;  ;; ;;         ;   ;           ;       ;     ;    ;     
+;    ;;;;   ;;;;   ;;;;          ;;;;           ;;;   ;;;;;    ;;   ;;;; 
+;                                                                        
+;                                                                        
+;                                                                        
+
 ;; adding a tile T for a player P
 
 (define (add-tile state0 tile player-name)
@@ -251,63 +320,20 @@
   (check-exn exn:infinite? (λ () (add-tile state-3-players inf-tile-to-add-to-board-3 player-red))
              "drive red player into infinite loop"))
 
-;; ---------------------------------------------------------------------------------------------------
-;; moving players 
-
-#; {Board Player* Index Index -> (values Player* [Listof Player])}
-;; move players facing (x,y), detrmine survivors, return those as the first list;
-;; the second list are the drop-outs that run into walls 
-(define (move-players board players x y)
-  (define-values (moved out inf)
-    (for/fold ((moved '()) (out '()) (inf '())) ((p (in-list players)))
-      (match-define  (player name port x-p y-p) p)
-      (define-values (x-at y-at) (looking-at port x-p y-p))
-      (cond
-        [(and (= x-at x) (= y-at y))
-         (define p-moved (move-one-player board p))
-         (cond
-           [(out? p-moved) (values moved (cons p-moved out) inf)]
-           [(inf? p-moved) (values moved out (cons p-moved inf))]
-           [else (values (cons p-moved moved) out inf)])]
-        [else (values (cons p moved) out inf)])))
-  (values (reverse moved) out inf))
-
-(struct out [player] #:transparent)
-(struct inf [player] #:transparent)
-
-#; {Board Player -> (U Player (out Player) (inf Player))}
-(define (move-one-player board the-player)
-  ;; start player on (port-p, x-p, y-p) that look at an occupied neighboring square
-  (match-define (player name port-p x-p y-p) the-player)
-  (let move-one-player ([port-p port-p][x-p x-p][y-p y-p][seen `((,x-p ,y-p))])
-    (match-define (list port x y external) (move-one-square board port-p x-p y-p))
-    (cond
-      [(member `(,x ,y) seen) (inf (player name port x y))]
-      [(equal? WALL external) (out (player name port x y))]
-      [(equal? OPEN external) (player name port x y)]
-      [else (move-one-player port x y (cons `(,x ,y) seen))])))
-
-#; {Board Port Index Index -> [List Index Index Next]}
-;; move player at (x-p, y-p) on port port-p "thru" the tile of the next square
-;; ASSUME the square is occupired with a tile 
-(define (move-one-square board port x-p y-p)
-  (match-define (square tile-p map-p)        (matrix-ref board x-p y-p))
-  (match-define (next port-in x-next y-next) (vector-ref map-p (port->index port)))
-  (match-define (square tile-next map-next)  (matrix-ref board x-next y-next))
-  (define port-out (tile-next port-in))
-  (define external (vector-ref map-next (port->index port-out)))
-  (list port-out x-next y-next external))
-
-(module+ test ;; move player  
-  (define red-player (find-player 3players player-red))
-  (check-equal? (move-one-square board+ (player-port red-player) 0 0) (list (index->port 1) 1 0 WALL)
-                "moved red player 1 step")
-
-  (check-equal? (move-one-player board+ red-player) (out (player player-red (index->port 1) 1 0))
-                "move red player all the way"))
-
-;; ---------------------------------------------------------------------------------------------------
-;; updadting the board
+;                                                                                      
+;                     ;                              ;                               ; 
+;                     ;           ;                  ;                               ; 
+;                     ;           ;                  ;                               ; 
+;   ;   ;  ;;;;    ;;;;  ;;;;   ;;;;;   ;;;          ;;;;    ;;;   ;;;;    ;;;;   ;;;; 
+;   ;   ;  ;; ;;  ;; ;;      ;    ;    ;;  ;         ;; ;;  ;; ;;      ;   ;;  ; ;; ;; 
+;   ;   ;  ;   ;  ;   ;      ;    ;    ;   ;;        ;   ;  ;   ;      ;   ;     ;   ; 
+;   ;   ;  ;   ;  ;   ;   ;;;;    ;    ;;;;;;        ;   ;  ;   ;   ;;;;   ;     ;   ; 
+;   ;   ;  ;   ;  ;   ;  ;   ;    ;    ;             ;   ;  ;   ;  ;   ;   ;     ;   ; 
+;   ;   ;  ;; ;;  ;; ;;  ;   ;    ;    ;             ;; ;;  ;; ;;  ;   ;   ;     ;; ;; 
+;    ;;;;  ;;;;    ;;;;   ;;;;    ;;;   ;;;;         ;;;;    ;;;    ;;;;   ;      ;;;; 
+;          ;                                                                           
+;          ;                                                                           
+;          ;                                                                           
 
 #; {Board Confguration Index Index -> Matrix}
 
@@ -359,8 +385,89 @@
                                [pm (update-portmap pm 1 0 0 0)])
                           pm))))
 
-;; ---------------------------------------------------------------------------------------------------
-;; creating a portmap, adding external connections to portmap
+;                                                                                                    
+;                                                                                                    
+;                           ;                               ;;;                                      
+;                                                             ;                                      
+;  ;;;;;;   ;;;   ;   ;   ;;;   ; ;;    ;;;;         ;;;;     ;    ;;;;   ;   ;   ;;;    ;;;;   ;;;  
+;  ;  ;  ; ;; ;;  ;   ;     ;   ;;  ;  ;;  ;         ;; ;;    ;        ;  ;   ;  ;;  ;   ;;  ; ;   ; 
+;  ;  ;  ; ;   ;   ; ;      ;   ;   ;  ;   ;         ;   ;    ;        ;   ; ;   ;   ;;  ;     ;     
+;  ;  ;  ; ;   ;   ; ;      ;   ;   ;  ;   ;         ;   ;    ;     ;;;;   ; ;   ;;;;;;  ;      ;;;  
+;  ;  ;  ; ;   ;   ; ;      ;   ;   ;  ;   ;         ;   ;    ;    ;   ;   ; ;   ;       ;         ; 
+;  ;  ;  ; ;; ;;    ;       ;   ;   ;  ;; ;;         ;; ;;    ;    ;   ;   ;;    ;       ;     ;   ; 
+;  ;  ;  ;  ;;;     ;     ;;;;; ;   ;   ;;;;         ;;;;      ;;   ;;;;    ;     ;;;;   ;      ;;;  
+;                                          ;         ;                      ;                        
+;                                       ;  ;         ;                     ;                         
+;                                        ;;          ;                    ;;                         
+
+#; {Board Player* Index Index -> (values Player* [Listof Player])}
+
+;; move players facing (x,y), detrmine survivors, return those as the first list;
+;; the second list are the drop-outs that run into walls
+
+(define (move-players board players x y)
+  (define-values (moved out inf)
+    (for/fold ((moved '()) (out '()) (inf '())) ((p (in-list players)))
+      (match-define  (player name port x-p y-p) p)
+      (define-values (x-at y-at) (looking-at port x-p y-p))
+      (cond
+        [(and (= x-at x) (= y-at y))
+         (define p-moved (move-one-player board p))
+         (cond
+           [(out? p-moved) (values moved (cons p-moved out) inf)]
+           [(inf? p-moved) (values moved out (cons p-moved inf))]
+           [else (values (cons p-moved moved) out inf)])]
+        [else (values (cons p moved) out inf)])))
+  (values (reverse moved) out inf))
+
+(struct out [player] #:transparent)
+(struct inf [player] #:transparent)
+
+#; {Board Player -> (U Player (out Player) (inf Player))}
+(define (move-one-player board the-player)
+  ;; start player on (port-p, x-p, y-p) that look at an occupied neighboring square
+  (match-define (player name port-p x-p y-p) the-player)
+  (let move-one-player ([port-p port-p][x-p x-p][y-p y-p][seen `((,x-p ,y-p))])
+    (match-define (list port x y external) (move-one-square board port-p x-p y-p))
+    (cond
+      [(member `(,x ,y) seen) (inf (player name port x y))]
+      [(equal? WALL external) (out (player name port x y))]
+      [(equal? OPEN external) (player name port x y)]
+      [else (move-one-player port x y (cons `(,x ,y) seen))])))
+
+#; {Board Port Index Index -> [List Index Index Next]}
+;; move player at (x-p, y-p) on port port-p "thru" the tile of the next square
+;; ASSUME the square is occupired with a tile 
+(define (move-one-square board port x-p y-p)
+  (match-define (square tile-p map-p)        (matrix-ref board x-p y-p))
+  (match-define (next port-in x-next y-next) (vector-ref map-p (port->index port)))
+  (match-define (square tile-next map-next)  (matrix-ref board x-next y-next))
+  (define port-out (tile-next port-in))
+  (define external (vector-ref map-next (port->index port-out)))
+  (list port-out x-next y-next external))
+
+(module+ test ;; move player  
+  (define red-player (find-player 3players player-red))
+  (check-equal? (move-one-square board+ (player-port red-player) 0 0) (list (index->port 1) 1 0 WALL)
+                "moved red player 1 step")
+
+  (check-equal? (move-one-player board+ red-player) (out (player player-red (index->port 1) 1 0))
+                "move red player all the way"))
+
+;                                                   
+;                        ;                          
+;                        ;         ;                
+;                        ;                          
+;    ;;;   ;;;;    ;;;   ; ;;    ;;;   ; ;;    ;;;; 
+;   ;;  ;      ;  ;;  ;  ;;  ;     ;   ;;  ;  ;;  ; 
+;   ;          ;  ;      ;   ;     ;   ;   ;  ;   ; 
+;   ;       ;;;;  ;      ;   ;     ;   ;   ;  ;   ; 
+;   ;      ;   ;  ;      ;   ;     ;   ;   ;  ;   ; 
+;   ;;     ;   ;  ;;     ;   ;     ;   ;   ;  ;; ;; 
+;    ;;;;   ;;;;   ;;;;  ;   ;   ;;;;; ;   ;   ;;;; 
+;                                                 ; 
+;                                              ;  ; 
+;                                               ;;  
 
 #; {Index Index -> PortMap }
 ;; create the default portmap for a square 
@@ -431,11 +538,23 @@
           
   (check-equal? (update-portmap nu-pm 1 0 2 0) pm3+))
 
-
-;; ---------------------------------------------------------------------------------------------------
-;; determine (occupied) neighbors of the square at (x,y)
+;                                                                 
+;                               ;      ;                          
+;                    ;          ;      ;                          
+;                               ;      ;                          
+;   ; ;;    ;;;    ;;;    ;;;;  ; ;;   ;;;;    ;;;    ;;;;   ;;;  
+;   ;;  ;  ;;  ;     ;   ;;  ;  ;;  ;  ;; ;;  ;; ;;   ;;  ; ;   ; 
+;   ;   ;  ;   ;;    ;   ;   ;  ;   ;  ;   ;  ;   ;   ;     ;     
+;   ;   ;  ;;;;;;    ;   ;   ;  ;   ;  ;   ;  ;   ;   ;      ;;;  
+;   ;   ;  ;         ;   ;   ;  ;   ;  ;   ;  ;   ;   ;         ; 
+;   ;   ;  ;         ;   ;; ;;  ;   ;  ;; ;;  ;; ;;   ;     ;   ; 
+;   ;   ;   ;;;;   ;;;;;  ;;;;  ;   ;  ;;;;    ;;;    ;      ;;;  
+;                            ;                                    
+;                         ;  ;                                    
+;                          ;;                                     
 
 #; {Board Index Index -> [values [Listof Index] [Listof Index]]}
+;; determine (occupied) neighbors of the square at (x,y)
 (define (neighbors* board x y)
   (define all `((,x ,(- y 1)) (,x ,(+ y 1)) (,(- x 1) ,y) (,(+ x 1) ,y)))
   (filter (match-lambda [`(,x ,y) (and (index? x) (index? y) (matrix-ref board x y))]) all))
@@ -448,8 +567,20 @@
     [(SOUTH) (values x (+ y 1))]
     [(WEST)  (values (- x 1) y)]))
 
-;; ---------------------------------------------------------------------------------------------------
-;; drawing all tiles in a set into a drawing context
+;                                     
+;                                     
+;             ;            ;          
+;                          ;          
+;   ;;;;    ;;;    ;;;   ;;;;;   ;;;  
+;   ;; ;;     ;   ;;  ;    ;    ;   ; 
+;   ;   ;     ;   ;        ;    ;     
+;   ;   ;     ;   ;        ;     ;;;  
+;   ;   ;     ;   ;        ;        ; 
+;   ;; ;;     ;   ;;       ;    ;   ; 
+;   ;;;;    ;;;;;  ;;;;    ;;;   ;;;  
+;   ;                                 
+;   ;                                 
+;   ;                                 
 
 (define PLAYER-SIZE (quotient TILE-SIZE 5)) 
 
