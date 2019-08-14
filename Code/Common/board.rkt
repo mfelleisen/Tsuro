@@ -38,54 +38,100 @@
 (define (index? z) (< -1 z SIZE))
 
 ;; -----------------------------------------------------------------------------
-;; initial placements
+;; combinators for creating board placement contracts 
 
-#; {Placements* = [Listof Placements0] s.t. constraints}
-#; {Placement0  = [List Tile PlayerName PortIndex Index Index] s.t. constraints}
+;; -----------------------------------------------------------------------------
+;; check a list of placements (initial or intermediate)
 
-;; contratc combinator
-(define placement0/c
-  [list/dc
-   [t tile?] [n string?] [p port?] [x index?] [y index?]
-   #:post at-periphery-facing-inward (p x y)
-   (and
-    ;; describe a square position near the periphery:
-    (or (= x 0) (= x SIZE) (= y 0) (= y SIZE))
-    ;; port element faces inside:
-    (let-values ([(x-facing y-facing) (looking-at p x y)])
-      (and (index? x-facing) (index? y-facing))))])
+#; {({Any -> Any} [Listof Any] -> Boolean) {Boolean -> Boolean} -> Contract}
+(define (make-*-contract items/c context)
+  (match-define (list combinator holds) context)
+  (and/c [listof items/c]
+         (apply-to-locations locations-distinct)
+         (apply-to-locations (neighboring combinator holds))))
 
-#; { [Listof Placement0] -> Boolean : locations are distinct and not neighboring }
-(define (locations-distinct-and-not-neighboring l)
-  (define locations (map cdddr l))
-  (and (locations-distinct locations) (not-neighboring locations)))
+(define isolated (list andmap not))
+(define contiguous (list ormap identity))
+
+#; {[Listof (U TilePlacement PlayerOnTile)] ;; ** this is bad; place x y first
+    ->
+    [[Listof [List Index Index] -> Contract]
+     -> Contract]}
+(define ((apply-to-locations mk-c) l)
+  (mk-c
+   (for/list ((x l))
+     (define r (reverse x))
+     (list (second r) (first r)))))
 
 #; { [Listof (List Index Index)] -> Boolean : locations are distinct }
 (define (locations-distinct locations)
   (= (length locations) (set-count (apply set locations))))
 
-#; { [Listof (List Index Index)] -> Boolean : locations are not neighboring }
-(define (not-neighboring locations)
+#; {({Any -> Any} [Listof Any] -> Boolean)
+    {Boolean -> Boolean}
+    ->
+    {[Listof (List Index Index)] -> Boolean : locations are not neighboring}}
+(define ((neighboring combinator holds) locations)
   (for/and ((loc (in-list locations)))
     (define all-but (remove loc locations))
-    (for/and ((n (in-list (apply neighbors* the-empty-board loc))))
-      (not (member n all-but)))))
-
-;; contract combinator 
-(define placements0*/c
-  (and/c (listof placement0/c)
-         locations-distinct-and-not-neighboring))
+    (combinator (λ (n) (holds (member n all-but)))
+                (apply neighbors* the-empty-board loc))))
 
 ;; -----------------------------------------------------------------------------
-;; add tile 
+;; check a single placement (initial or intermediate)
+
+#; { (Index Index -> Boolean) -> Contract }
+(define (make-placement/c bordering-periphery?)
+  [list/dc
+   [t tile?] [n string?] [p port?] [x index?] [y index?]
+   #:post at-periphery-facing-inward (p x y)
+   (and (bordering-periphery? x y)
+        (player-facing-inward? p x y))])
+
+#; (Index Index -> Boolean : index is near boder)
+(define (bordering-periphery? x y)
+  (or (= x 0) (= x SIZE) (= y 0) (= y SIZE)))
+
+#; { PortIndex Index Index -> Boolean : p on (x,y) looks at an interior square}
+(define (player-facing-inward? p x y)
+  (define-values (x-facing y-facing) (looking-at p x y))
+  (and (index? x-facing) (index? y-facing)))
+
+;; -----------------------------------------------------------------------------
+;; initial placements
+
+#; {InitialTile** = [Listof PlayerOnTile] s.t. distinct non-neigboring locs}
+#; {PlayerOnTile  = [List Tile PlayerName PortIndex Index Index] s.t. constraints}
+
+(define player-on-tile/c (make-placement/c bordering-periphery?))
+(define initial-player-on-tile*/c (make-*-contract player-on-tile/c isolated))
+
+;; -----------------------------------------------------------------------------
+;; intermediate placements 
+
+#; {Intermediate* = [Listof Intermediate]
+                  s.t.
+                  (1) contiguous & distinct locs,
+                  (2) each player can go "backwards" to peripheral port on resulting board}
+#; {Intermediate  = (U TilePlacement
+                       PlayerOnTile w/o perhiphery constraint)}
+#; {TilePlacement = [List Tile Index Index]}
+
+(define tile/c (make-placement/c (λ (x y) #t)))
+(define intermediate*/c (make-*-contract (or/c player-on-tile/c tile/c) contiguous))
+
+;; -----------------------------------------------------------------------------
+;; adding a tile to a properly built board
+
 #; { State -> (-> PlayerName Boolean : the player is on the list of players)}
 (define ((part-of s) pname)
   (cons? (memf (finder pname) (state-players s))))
 
 ;; -----------------------------------------------------------------------------
-;; state
+;; a consistent state
 
 #; { State -> Boolean : every player faces an open square }
+;; for initialize and add-tile 
 (define (every-player-faces-open-square s)
   (match-define (state board players) s)
   (for/and ((p players))
@@ -93,10 +139,14 @@
     (define-values (x-look y-look) (looking-at port x y))
     (boolean? (matrix-ref board x-look y-look))))
 
-(struct exn:infinite exn (player))
+#: {State -> Boolean : every player can go backwatds to an outside port}
+;; for intermediate, though it also holds for initialize and add-tile
+(define (every-player-can-leave-going-backwards s)
+  #false)
 
 ;; for tests of contracts, see below data examples 
 
+;; -----------------------------------------------------------------------------
 (provide
  ;; type State
  ;; all players are on ports that face empty squares on the board 
@@ -109,11 +159,13 @@
  (contract-out 
   [initialize
    ;; creates a state from a list of initial placements 
-   (-> placements0*/c (and/c state? every-player-faces-open-square))]
+   (-> initial-player-on-tile*/c (and/c state? every-player-faces-open-square))]
   
   [add-tile
    ;; place a configured tile on the empty square that the player pn neighbors
-   ;; EFFECT may raise (exn:finite String CMS Player) to signal an infinite loop
+   ;; EFFECT may raise
+   #;   (exn:finite String CMS Player)
+   ;; to signal an infinite loop
    (->i ([s state?][c tile?][pn (s) (and/c string? (part-of s))])
         [result (and/c state? every-player-faces-open-square)])]))
 
@@ -233,8 +285,8 @@
   (define placement1 (first inits-for-state-with-3-players)))
 
 (module+ test ;; contracts
-  (check-true (placement0/c placement1))
-  (check-true (placements0*/c inits-for-state-with-3-players))
+  (check-true (player-on-tile/c placement1))
+  (check-true (initial-player-on-tile*/c inits-for-state-with-3-players))
   (check-true ((part-of (state-with-3-players)) player-red)))
 
 ;                                                                        
@@ -287,7 +339,7 @@
 ;                                                                        
 ;                                                                        
 
-;; adding a tile T for a player P
+(struct exn:infinite exn (player))
 
 (define (add-tile state0 tile player-name)
   (match-define  (state board players) state0)
