@@ -15,6 +15,7 @@
     ))
 
 ;; json-type-provider
+;; https://github.com/philnguyen/json-type-provider
 
 (define pkg-desc "Sources for Tsuro/Sw Dev Fall 2019")
 
