@@ -14,8 +14,7 @@
  ;; evaluate to a contract that first checks a list for its elements and then
  ;; the post condition involviing a subset of the labeled fields
  ;; WARNING: not robust
- list/dc
- )
+ list/dc)
 
 ;; -----------------------------------------------------------------------------
 (require (for-syntax syntax/parse))
@@ -39,15 +38,16 @@
 
 (define-syntax (list/dc stx)
   (syntax-parse stx
-    [(_ [x:id c:expr] ... (~optional [~seq #:post name:id (y:id ...) condition:expr ...]))
+    [(_ [x:id c:expr] ... (~optional [~seq #:post name (y:id ...) prop:expr ...]))
+     #:declare name (expr/c #'string?)
      ;; check that y ... < x ...
      #'(and/c
         (list/c c ...)
-        (let ([name (match-lambda [(list x ...) (and condition ...)])]) name))]))
+        (flat-named-contract (string->symbol name.c) (match-lambda [(list x ...) (and prop ...)])))]))
 
 
 (module+ test
-  (define ctc (list/dc [x number?] [y number?] #:post a (x y) (>= x y)))
+  (define ctc (list/dc [x number?] [y number?] #:post "a" (x y) (>= x y)))
 
   (define/contract (f z) (-> ctc number?) 42)
 
