@@ -3,6 +3,7 @@
 ;; a data representation for game States, plus basic functions for manipulating them
 
 ;; TODO
+;; -- is equality on tiles a good thing? 
 ;; -- lgelaity of an intermediate state creation 
 ;; -- JSON de/serialozation 
 
@@ -70,8 +71,8 @@
 (define ((apply-to-locations mk-c) l)
   (define locations
     (for/list ((x l))
-     (define r (reverse x))
-     (list (second r) (first r))))
+      (define r (reverse x))
+      (list (second r) (first r))))
   (mk-c locations))
 
 #; { [Listof (List Index Index)] -> Boolean : locations are distinct }
@@ -99,8 +100,9 @@
 ;                                       ;  ;                       ;                                 
 ;                                        ;;                        ;                                 
 
-#; {String (Index Index -> Boolean) -> Contract }
-(define (make-placement/c label good?)
+#; {[List String (Index Index -> Boolean)] -> Contract }
+(define (make-placement/c label+good?)
+  (match-define (list label good?) label+good?)
   [list/dc
    [t tile?] [n string?] [p port?] [x index?] [y index?]
    #:post label (p x y)
@@ -115,6 +117,9 @@
 (define (player-facing-inward? p x y)
   (define-values (x-facing y-facing) (looking-at p x y))
   (and (index? x-facing) (index? y-facing)))
+
+(define at-periphery-facing-inward (list "at-periphery-facing-inward" bordering-periphery?))
+(define facing-inward (list "facing-inward" (λ (x y) #t)))
 
 ;                                                                                      
 ;                                                                                      
@@ -136,7 +141,7 @@
 #; {InitialTile** = [Listof PlayerOnTile] s.t. distinct non-neigboring locs}
 #; {PlayerOnTile  = [List Tile PlayerName PortIndex Index Index] s.t. constraints}
 
-(define player-on-tile/c (make-placement/c "at-periphery-facing-inward" bordering-periphery?))
+(define player-on-tile/c (make-placement/c at-periphery-facing-inward))
 (define initial-player-on-tile*/c (make-list-of-places-ctc player-on-tile/c isolated))
 
 ;                                                                                                    
@@ -159,13 +164,13 @@
 #; {Intermediate* = [Listof Intermediate]
                   s.t.
                   (1) contiguous & distinct locs,
-                  (2) each player can go "backwards" to peripheral port on resulting board}
+                  (2) each player can go "backwards" to periphery on resulting board}
 #; {Intermediate  = (U TilePlacement
                        PlayerOnTile w/o perhiphery constraint)}
 #; {TilePlacement = [List Tile Index Index]}
 
 (define tile/c (list/c tile? index? index?))
-(define player-on-any-tile/c (make-placement/c "facing-inward" (λ (x y) #t)))
+(define player-on-any-tile/c (make-placement/c facing-inward))
 (define either-or (or/c tile/c player-on-any-tile/c))
 (define intermediate*/c (make-list-of-places-ctc either-or contiguous))
 
@@ -199,9 +204,11 @@
   (match-define (state board players) s)
   (for/and ((p players))
     (match-define (player name port x y) p)
-    (match-define (square tile _portmap)   (matrix-ref board x y))
-    (define player-moved-to-exit-port    (player name (tile port) x y))
-    (out? (move-one-player board player-moved-to-exit-port))))
+    (match-define (square tile _portmap) (matrix-ref board x y))
+    (or~ #:let exit-port (tile port)
+         (and (bordering-periphery? x y) (player-facing-inward? port x y))
+         #:let player-moved-to-exit-port (player name (tile port) x y)
+         (out? (move-one-player board player-moved-to-exit-port #:to-periphery? #t)))))
 
 ;; for tests of contracts, see below data examples 
 
@@ -275,7 +282,7 @@
 (require Tsuro/Code/Common/matrix)
 (require pict)
 
-; (require Tsuro/Code/Lib/spy)
+(require Tsuro/Code/Lib/spy)
 
 (module+ test
   (require (submod ".."))
@@ -331,6 +338,8 @@
 ;; ---------------------------------------------------------------------------------------------------
 ;; data examples
 
+(require 'board-dsl)
+
 (define the-empty-board (build-matrix SIZE SIZE (λ (_i _j) BLANK)))
 
 (match-define `(,port-2 ,port-3 ,port-4) (map index->port '(2 3 4)))
@@ -345,8 +354,16 @@
 
 (define inits-for-state-with-3-players
   `((,tile-00 ,player-red   ,port-2 0 0)
-    (,tile-02 ,player-white ,port-3 0 2)
-    (,tile-20 ,player-blue  ,port-4 2 0)))
+    (,tile-20 ,player-blue  ,port-4 2 0)
+    (,tile-02 ,player-white ,port-3 0 2)))
+
+;; ---------------------------------------------------------------------------------------------------
+(module+ test
+  (check-equal? (board-from-tiles
+                 ((34 "red" on port-2) #f (33 #:rotate 90 "blue" on port-4))
+                 (#f)
+                 ((34 "white" on port-3)))
+                inits-for-state-with-3-players))
 
 (define 3players (map (λ (init) (apply player (rest init))) inits-for-state-with-3-players))
 (define red-player (first 3players))
@@ -443,13 +460,13 @@
          (values (add-new-square-update-neighbors board tile x y)
                  (cons (player name port x y) players))])))
   (define s (state board players))
-  (and (every-player-faces-an-open-square s) (every-player-can-leave-going-backwards s) s))
+  #;
+  (and (every-player-faces-an-open-square s)
+       (every-player-can-leave-going-backwards s #:to-periphery #t)
+       s)
+  s)
 
 (module+ test ;; intermediate
-  (define board-intermediate 
-    (let* ([square-00 (square tile1 (create-portmap 0 0))])
-      (matrix-set the-empty-board 0 0 square-00)))
-  ; (check-exn exn:fail:contract? (λ () (initialize `((,tile1 "x" 2 0 0)))) "port, not index")
   (define s3 (state-with-3-players))
   (define s3+tiles
     (let* ([b (state-board s3)]
@@ -458,7 +475,15 @@
            [p (state-players s3)])
       (state b (reverse p))))
 
-  (check-false (intermediate intermediate-with-3)))
+  
+  (check-false (every-player-faces-an-open-square (intermediate intermediate-with-3))
+               "because the red player is connected to a tile that knocks it out")
+  (check-true (every-player-can-leave-going-backwards (intermediate intermediate-with-3))
+              "every player is at periphery")
+
+  (check-false (intermediate intermediate-with-3))
+  (define intermediate-board-with-3 (intermediate intermediate-with-3)))
+
 
 ;                                                                        
 ;              ;      ;                                                  
@@ -611,9 +636,10 @@
 (struct out [player] #:transparent)
 (struct inf [player] #:transparent)
 
-#; {Board Player -> (U Player (out Player) (inf Player))}
-(define (move-one-player board the-player)
+#; {Board Player [#:to-periphery Boolean] -> (U Player (out Player) (inf Player))}
+(define (move-one-player board the-player #:to-periphery? (to-periphery #f))
   ;; start player on (port-p, x-p, y-p) that look at an occupied neighboring square
+  (define is-at-periphery? (if to-periphery bordering-periphery? (λ (x y) #f)))
   (match-define (player name port-p x-p y-p) the-player)
   (let move-one-player ([port-p port-p][x-p x-p][y-p y-p][seen `((,x-p ,y-p))])
     (match-define (list port x y external) (move-one-square board port-p x-p y-p))
@@ -621,6 +647,7 @@
       [(member `(,x ,y) seen) (inf (player name port x y))]
       [(equal? WALL external) (out (player name port x y))]
       [(equal? OPEN external) (player name port x y)]
+      [(is-at-periphery? x y) (out (player name port x y))]
       [else (move-one-player port x y (cons `(,x ,y) seen))])))
 
 #; {Board Port Index Index -> [List Index Index Next]}
@@ -826,5 +853,5 @@
     (send frame show show?))
   (main #f state-with-3-players)
   (main #f (λ () state+))
-  #;
-  (main #t (λ () intermediate-board-with-3)))
+  ;#;
+  (main #t (λ () intermediate-board-with-3 )))

@@ -2,7 +2,21 @@
 
 ;; determine the set of unique Tsuro tiles 
 
+(define TILES# 35)
+
 (provide
+ #; {type TileIndex = [0 .. TILES#]}
+ #; {type Edge = [List Port Port]}
+
+ TILES#
+ 
+ #; [-> [Listof [List Nat Pict [List Edge Edge Edge Edge]]]]
+ all-tiles->table
+
+ #; {TileIndex -> Tile}
+ tile-index->tile
+
+ ;; [Setof Tile]
  all-tile-types)
 
 ;; ---------------------------------------------------------------------------------------------------
@@ -39,4 +53,13 @@
 (define all-tile-types (all-configs))
 
 (module+ test 
-  (check-equal? (set-count all-tile-types) 35 "wrong number of tiles generated: ~a"))
+  (check-equal? (set-count all-tile-types) TILES# "wrong number of tiles generated: ~a"))
+
+(define (all-tiles->table)
+  (for/list ((t (in-list (set->list all-tile-types))) (i (in-naturals)))
+    (list i (tile->pict t) (vector-ref (struct->vector t) 1))))
+
+(define table (all-tiles->table))
+(define (tile-index->tile i)
+  (define r (list-ref table i))
+  (create-tile (third r)))
