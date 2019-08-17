@@ -11,13 +11,11 @@
  TILES#
  
  #; [-> [Listof [List Nat Pict [List Edge Edge Edge Edge]]]]
+ ;; for rendering the tiles table and eventually placing it on-line 
  all-tiles->table
 
  #; {TileIndex -> Tile}
- tile-index->tile
-
- ;; [Setof Tile]
- all-tile-types)
+ tile-index->tile)
 
 ;; ---------------------------------------------------------------------------------------------------
 (require Tsuro/Code/Common/tiles)
@@ -47,8 +45,12 @@
        (define tail (rest ports))
        (append-map (λ (next) (map (curry cons (edge head next)) (all (remove next tail)))) tail)]))
   
-  (for/set ((lc (all PORTS)))
-    (create-tile lc)))
+  (define lst 
+    (for/fold ((set '())) ((lc (all PORTS)))
+      (define next (create-tile lc))
+      (if (memf (curry rotate-=? next) set) set (cons next set))))
+
+  (apply set (reverse lst)))
 
 (define all-tile-types (all-configs))
 

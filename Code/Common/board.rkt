@@ -4,6 +4,7 @@
 
 ;; TODO
 ;; -- is equality on tiles a good thing? 
+;; -- add state-from-tiles to dsl
 ;; -- lgelaity of an intermediate state creation 
 ;; -- JSON de/serialozation 
 
@@ -279,6 +280,7 @@
 
 (require (except-in Tsuro/Code/Common/tiles tile?))
 (require (except-in Tsuro/Code/Common/port-alphabetic port?))
+(require Tsuro/Code/Common/distinct-tiles)
 (require Tsuro/Code/Common/matrix)
 (require pict)
 
@@ -338,80 +340,22 @@
 ;; ---------------------------------------------------------------------------------------------------
 ;; data examples
 
-;; a "DSL" for writing down initialization and intermediate boards for tests 
-(module board-dsl racket
-  
-  (provide
-   ;; SYNTAX 
-   #; (board-from-tiles (S ...) ...)
-   #; (S =  #f
-         || I
-         || (I PlayerName _on_ Port))
-   #; {I = 0 .. TILES#}
-   ;; creates a list of tile placements from which initialze and intermediate (in board) creates states 
-   board-from-tiles on)
-
-  ;; ---------------------------------------------------------------------------------------------------
-  (require Tsuro/Code/Common/tiles)
-  (require Tsuro/Code/Common/distinct-tiles)
-  (require Tsuro/Code/Common/port-alphabetic)
-  (require (for-syntax syntax/parse))
-
-  ;; ---------------------------------------------------------------------------------------------------
-  (begin-for-syntax
-    (define-syntax-class degree [pattern 90][pattern 180][pattern 270])
-    
-    (define-syntax-class tile-index/or-tile-index-with-player
-      (pattern (~datum #f)
-               #:with square #'#f)
-      (pattern (index (~optional (~seq #:rotate r:degree) #:defaults ([r #'0])) name (~literal on) port)
-               #:declare name  (expr/c #'string?)
-               #:declare port  (expr/c #'port?)
-               #:declare index (expr/c #'(</c TILES#))
-               #:with tile   #'(rotate-tile (tile-index->tile index) #:degree r)
-               #:with square #'`(,tile ,name ,port.c))
-      (pattern index
-               #:declare index (expr/c #'(</c TILES#))
-               #:with tile   #'(tile-index->tile index.c)
-               #:with square #'`(,tile))))
-
-  (define-syntax (on stx) (raise-syntax-error 'on "used out of context" stx))
-
-  (define-syntax (board-from-tiles stx)
-    (syntax-parse stx
-      [(_ (t:tile-index/or-tile-index-with-player ...) ...)
-       #'(board-from-tiles/proc (list (list t.square ...) ...))]))
- 
-  (define (board-from-tiles/proc rectangle)
-    (define (f row i)
-      (for/list ((cell (in-list row)) (j (in-naturals)) #:when cell)
-        (append cell (list j i))))
-    (apply append (for/list ((row (in-list rectangle)) (i (in-naturals))) (f row i)))))
-(require 'board-dsl)
-
 (define the-empty-board (build-matrix SIZE SIZE (λ (_i _j) BLANK)))
 
 (match-define `(,port-2 ,port-3 ,port-4) (map index->port '(2 3 4)))
 
 (define player-red   "red")
-(define player-white "white")
 (define player-blue  "blue")
+(define player-white "white")
 
-(define tile-00 tile1)
-(define tile-02 tile1)
-(define tile-20 90tile2)
+(define tile-00 (tile-index->tile 34))
+(define tile-02 (tile-index->tile 33))
+(define tile-20 (rotate-tile (tile-index->tile 34)))
 
 (define inits-for-state-with-3-players
   `((,tile-00 ,player-red   ,port-2 0 0)
     (,tile-20 ,player-blue  ,port-4 2 0)
     (,tile-02 ,player-white ,port-3 0 2)))
-
-(module+ test ;; testing the boar-from-tiles "dsl"
-  (check-equal? (board-from-tiles
-                 ((34 "red" on port-2) #f (33 #:rotate 90 "blue" on port-4))
-                 (#f)
-                 ((34 "white" on port-3)))
-                inits-for-state-with-3-players))
 
 (define 3players (map (λ (init) (apply player (rest init))) inits-for-state-with-3-players))
 (define red-player (first 3players))
@@ -476,7 +420,56 @@
 ;                                                                        
 ;                                                                        
 
-;; initialize a State from a list of (initial) Placements0
+;; a "DSL" for writing down initialization and intermediate boards for tests 
+(module board-dsl racket
+  
+  (provide
+   ;; SYNTAX 
+   #; (board-from-tiles (S ...) ...)
+   #; (S =  #f
+         || I
+         || (I PlayerName _on_ Port))
+   #; {I = 0 .. TILES#}
+   ;; creates a list of tile placements from which initialze and intermediate (in board) creates states 
+   board-from-tiles on)
+
+  ;; ---------------------------------------------------------------------------------------------------
+  (require Tsuro/Code/Common/tiles)
+  (require Tsuro/Code/Common/distinct-tiles)
+  (require Tsuro/Code/Common/port-alphabetic)
+  (require (for-syntax syntax/parse))
+
+  ;; ---------------------------------------------------------------------------------------------------
+  (begin-for-syntax
+    (define-syntax-class degree [pattern 90][pattern 180][pattern 270])
+    
+    (define-syntax-class tile-index/or-tile-index-with-player
+      (pattern (~datum #f)
+               #:with square #'#f)
+      (pattern (index (~optional (~seq #:rotate r:degree) #:defaults ([r #'0])) name (~literal on) port)
+               #:declare name  (expr/c #'string?)
+               #:declare port  (expr/c #'port?)
+               #:declare index (expr/c #'(</c TILES#))
+               #:with tile   #'(rotate-tile (tile-index->tile index) #:degree r)
+               #:with square #'`(,tile ,name ,port.c))
+      (pattern index
+               #:declare index (expr/c #'(</c TILES#))
+               #:with tile   #'(tile-index->tile index.c)
+               #:with square #'`(,tile))))
+
+  (define-syntax (on stx) (raise-syntax-error 'on "used out of context" stx))
+
+  (define-syntax (board-from-tiles stx)
+    (syntax-parse stx
+      [(_ (t:tile-index/or-tile-index-with-player ...) ...)
+       #'(board-from-tiles/proc (list (list t.square ...) ...))]))
+ 
+  (define (board-from-tiles/proc rectangle)
+    (define (f row i)
+      (for/list ((cell (in-list row)) (j (in-naturals)) #:when cell)
+        (append cell (list j i))))
+    (apply append (for/list ((row (in-list rectangle)) (i (in-naturals))) (f row i)))))
+(require 'board-dsl)
 
 (define (initialize lo-placements)
   (define players
@@ -487,6 +480,13 @@
       (match-define `(,tile ,_  ,_ ,x ,y) placement)
       (matrix-set m x y (square tile (create-portmap x y)))))
   (state board players))
+
+(module+ test ;; testing the boar-from-tiles "dsl"
+  (check-equal? (board-from-tiles
+                 ((34 "red" on port-2) #f (34 #:rotate 90 "blue" on port-4))
+                 (#f)
+                 ((33 "white" on port-3)))
+                inits-for-state-with-3-players))
 
 (module+ test ;; initialize 
   (define board1
