@@ -389,22 +389,6 @@
   (check-false (intermediate*/c inits-for-state-with-3-players)
                "initial tiles cannot touch, so they are not intermediate"))
 
-
-(module+ test ;; examples of intermediate placements
-  (define tile-01 tile2)
-  (define tile-10 tile2)
-  (define contiguity-for-3-platers `((,tile-01 0 1) (,tile-10 1 0)))
-  (define intermediate-with-3 (append inits-for-state-with-3-players contiguity-for-3-platers))
-
-  (check-true (andmap tile/c contiguity-for-3-platers) "tiles are tiles")
-  (check-true (player-on-any-tile/c (first intermediate-with-3)) "1 p")
-  (check-false (tile/c (first intermediate-with-3)) "1 t")
-  (check-true ((or/c player-on-any-tile/c tile/c) (first intermediate-with-3)) "1 or")
-  (check-true ((or/c tile/c player-on-any-tile/c) (first intermediate-with-3)) "reversed or")
-  (check-true (either-or (first intermediate-with-3)) "1 either-or")
-  (check-true (either-or (fourth intermediate-with-3)) "4 either-or")
-  (check-true (intermediate*/c intermediate-with-3)))
-
 ;                                                                        
 ;                                                                        
 ;      ;             ;     ;       ;          ;;;       ;                
@@ -420,7 +404,57 @@
 ;                                                                        
 ;                                                                        
 
+(define (initialize lo-placements)
+  (define players
+    (for/list ([p (in-list lo-placements)])
+      (apply player (rest p))))
+  (define board
+    (for/fold ((m the-empty-board)) ((placement (in-list lo-placements)))
+      (match-define `(,tile ,_  ,_ ,x ,y) placement)
+      (matrix-set m x y (square tile (create-portmap x y)))))
+  (state board players))
+
+(module+ test ;; initialize 
+  (define board1
+    (let* ([square-00 (square tile1 (create-portmap 0 0))])
+      (matrix-set the-empty-board 0 0 square-00)))
+  (check-exn exn:fail:contract? (λ () (initialize `((,tile1 "x" 2 0 0)))) "port, not index")
+
+  (check-equal? (initialize inits-for-state-with-3-players) (state-with-3-players)))
+
+;                                                                                      
+;                                                        ;                             
+;      ;            ;                                    ;     ;            ;          
+;                   ;                                    ;                  ;          
+;    ;;;   ; ;;   ;;;;;   ;;;    ;;;; ;;;;;;   ;;;    ;;;;   ;;;   ;;;;   ;;;;;   ;;;  
+;      ;   ;;  ;    ;    ;;  ;   ;;  ;;  ;  ; ;;  ;  ;; ;;     ;       ;    ;    ;;  ; 
+;      ;   ;   ;    ;    ;   ;;  ;    ;  ;  ; ;   ;; ;   ;     ;       ;    ;    ;   ;;
+;      ;   ;   ;    ;    ;;;;;;  ;    ;  ;  ; ;;;;;; ;   ;     ;    ;;;;    ;    ;;;;;;
+;      ;   ;   ;    ;    ;       ;    ;  ;  ; ;      ;   ;     ;   ;   ;    ;    ;     
+;      ;   ;   ;    ;    ;       ;    ;  ;  ; ;      ;; ;;     ;   ;   ;    ;    ;     
+;    ;;;;; ;   ;    ;;;   ;;;;   ;    ;  ;  ;  ;;;;   ;;;;   ;;;;;  ;;;;    ;;;   ;;;; 
+;                                                                                      
+;                                                                                      
+;                                                                                      
+
 ;; a "DSL" for writing down initialization and intermediate boards for tests 
+(define (intermediate l-intermediate)
+  (define board0 the-empty-board)
+  (define-values (board players)
+    (for/fold ((board board0) (players '())) ([p l-intermediate])
+      (match p
+        [(list tile x y)
+         (values (add-new-square-update-neighbors board tile x y)
+                 players)]
+        [(list tile name port x y)
+         (values (add-new-square-update-neighbors board tile x y)
+                 (cons (player name port x y) players))])))
+  (define s (state board players))
+  
+  (and (every-player-faces-an-open-square s)
+       (every-player-can-leave-going-backwards s #:to-periphery #t)
+       s))
+
 (module board-dsl racket
   
   (provide
@@ -469,52 +503,33 @@
       (for/list ((cell (in-list row)) (j (in-naturals)) #:when cell)
         (append cell (list j i))))
     (apply append (for/list ((row (in-list rectangle)) (i (in-naturals))) (f row i)))))
-(require 'board-dsl)
-
-(define (initialize lo-placements)
-  (define players
-    (for/list ([p (in-list lo-placements)])
-      (apply player (rest p))))
-  (define board
-    (for/fold ((m the-empty-board)) ((placement (in-list lo-placements)))
-      (match-define `(,tile ,_  ,_ ,x ,y) placement)
-      (matrix-set m x y (square tile (create-portmap x y)))))
-  (state board players))
 
 (module+ test ;; testing the boar-from-tiles "dsl"
+  (require (submod ".." board-dsl))
+  
   (check-equal? (board-from-tiles
                  ((34 "red" on port-2) #f (34 #:rotate 90 "blue" on port-4))
                  (#f)
                  ((33 "white" on port-3)))
                 inits-for-state-with-3-players))
 
-(module+ test ;; initialize 
-  (define board1
-    (let* ([square-00 (square tile1 (create-portmap 0 0))])
-      (matrix-set the-empty-board 0 0 square-00)))
-  (check-exn exn:fail:contract? (λ () (initialize `((,tile1 "x" 2 0 0)))) "port, not index")
-
-  (check-equal? (initialize inits-for-state-with-3-players) (state-with-3-players)))
-
-(define (intermediate l-intermediate)
-  (define board0 the-empty-board)
-  (define-values (board players)
-    (for/fold ((board board0) (players '())) ([p l-intermediate])
-      (match p
-        [(list tile x y)
-         (values (add-new-square-update-neighbors board tile x y)
-                 players)]
-        [(list tile name port x y)
-         (values (add-new-square-update-neighbors board tile x y)
-                 (cons (player name port x y) players))])))
-  (define s (state board players))
-  #;
-  (and (every-player-faces-an-open-square s)
-       (every-player-can-leave-going-backwards s #:to-periphery #t)
-       s)
-  s)
-
 (module+ test ;; intermediate
+  
+  (define tile-01 tile2)
+  (define tile-10 tile2)
+  (define contiguity-for-3-platers `((,tile-01 0 1) (,tile-10 1 0)))
+  (define intermediate-bad (append inits-for-state-with-3-players contiguity-for-3-platers))
+
+  ;; contracts for intermediate placements
+  (check-true (andmap tile/c contiguity-for-3-platers) "tiles are tiles")
+  (check-true (player-on-any-tile/c (first intermediate-bad)) "1 p")
+  (check-false (tile/c (first intermediate-bad)) "1 t")
+  (check-true ((or/c player-on-any-tile/c tile/c) (first intermediate-bad)) "1 or")
+  (check-true ((or/c tile/c player-on-any-tile/c) (first intermediate-bad)) "reversed or")
+  (check-true (either-or (first intermediate-bad)) "1 either-or")
+  (check-true (either-or (fourth intermediate-bad)) "4 either-or")
+  (check-true (intermediate*/c intermediate-bad))
+  
   (define s3 (state-with-3-players))
   (define s3+tiles
     (let* ([b (state-board s3)]
@@ -522,14 +537,21 @@
            [b (add-new-square-update-neighbors b tile-01 0 1)]
            [p (state-players s3)])
       (state b (reverse p))))
-
   
-  (check-false (every-player-faces-an-open-square (intermediate intermediate-with-3))
+  (check-false (every-player-faces-an-open-square (intermediate intermediate-bad))
                "because the red player is connected to a tile that knocks it out")
-  (check-true (every-player-can-leave-going-backwards (intermediate intermediate-with-3))
+  (check-true (every-player-can-leave-going-backwards (intermediate intermediate-bad))
               "every player is at periphery")
+  (check-false (intermediate intermediate-bad))
 
-  (check-false (intermediate intermediate-with-3))
+  (define intermediate-good
+    (board-from-tiles
+     ((34 "red" on port-2) #f (34 #:rotate 90 "blue" on port-4))
+     (#f)
+     ((33 "white" on port-3))))
+
+  #;
+
   (define intermediate-board-with-3 (intermediate intermediate-with-3)))
 
 
@@ -901,5 +923,5 @@
     (send frame show show?))
   (main #f state-with-3-players)
   (main #f (λ () state+))
-  ;#;
+  #;
   (main #t (λ () intermediate-board-with-3 )))
