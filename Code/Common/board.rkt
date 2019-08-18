@@ -3,9 +3,7 @@
 ;; a data representation for game States, plus basic functions for manipulating them
 
 ;; TODO
-;; -- is equality on tiles a good thing? 
 ;; -- add state-from-tiles to dsl
-;; -- lgelaity of an intermediate state creation 
 ;; -- JSON de/serialozation 
 
 ;; safety
@@ -56,35 +54,21 @@
 
 #; {Location = [List Index Index]}
 
-#; {({Any -> Any} [Listof Any] -> Boolean) {Boolean -> Boolean} -> Contract}
-(define (make-list-of-places-ctc items/c context)
-  (match-define (list name combinator holds) context)
-  (define ctc (flat-named-contract name (apply-to-locations (neighboring combinator holds))))
+#; ({Any -> Any : X} ([Listof X] -> Boolean) -> Contract)
+(define (make-list-of-places-ctc items/c ctc)
   (and/c [listof items/c]
-         (apply-to-locations locations-distinct)
+         locations-distinct
          ctc))
 
-(define isolated (list 'isolated andmap not))
-(define contiguous (list 'contiguous ormap (compose not not)))
-
-#; {[Listof (U TilePlacement PlayerOnTile)] -> [[Listof Location -> Contract] -> Contract]}
-;; ** this is bad; place x y first
-(define ((apply-to-locations mk-c) l)
-  (define locations
-    (for/list ((x l))
-      (define r (reverse x))
-      (list (second r) (first r))))
-  (mk-c locations))
-
-#; { [Listof (List Index Index)] -> Boolean : locations are distinct }
-(define (locations-distinct locations)
+#; {[Listof Intermediate] -> Boolean : locations are distinct }
+(define (locations-distinct specifications)
+  (define locations (map place-of specifications))
   (= (length locations) (set-count (apply set locations))))
 
-#; {({Any -> Any} [Listof Any] -> Boolean) {Boolean -> Boolean} -> {[Listof Location] -> Boolean}}
-(define ((neighboring combinator holds) locations)
-  (for/and ((loc (in-list locations)))
-    (define all-but (remove loc locations))
-    (combinator (λ (n) (holds (member n all-but))) (apply neighbor-locations loc))))
+#; {Intermediate -> [List Index Index]}
+(define (place-of x) ;; this is a trick; I should place the Index parts first and second 
+  (define r (reverse x))
+  (list (second r) (first r)))
 
 ;                                                                                                    
 ;                                                                                                    
@@ -142,8 +126,16 @@
 #; {InitialTile** = [Listof PlayerOnTile] s.t. distinct non-neigboring locs}
 #; {PlayerOnTile  = [List Tile PlayerName PortIndex Index Index] s.t. constraints}
 
+#; {InitialTile** -> Boolean : distinct non-neighboring locations}
+(define (no-neighbors? tile-spec)
+  (for/and ((t (in-list tile-spec)))
+    (define loc (place-of t))
+    (define all-but (remove loc tile-spec))
+    (for/and ((n (apply neighbor-locations loc)))
+      (not (member n all-but)))))
+
 (define player-on-tile/c (make-placement/c at-periphery-facing-inward))
-(define initial-player-on-tile*/c (make-list-of-places-ctc player-on-tile/c isolated))
+(define initial-player-on-tile*/c (make-list-of-places-ctc player-on-tile/c no-neighbors?))
 
 ;                                                                                                    
 ;                                                                      ;                             
@@ -164,16 +156,30 @@
 
 #; {Intermediate* = [Listof Intermediate]
                   s.t.
-                  (1) contiguous & distinct locs,
-                  (2) each player can go "backwards" to periphery on resulting board}
+                  (1) distinct locs
+                  (2) every location is
+                  -- either occupied,
+                  -- at the periphery, 
+                  -- or has two neighbors}
 #; {Intermediate  = (U TilePlacement
                        PlayerOnTile w/o perhiphery constraint)}
 #; {TilePlacement = [List Tile Index Index]}
 
+#; {Intermediate* -> Boolean}
+(define (occupied-periphery-or-2-neighbors tile-spec)
+  (for/and ((t (in-list tile-spec)))
+    (or~ (> (length t) 3)
+         (apply bordering-periphery? (place-of t))
+         #:let x-y (place-of t)
+         #:let locations (map place-of tile-spec)
+         #:let all-but (remove x-y locations)
+         #:let neigbors# (for/sum ((n (apply neighbor-locations x-y)) #:when (member n all-but)) 1)
+         (> neigbors# 1))))
+
 (define tile/c (list/c tile? index? index?))
 (define player-on-any-tile/c (make-placement/c facing-inward))
 (define either-or (or/c tile/c player-on-any-tile/c))
-(define intermediate*/c (make-list-of-places-ctc either-or contiguous))
+(define intermediate*/c (make-list-of-places-ctc either-or occupied-periphery-or-2-neighbors))
 
 ;                                                   
 ;                                                   
@@ -386,8 +392,8 @@
   (check-true (initial-player-on-tile*/c inits-for-state-with-3-players))
   (check-true ((takes-part-in-game (state-with-3-players)) player-red))
 
-  (check-false (intermediate*/c inits-for-state-with-3-players)
-               "initial tiles cannot touch, so they are not intermediate"))
+  (check-true (intermediate*/c inits-for-state-with-3-players)
+              "an initial configuration of tiles is also intermediate"))
 
 ;                                                                        
 ;                                                                        
@@ -437,8 +443,15 @@
 ;                                                                                      
 ;                                                                                      
 
-;; a "DSL" for writing down initialization and intermediate boards for tests 
 (define (intermediate l-intermediate)
+  (define s (intermediate-aux l-intermediate))
+  (and (every-player-faces-an-open-square s)
+       (every-player-can-leave-going-backwards s)
+       s))
+
+#; {Intermediate* -> State}
+;; produces the state as specified without checking whether it is valid 
+(define (intermediate-aux l-intermediate)
   (define board0 the-empty-board)
   (define-values (board players)
     (for/fold ((board board0) (players '())) ([p l-intermediate])
@@ -449,12 +462,9 @@
         [(list tile name port x y)
          (values (add-new-square-update-neighbors board tile x y)
                  (cons (player name port x y) players))])))
-  (define s (state board players))
-  
-  (and (every-player-faces-an-open-square s)
-       (every-player-can-leave-going-backwards s #:to-periphery #t)
-       s))
+  (state board players))
 
+;; a "DSL" for writing down initialization and intermediate boards for tests 
 (module board-dsl racket
   
   (provide
@@ -464,28 +474,28 @@
          || I
          || (I PlayerName _on_ Port))
    #; {I = 0 .. TILES#}
-   ;; creates a list of tile placements from which initialze and intermediate (in board) creates states 
+   ;; creates a list of tile placements from which initialze and intermediate create a board 
    board-from-tiles on)
 
-  ;; ---------------------------------------------------------------------------------------------------
+  ;; -------------------------------------------------------------------------------------------------
   (require Tsuro/Code/Common/tiles)
   (require Tsuro/Code/Common/distinct-tiles)
   (require Tsuro/Code/Common/port-alphabetic)
   (require (for-syntax syntax/parse))
 
-  ;; ---------------------------------------------------------------------------------------------------
+  ;; -------------------------------------------------------------------------------------------------
   (begin-for-syntax
     (define-syntax-class degree [pattern 90][pattern 180][pattern 270])
     
     (define-syntax-class tile-index/or-tile-index-with-player
       (pattern (~datum #f)
                #:with square #'#f)
-      (pattern (index (~optional (~seq #:rotate r:degree) #:defaults ([r #'0])) name (~literal on) port)
-               #:declare name  (expr/c #'string?)
+      (pattern (index (~optional (~seq #:rotate r:degree) #:defaults ([r #'0])) n (~literal on) port)
+               #:declare n     (expr/c #'string?)
                #:declare port  (expr/c #'port?)
                #:declare index (expr/c #'(</c TILES#))
                #:with tile   #'(rotate-tile (tile-index->tile index) #:degree r)
-               #:with square #'`(,tile ,name ,port.c))
+               #:with square #'`(,tile ,n ,port.c))
       (pattern index
                #:declare index (expr/c #'(</c TILES#))
                #:with tile   #'(tile-index->tile index.c)
@@ -514,6 +524,13 @@
                 inits-for-state-with-3-players))
 
 (module+ test ;; intermediate
+
+  (define not-intermediate
+    (board-from-tiles
+     ((34 "red" on port-2) #f (34 #:rotate 90 "blue" on port-4))
+     (33 33)
+     ((33 #:rotate 180 "white" on port-3))))
+  (check-false (intermediate*/c not-intermediate) "an isolated tile that nobody could have placed")
   
   (define tile-01 tile2)
   (define tile-10 tile2)
@@ -526,8 +543,6 @@
   (check-false (tile/c (first intermediate-bad)) "1 t")
   (check-true ((or/c player-on-any-tile/c tile/c) (first intermediate-bad)) "1 or")
   (check-true ((or/c tile/c player-on-any-tile/c) (first intermediate-bad)) "reversed or")
-  (check-true (either-or (first intermediate-bad)) "1 either-or")
-  (check-true (either-or (fourth intermediate-bad)) "4 either-or")
   (check-true (intermediate*/c intermediate-bad))
   
   (define s3 (state-with-3-players))
@@ -538,22 +553,40 @@
            [p (state-players s3)])
       (state b (reverse p))))
   
-  (check-false (every-player-faces-an-open-square (intermediate intermediate-bad))
-               "because the red player is connected to a tile that knocks it out")
-  (check-true (every-player-can-leave-going-backwards (intermediate intermediate-bad))
-              "every player is at periphery")
-  (check-false (intermediate intermediate-bad))
+  (check-false (every-player-faces-an-open-square     (intermediate-aux intermediate-bad)))
+  (check-true (every-player-can-leave-going-backwards (intermediate-aux intermediate-bad)))
+  
+  (define intermediate-bad-2
+    (board-from-tiles
+     ((34 "red" on port-2) #f (34 #:rotate 90 "blue" on port-4))
+     (33)
+     (33 (33 #:rotate 180 "white" on port-3))))
+
+  (check-true (every-player-faces-an-open-square       (intermediate-aux intermediate-bad-2)))
+  (check-false (every-player-can-leave-going-backwards (intermediate-aux intermediate-bad-2)))
 
   (define intermediate-good
     (board-from-tiles
      ((34 "red" on port-2) #f (34 #:rotate 90 "blue" on port-4))
-     (#f)
-     ((33 "white" on port-3))))
+     (33)
+     ((33 #:rotate 180 "white" on port-3))))
+  
+  (check-true (every-player-faces-an-open-square      (intermediate-aux intermediate-good)))
+  (check-true (every-player-can-leave-going-backwards (intermediate-aux intermediate-good)))
 
-  #;
-
-  (define intermediate-board-with-3 (intermediate intermediate-with-3)))
-
+  (define intermediate-good-state
+    '(state-from
+      [(player "red" port-2 0 0)
+       (player "blue" port-4 2 0)
+       (player "white" port-3 0 2)]
+      #:board
+      (34 0 0)
+      (34 #:rotate 90 2 0)
+      (33 0 1)
+      (33 #:rotate 180 )))
+  
+  (check-true (state? (intermediate intermediate-good)))
+  )
 
 ;                                                                        
 ;              ;      ;                                                  
@@ -711,14 +744,20 @@
   ;; start player on (port-p, x-p, y-p) that look at an occupied neighboring square
   (define is-at-periphery? (if to-periphery bordering-periphery? (λ (x y) #f)))
   (match-define (player name port-p x-p y-p) the-player)
-  (let move-one-player ([port-p port-p][x-p x-p][y-p y-p][seen `((,x-p ,y-p))])
-    (match-define (list port x y external) (move-one-square board port-p x-p y-p))
-    (cond
-      [(member `(,x ,y) seen) (inf (player name port x y))]
-      [(equal? WALL external) (out (player name port x y))]
-      [(equal? OPEN external) (player name port x y)]
-      [(is-at-periphery? x y) (out (player name port x y))]
-      [else (move-one-player port x y (cons `(,x ,y) seen))])))
+  (let/ec return 
+    (let move-one-player ([port-p port-p][x-p x-p][y-p y-p][seen `((,x-p ,y-p))])
+      (when to-periphery
+        (match-define (square tile-p map-p) (matrix-ref board x-p y-p))
+        (unless (next? (vector-ref map-p (port->index port-p)))
+          ;; the player didn't get to the periphery but an open square 
+          (return the-player)))
+      (match-define (list port x y external) (move-one-square board port-p x-p y-p))
+      (cond
+        [(member `(,x ,y) seen) (inf (player name port x y))]
+        [(equal? WALL external) (out (player name port x y))]
+        [(equal? OPEN external) (player name port x y)]
+        [(is-at-periphery? x y) (out (player name port x y))]
+        [else (move-one-player port x y (cons `(,x ,y) seen))]))))
 
 #; {Board Port Index Index -> [List Index Index Next]}
 ;; move player at (x-p, y-p) on port port-p "thru" the tile of the next square
@@ -923,5 +962,4 @@
     (send frame show show?))
   (main #f state-with-3-players)
   (main #f (λ () state+))
-  #;
-  (main #t (λ () intermediate-board-with-3 )))
+  (main #t (λ () intermediate-good-state )))
