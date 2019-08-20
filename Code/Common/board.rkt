@@ -420,12 +420,14 @@
 (module+ test
   ;; SYNTAX
 
-  #; (state-from #:board0 board0 #:players p ... #:tiles s ...)
+  #; (state-from #:board0 board0 #:players0 [p ...] S ...)
   
   #; (init-list-from-tiles (S ...) ...)
   #; (S =  #f
         || I
-        || (I PlayerName _on_ Port))
+        || (I PlayerName #:on Port)
+        || (I #:rotate (0,90,180,270))
+        || (I #:rotate (0,90,180,270) PlayerName #:on Port))
   #; {I = 0 .. TILES#}
   ;; creates a list of tile placements from which initialze and intermediate create a board 
   
@@ -433,15 +435,16 @@
   (begin-for-syntax
     (define-syntax-class degree [pattern 90][pattern 180][pattern 270])
     
-    (define-syntax-class tile-index/or-tile-index-with-player
+    (define-syntax-class index/or-index-w-player
       (pattern (~datum #f)
                #:with square #'#f)
-      (pattern (index (~optional (~seq #:rotate r:degree) #:defaults ([r #'0])) n (~literal on) port)
-               #:declare n     (expr/c #'string?)
-               #:declare port  (expr/c #'port?)
-               #:declare index (expr/c #'(</c TILES#))
-               #:with tile   #'(rotate-tile (tile-index->tile index) #:degree r)
-               #:with square #'`(,tile ,n ,port.c))
+      (pattern
+       (index (~optional (~seq #:rotate r:degree) #:defaults ([r #'0])) (~optional (~seq n #:on p)))
+       #:declare n     (expr/c #'string?)
+       #:declare p     (expr/c #'port?)
+       #:declare index (expr/c #'(</c TILES#))
+       #:with tile   #'(rotate-tile (tile-index->tile index.c) #:degree r)
+       #:with square #'`(~? (,tile ,n.c ,p) (,tile)))
       (pattern index
                #:declare index (expr/c #'(</c TILES#))
                #:with tile   #'(tile-index->tile index.c)
@@ -454,11 +457,9 @@
                #:declare yi (expr/c #'index?)
                #:with (tile x y) #'( (rotate-tile (tile-index->tile ti.c) #:degree r) xi.c yi.c)]))
 
-  (define-syntax (on stx) (raise-syntax-error 'on "used out of context" stx))
-
   (define-syntax (init-list-from-tiles stx)
     (syntax-parse stx
-      [(_ (t:tile-index/or-tile-index-with-player ...) ...)
+      [(_ (t:index/or-index-w-player ...) ...)
        #'(init-list-from-tiles/proc (list (list t.square ...) ...))]))
  
   (define (init-list-from-tiles/proc rectangle)
@@ -469,39 +470,45 @@
 
   (define-syntax (state-from stx)
     (syntax-parse stx
-      [(_ #:board0 board0 #:players playr ... #:tiles s:square-spec ...)
-       #:declare playr (expr/c #'player?)
-       #'(state (let* ([m board0]
-                       [m (add-new-square-update-neighbors m s.tile s.x s.y)]
-                       ...)
-                  m)
-                (list playr.c ...))])))
+      [(_ (~optional (~seq #:board0 board0))
+          (~optional (~seq #:players0 [p ...]))
+          (t:index/or-index-w-player ...) ...)
+       #:declare p (expr/c #'player?)
+       #'(sft/proc (~? board0 the-empty-board) (~? (list p.c ...) '()) `((,t.square ...) ...))]))
+
+  (define (sft/proc board0 players0  rectangle)
+    (define init-list (init-list-from-tiles/proc rectangle))
+    (define-values (players board)
+      (for/fold ((players players0) (board board0)) ((t init-list))
+        (match t
+          [`(,tile ,x ,y) (values players (add-new-square-update-neighbors board tile x y))]
+          [`(,tile ,name ,port ,x ,y)
+           (define new-player (player name port x y))
+           (values (cons new-player players) (add-new-square-update-neighbors board tile x y))])))
+    (state board (reverse players))))
 
 (module+ test ;; testing the DSL
   (check-equal? (init-list-from-tiles
-                 ((34 "red" on port-2) #f (34 #:rotate 90 "blue" on port-4))
+                 ((34 "red" #:on port-2) #f (34 #:rotate 90 "blue" #:on port-4))
                  (#f)
-                 ((33 "white" on port-3)))
+                 ((33 "white" #:on port-3)))
                 inits-for-state-with-3-players)
 
   (match-define (state board3 (list playr1 playr2 playr3)) (state-with-3-players))
   
   (check-equal? (state-from
-                 #:board0 board3
-                 #:players playr1 playr2 playr3
-                 #:tiles
-                 [tile-00-index 0 0]
-                 [tile-02-index #:rotate 90 0 2]
-                 [tile-20-index 2 0])
+                 [[tile-00-index "red" #:on port-2] #f [tile-20-index "blue" #:on port-4]]
+                 (#f)
+                 [[tile-02-index #:rotate 90 "white" #:on port-3]])
                 (state-with-3-players)))
 
 (module+ test ;; intermediate boards, states, and contracts 
 
   (define not-intermediate
     (init-list-from-tiles
-     ((34 "red" on port-2) #f (34 #:rotate 90 "blue" on port-4))
+     ((34 "red" #:on port-2) #f (34 #:rotate 90 "blue" #:on port-4))
      (33 33)
-     ((33 #:rotate 180 "white" on port-3))))
+     ((33 #:rotate 180 "white" #:on port-3))))
   (check-false (intermediate*/c not-intermediate) "an isolated tile that nobody could have placed")
   
   (define tile-01 (tile-index->tile 33))
@@ -588,33 +595,26 @@
 (module+ test 
   (define intermediate-bad-state-2
     (init-list-from-tiles
-     ((34 "red" on port-2) #f (34 #:rotate 90 "blue" on port-4))
+     ((34 "red" #:on port-2) #f (34 #:rotate 90 "blue" #:on port-4))
      (33)
-     (33 (33 #:rotate 180 "white" on port-3))))
+     (33 (33 #:rotate 180 "white" #:on port-3))))
 
   (check-true (every-player-faces-an-open-square       (intermediate-aux intermediate-bad-state-2)))
   (check-false (every-player-can-leave-going-backwards (intermediate-aux intermediate-bad-state-2)))
 
   (define intermediate-good
     (init-list-from-tiles
-     ((34 "red" on port-2) #f (34 #:rotate 90 "blue" on port-4))
+     ((34 "red" #:on port-2) #f (34 #:rotate 90 "blue" #:on port-4))
      (33)
-     ((33 #:rotate 180 "white" on port-3))))
+     ((33 #:rotate 180 "white" #:on port-3))))
   
   (check-true (every-player-faces-an-open-square      (intermediate-aux intermediate-good)))
   (check-true (every-player-can-leave-going-backwards (intermediate-aux intermediate-good)))
-  
+
   (define intermediate-good-state
-    (state-from #:board0 the-empty-board
-                #:players
-                (player "red" port-2 0 0)
-                (player "blue" port-4 2 0)
-                (player "white" port-3 0 2)
-                #:tiles
-                (34 0 0)
-                (34 #:rotate 90 2 0)
-                (33 0 1)
-                (33 #:rotate 180 0 2)))
+    (state-from ((34 "red" #:on port-2) #f (34 #:rotate 90 "blue" #:on port-4))
+                (33)
+                ((33 #:rotate 180 "white" #:on port-3))))
   
   (check-equal? (intermediate intermediate-good) intermediate-good-state))
 
@@ -657,11 +657,9 @@
 (module+ test ;; add-tile
   (match-define (list playr1-3 playr2-3) (remf (finder player-red) (state-players state-3-players)))
   (define state+
-    (state-from
-     #:board0 board-3-players
-     #:players playr1-3 playr2-3
-     #:tiles
-     (tile-to-add-to-board-3-index #:rotate 90 1 0)))
+    (state-from #:board0 board-3-players
+                #:players0 [playr2-3 playr1-3]
+                (#f (tile-to-add-to-board-3-index #:rotate 90))))
 
   (define board+ (state-board state+))
   
@@ -815,39 +813,22 @@
 
   (check-equal? (move-one-player board+ red-player) (out (player player-red (index->port 1) 1 0))
                 "move red player out")
-
-  (define red-player-good-move (player "red" port-2 0 0))
+  
   (match-define (state board-good-move _)
-    (state-from #:board0 the-empty-board
-                #:players
-                red-player-good-move
-                (player "blue" port-4 2 0)
-                (player "white" port-3 0 2)
-                #:tiles
-                (34 0 0)
-                (34 #:rotate 90 2 0)
-                (33 0 1)
-                (33 1 0)
-                (33 #:rotate 180 0 2)))
+    (state-from [(34 "red" #:on port-2) 33 (34 #:rotate 90 "blue" #:on port-4)]
+                [33]
+                [(33 #:rotate 180 "white" #:on port-3)]))
 
-  (check-equal? (move-one-player board-good-move red-player-good-move)
+  (check-equal? (move-one-player board-good-move (player "red" port-2 0 0))
                 (player player-red (index->port 5) 1 0)
                 "move red player to internal square")
 
-  (define red-player-inf (player "red" port-2 0 0))
   (match-define (state board-inf _)
-    (state-from #:board0 the-empty-board
-                #:players
-                red-player-inf
-                (player "blue" port-4 2 0)
-                (player "white" port-3 0 2)
-                #:tiles
-                (34 0 0)
-                (34 #:rotate 90 2 0)
-                (33 0 1)
-                (34 1 0)
-                (33 #:rotate 180 0 2)))
-
+    (state-from [(34 "red" #:on port-2) 34 (34 #:rotate 90 "blue" #:on port-4)]
+                [33]
+                [(33 #:rotate 180 "white" #:on port-3)]))
+  (define red-player-inf (player "red" port-2 0 0))
+  
   (check-equal? (move-one-player board-inf red-player-inf) (inf red-player-inf) "move player inf"))
 
 ;                                                   
