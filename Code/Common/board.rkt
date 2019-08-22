@@ -286,7 +286,7 @@
 ;                 ;                                                                    
 ;                 ;                                                                    
 
-(require (except-in Tsuro/Code/Common/tiles tile?))
+(require (except-in Tsuro/Code/Common/tiles tile? table))
 (require (except-in Tsuro/Code/Common/port-alphabetic port?))
 (require Tsuro/Code/Common/matrix)
 (require pict)
@@ -1013,6 +1013,7 @@
     
   (send frame show #t))
 
+#;
 (module+ test ;; show graphical iterations
   (show-state state-with-3-players)
   (show-state (λ () state+))
