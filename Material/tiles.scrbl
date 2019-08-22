@@ -1,11 +1,11 @@
 #lang scribble/manual
 
-@(require Tsuro/Code/Common/distinct-tiles)
+@(require Tsuro/Code/Common/tiles)
 @(require (only-in racket ~a))
 
 @title{Tsuro Sw Dev F19 Tile Types}
 
-@(define tbl @all-tiles->table[])
+@(define tbl table)
 @(define row (car tbl))
 @(define (list-join l x)
    (if (null? l)

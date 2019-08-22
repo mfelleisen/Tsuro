@@ -288,7 +288,6 @@
 
 (require (except-in Tsuro/Code/Common/tiles tile?))
 (require (except-in Tsuro/Code/Common/port-alphabetic port?))
-(require Tsuro/Code/Common/distinct-tiles)
 (require Tsuro/Code/Common/matrix)
 (require pict)
 
