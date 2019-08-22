@@ -245,29 +245,31 @@
  ;; all players are on ports that face empty squares on the board 
  state?
 
- ; (-> state?)
- ;; creates a sample state 
- state-with-3-players
- 
+ ;; type Player
+ #; [name #;string? port #;port? x #;index? y #;index?]
+ (struct-out player)
+
  (contract-out 
   [initialize
    ;; creates a state from a list of initial placements 
    (-> initial-player-on-tile*/c (and/c state? every-player-faces-an-open-square))]
   
-  [intermediate (-> intermediate*/c
-                    (or/c #false 
-                          (and/c state?
-                                 ;; and it satisfies
-                                 #; every-player-faces-an-open-square
-                                 #; every-player-can-leave-going-backwards)))]
-  
+  [exn:infinite? (-> any/c boolean?)]
   [add-tile
    ;; place a configured tile on the empty square that the player pn neighbors
-   ;; EFFECT may raise
-   #;   (exn:finite String CMS Player)
-   ;; to signal an infinite loop
+   ;; EFFECT may raise (exn:infinite String CMS Player) to signal an infinite loop
    (->i ([s state?][c tile?][name (s) (and/c string? (takes-part-in-game s))])
-        [result (and/c state? every-player-faces-an-open-square)])]))
+        [result (and/c state? every-player-faces-an-open-square)])]
+  
+  [state-players (-> state? (listof player?))]
+
+  [intermediate
+   (-> intermediate*/c
+       (or/c #false 
+             (and/c state?
+                    #; "and it also satisfies"
+                    #; every-player-faces-an-open-square
+                    #; every-player-can-leave-going-backwards)))]))
 
 ;                                                                                      
 ;       ;                                  ;                                           
@@ -996,14 +998,13 @@
 (define (is-player-on players x y)
   (define p (memf (λ (p) (match-define (player _ _ x0 y0) p) (and (= x x0) (= y y0))) players))
   (if (boolean? p) p (first p)))
-  
 
 #; {PortIndex Natural Natural -> (values Natural Natural)}
 (define (logical-coordinates->geometry port x y)
   (values (* x TILE-SIZE)) (* TILE-SIZE y))
 
-#; {Boolean (-> State) -> Void}
-(define (main show? s)
+#; {(-> State) -> Void}
+(define (show-state s)
   (define frame (new frame% [label "hello"][width WIDTH][height HEIGHT]))
   
   (define canvas
@@ -1011,11 +1012,10 @@
          [parent frame]
          [paint-callback (λ (e dc) (draw-state (s) dc))]))
     
-  (send frame show show?))
+  (send frame show #t))
 
 (module+ test ;; show graphical iterations
-  (main #f state-with-3-players)
-  (main #f (λ () state+))
-  (main #t (λ () intermediate-good-state))
-
-  (main #t (λ () state+)))
+  (show-state state-with-3-players)
+  (show-state (λ () state+))
+  (show-state (λ () intermediate-good-state))
+  (show-state (λ () state+)))
