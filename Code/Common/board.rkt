@@ -300,6 +300,10 @@
   #;
   (require racket/gui/base))
 
+(module+ json
+  (require (submod Tsuro/Code/Common/tiles json))
+  (require rackunit))
+
 ;                                                                 
 ;       ;                                                         
 ;       ;           ;                                             
@@ -1019,3 +1023,51 @@
   (show-state (λ () state+))
   (show-state (λ () intermediate-good-state))
   (show-state (λ () state+)))
+
+;                              
+;      ;                       
+;                              
+;                              
+;    ;;;    ;;;    ;;;   ; ;;  
+;      ;   ;   ;  ;; ;;  ;;  ; 
+;      ;   ;      ;   ;  ;   ; 
+;      ;    ;;;   ;   ;  ;   ; 
+;      ;       ;  ;   ;  ;   ; 
+;      ;   ;   ;  ;; ;;  ;   ; 
+;      ;    ;;;    ;;;   ;   ; 
+;      ;                       
+;      ;                       
+;    ;;
+
+;; ------------------------------------------------------------------
+#; {State   = (state Board Player*)}
+#; {Player* = [Listof Player]}
+#; {Player  = (player PlayerName p x y)}
+#; {PlayerName = String}
+#; {Board   = [Matrixof Square] :: {Index x Index}}
+#; {Index   = [0 .. SIZE]}
+#; {Square  = (U BLANK                   ;; an unoccupied, blank square 
+                 (square Tile PortMap))} ;; a configured tile with connections to neighbors cached 
+
+
+(module+ json
+
+  (define (player->jsexpr p)
+    (match-define (player name port x y) p)
+    (hash 'name name 'port port 'x x 'y y))
+
+  (define (jsexpr->player pj)
+    (match pj
+      [(hash-table ('name name) ('port port) ('x x) ('y y)) (player name port x y)]))
+
+  (define (square->jsexpr s x y)
+    (hash 'tile (tile->jsexpr (square-tile s))) 'x x 'y y)
+
+  (define (state->jsexpr s)
+    (hash 'players (state-players s) 'board (matrix-where (state-board s) (λ (n _ _2) n) square->jsexpr)))
+
+  (define (jsexpr->state sj)
+    #f)
+
+  (define s3 (state-with-3-players))
+  (check-equal? (jsexpr->state (state->jsexpr s3)) s3))
