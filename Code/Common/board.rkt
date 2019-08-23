@@ -758,45 +758,50 @@
 (struct inf [player] #:transparent)
 
 #; {Board Player [#:to-periphery Boolean] -> (U Player (out Player) (inf Player))}
-;; this function has two purposes:
-;; -- (1) move a player forward to the first open square or the wall
-;; -- (2) 
+;; (1) move a player forward to the first open square or the wall
+;; (2) when to-periphery?: move a player backwards to the a square on the periphery or to the wall 
 (define (move-one-player board the-player #:to-periphery? (to-periphery #f))
   ;; start player on (port-p, x-p, y-p) that look at an occupied neighboring square
   (define peri? (if to-periphery bordering-periphery? (λ (x y) #f)))
   (match-define (player name port-p x-p y-p) the-player)
   (let/ec return 
-    (let move-one-player ([port-p port-p][x-p x-p][y-p y-p][seen (set `(,x-p ,y-p))])
-      (define player-square (matrix-ref board x-p y-p))
-      (when (and to-periphery (outside? (player-square port-p)))
-          ;; the player didn't get to the periphery but an open square 
-          (return the-player))
-      (match-define (list port x y external) (move-one-square board port-p player-square))
-      (cond
-        [(open? external) (player name port x y)]
-        [(wall? external) (out (player name port x y))]
-        [(seen? x y seen) (inf (player name port x y))]
-        [else (move-one-player port x y (set-add seen `(,x ,y)))]))))
+    (let move-one-player ([port port-p](square (matrix-ref board x-p y-p))[seen (set `(,x-p ,y-p))])
+      (when (and to-periphery (outside? (square port)))
+        ;; the player didn't get to the periphery but an open square 
+        (return the-player))
+      (match (move-player-one-square board square port name seen)
+        [(? player? it) it]
+        [(? out? it)    it]
+        [(? inf? it)    it]
+        [(list port square seen) (move-one-player port square seen)]))))
 
-#; {Index Index [Setof [List Index Index]] -> Boolean}
-(define (seen? x y seen)
-  (set-member? seen `(,x ,y)))
+#; {type Seen = [Setof [List Index Index]]}
 
-#; {Board Port Square -> [List Index Index Next]}
-;; move player at (x-p, y-p) on port port-p "thru" the tile of the next square
+#; {Index Index Seen -> Boolean}
+(define (seen? x y seen) (set-member? seen `(,x ,y)))
+
+#; {Board Square Port Name Seen -> (U Player (out Player) (inf Player) [List Port Index Index Seen])}
+;; move player at (x-p, y-p) on port-in to the tile on the next square
 ;; ASSUME the square is occupired with a tile 
-(define (move-one-square board port-in player-square)
-  (define next        (player-square port-in))
+(define (move-player-one-square board player-square player-port name seen)
+  (define next        (player-square player-port))
+  (define port-in     (next-port next))
+  (define x           (next-x next))
+  (define y           (next-y next))
   (define next-square (matrix-ref board (next-x next) (next-y next)))
-  (define port-out    ((square-tile next-square) (next-port next)))
+  (define port-out    ((square-tile next-square) port-in))
   (define external    (next-square port-out))
-  (list port-out (next-x next) (next-y next) external))
+  (cond
+    [(open? external) (player name port-out x y)]
+    [(wall? external) (out (player name port-out x y))]
+    [(seen? x y seen) (inf (player name port-out x y))]
+    [else (list port-out (matrix-ref board x y) (set-add seen `(,x ,y)))]))
 
 (module+ test ;; move player
-  (define p-sq (matrix-ref board+ 0 0))
-  #;
-  (check-equal? (move-one-square board+ (player-port red-player) p-sq) (list (index->port 1) 1 0 wall)
-                "moved red player 1 step")
+  (check-equal?
+   (move-player-one-square board+ (matrix-ref board+ 0 0) (player-port red-player) "red" (set))
+   (out (player "red" (index->port 1) 1 0))
+   "moved red player 1 step")
 
   (check-equal? (move-one-player board+ red-player) (out (player player-red (index->port 1) 1 0))
                 "move red player out")
