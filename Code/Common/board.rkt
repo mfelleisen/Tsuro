@@ -374,35 +374,25 @@
 
 (define the-one-square (compose third first))
 
-;; this is a function because it uses create-portmap explicitly 
-(define (state-with-3-players #:with (with #false))
-  (define square-00 (the-one-square (add-square '() tile-00 0 0)))
-  (define square-02 (the-one-square (add-square '() tile-02 0 2)))
-  (define square-20 (the-one-square (add-square '() tile-20 2 0)))
-  (define boatd3
-    (let* ([m the-empty-board]
-           [m (matrix-set m 0 0 square-00)]
-           [m (matrix-set m 0 2 square-02)]
-           [m (matrix-set m 2 0 square-20)])
-      m))
-  (define the-board (state boatd3 3players))
-  (if with
-      (values the-board square-00 square-02 square-20)
-      the-board))
+(define square-00 (the-one-square (add-square '() tile-00 0 0)))
+(define square-02 (the-one-square (add-square '() tile-02 0 2)))
+(define square-20 (the-one-square (add-square '() tile-20 2 0)))
 
-(module+ test ;; additional data samples
-  (define-values (state-3-players square-00 square-02 square-20) (state-with-3-players #:with #true))
-  (define board-3-players (state-board state-3-players))
-  (define tile-to-add-to-board-3-index 33)
-  (define tile-to-add-to-board-3 (tile-index->tile tile-to-add-to-board-3-index))
-  (define placement1 (first inits-for-state-with-3-players))
+(define boatd3
+  (let* ([m the-empty-board]
+         [m (matrix-set m 0 0 square-00)]
+         [m (matrix-set m 0 2 square-02)]
+         [m (matrix-set m 2 0 square-20)])
+    m))
 
-  (check-equal? (survivors state-3-players) (set-map 3players player-name) "survivors"))
+(define state3 (state boatd3 3players))
 
-(module+ test ;; contracts for initial placements 
-  (check-true (player-on-tile/c placement1))
+(module+ test ;; some contract testing 
+  (check-equal? (survivors state3) (set-map 3players player-name) "survivors")
+  
+  (check-true (player-on-tile/c (first inits-for-state-with-3-players)))
   (check-true (initial-player-on-tile*/c inits-for-state-with-3-players))
-  (check-true ((takes-part-in-game state-3-players) player-red))
+  (check-true ((takes-part-in-game state3) player-red))
 
   (check-true (intermediate*/c inits-for-state-with-3-players)
               "an initial configuration of tiles is also intermediate"))
@@ -462,7 +452,7 @@
                #:declare yi (expr/c #'index?)
                #:with (tile x y) #'( (rotate-tile (tile-index->tile ti.c) #:degree r) xi.c yi.c)]))
 
-  (define-syntax (init-list-from-tiles stx)
+  (define-syntax (intermediate-list-from-spec stx)
     (syntax-parse stx
       [(_ (t:index/or-index-w-player ...) ...)
        #'(init-list-from-tiles/proc (list (list t.square ...) ...))]))
@@ -493,45 +483,20 @@
     (state board players)))
 
 (module+ test ;; testing the DSL
-  (check-equal? (init-list-from-tiles
+  (check-equal? (intermediate-list-from-spec
                  ((34 "red" #:on port-2) #f (34 #:rotate 90 "blue" #:on port-4))
                  (#f)
                  ((33 "white" #:on port-3)))
                 inits-for-state-with-3-players)
 
-  (match-define (state board3 _) state-3-players)
+  (match-define (state board3 _) state3)
 
   (require Tsuro/Code/Lib/diff)
   (check-equal? (state-from
                  [[tile-00-index "red" #:on port-2] #f [tile-20-index "blue" #:on port-4]]
                  (#f)
                  [[tile-02-index "white" #:on port-3]])
-                state-3-players))
-
-(module+ test ;; intermediate boards, states, and contracts 
-
-  (define not-intermediate
-    (init-list-from-tiles
-     ((34 "red" #:on port-2) #f (34 #:rotate 90 "blue" #:on port-4))
-     (33 33)
-     ((33 #:rotate 180 "white" #:on port-3))))
-  (check-false (intermediate*/c not-intermediate) "an isolated tile that nobody could have placed")
-  
-  (define tile-01 (tile-index->tile 33))
-  (define tile-10 (tile-index->tile 33))
-  (define contiguity-for-3-platers `((,tile-01 0 1) (,tile-10 1 0)))
-  (define intermediate-bad-state (append inits-for-state-with-3-players contiguity-for-3-platers))
-
-  ;; contracts for intermediate placements
-  (check-true (andmap tile/c contiguity-for-3-platers) "tiles are tiles")
-  (check-true (player-on-any-tile/c (first intermediate-bad-state)) "1 p")
-  (check-false (tile/c (first intermediate-bad-state)) "1 t")
-  (check-true ((or/c player-on-any-tile/c tile/c) (first intermediate-bad-state)) "1 or")
-  (check-true ((or/c tile/c player-on-any-tile/c) (first intermediate-bad-state)) "reversed or")
-  (check-true (intermediate*/c intermediate-bad-state))
-  
-  (check-false (every-player-faces-an-open-square     (intermediate-aux intermediate-bad-state)))
-  (check-true (every-player-can-leave-going-backwards (intermediate-aux intermediate-bad-state))))
+                state3))
 
 ;                                                                        
 ;                                                                        
@@ -560,7 +525,7 @@
 
 (module+ test ;; initialize 
   (check-exn exn:fail:contract? (λ () (initialize `((,tile1 "x" 2 0 0)))) "port, not index")
-  (check-equal? (initialize inits-for-state-with-3-players) state-3-players))
+  (check-equal? (initialize inits-for-state-with-3-players) state3))
 
 ;                                                                                      
 ;                                                        ;                             
@@ -598,31 +563,55 @@
                  (set-add players (player name port x y)))])))
   (state board players))
 
-(module+ test 
-  (define intermediate-bad-state-2
-    (init-list-from-tiles
+(module+ test ;; intermediate boards, states, and contracts 
+
+  (define bad-intermediate-spec
+    (intermediate-list-from-spec
+     ((34 "red" #:on port-2) #f (34 #:rotate 90 "blue" #:on port-4))
+     (33 33)
+     ((33 #:rotate 180 "white" #:on port-3))))
+  (check-false (intermediate*/c bad-intermediate-spec) "an isolated tile that nobody could place")
+  
+  (define contiguity-for-3-platers `((,(tile-index->tile 33) 0 1) (,(tile-index->tile 33) 1 0)))
+  (define bad-intermediate-spec-2 (append inits-for-state-with-3-players contiguity-for-3-platers))
+  (check-true (andmap tile/c contiguity-for-3-platers) "tiles are tiles")
+  (check-true (player-on-any-tile/c (first bad-intermediate-spec-2)) "1 p")
+  (check-false (tile/c (first bad-intermediate-spec-2)) "1 t")
+  (check-true ((or/c player-on-any-tile/c tile/c) (first bad-intermediate-spec-2)) "1 or")
+  (check-true ((or/c tile/c player-on-any-tile/c) (first bad-intermediate-spec-2)) "reversed or")
+  
+  (check-true (intermediate*/c bad-intermediate-spec-2) "it's okay as input but creates a bad state")
+  (check-false (every-player-faces-an-open-square       (intermediate-aux bad-intermediate-spec-2))
+               "avatar is interior because of contiguity")
+  (check-true (every-player-can-leave-going-backwards   (intermediate-aux bad-intermediate-spec-2))
+              "but it is on an initial square")
+
+  (define bad-intermediate-spec-3
+    (intermediate-list-from-spec
      ((34 "red" #:on port-2) #f (34 #:rotate 90 "blue" #:on port-4))
      (33)
      (33 (33 #:rotate 180 "white" #:on port-3))))
 
-  (check-true (every-player-faces-an-open-square       (intermediate-aux intermediate-bad-state-2)))
-  (check-false (every-player-can-leave-going-backwards (intermediate-aux intermediate-bad-state-2)))
+  (check-true (every-player-faces-an-open-square       (intermediate-aux bad-intermediate-spec-3)))
+  (check-false (every-player-can-leave-going-backwards (intermediate-aux bad-intermediate-spec-3))
+               "the white guy can't leave"))
 
-  (define intermediate-good
-    (init-list-from-tiles
+(module+ test ;; testing intermediate's results 
+  (define good-intermediate-spec
+    (intermediate-list-from-spec
      ((34 "red" #:on port-2) #f (34 #:rotate 90 "blue" #:on port-4))
      (33)
      ((33 #:rotate 180 "white" #:on port-3))))
   
-  (check-true (every-player-faces-an-open-square      (intermediate-aux intermediate-good)))
-  (check-true (every-player-can-leave-going-backwards (intermediate-aux intermediate-good)))
+  (check-true (every-player-faces-an-open-square      (intermediate-aux good-intermediate-spec)))
+  (check-true (every-player-can-leave-going-backwards (intermediate-aux good-intermediate-spec)))
 
-  (define intermediate-good-state
+  (define good-intermediate-state
     (state-from ((34 "red" #:on port-2) #f (34 #:rotate 90 "blue" #:on port-4))
                 (33)
                 ((33 #:rotate 180 "white" #:on port-3))))
   
-  (check-equal? (intermediate intermediate-good) intermediate-good-state))
+  (check-equal? (intermediate good-intermediate-spec) good-intermediate-state))
 
 ;                                                                        
 ;              ;      ;                                                  
@@ -662,22 +651,26 @@
   (compose (curry equal? pn) player-name))
 
 (module+ test ;; add-tile
+
+  (define tile-to-add-to-board-3-index 33)
+  (define tile-to-add-to-board-3 (tile-index->tile tile-to-add-to-board-3-index))
+
   (check-equal? (find-player 3players "red") red-player)
-  (match-define (list p1 p2) (set->list (set-remove (state-players state-3-players) red-player)))
+  (match-define (list p1 p2) (set->list (set-remove (state-players state3) red-player)))
   (define state+
-    (state-from #:board0 board-3-players
+    (state-from #:board0 board3
                 #:players0 [p2 p1]
                 (#f (tile-to-add-to-board-3-index #:rotate 90))))
 
   (define board+ (state-board state+))
   
-  (check-equal? (add-tile state-3-players (rotate-tile tile-to-add-to-board-3) player-red) state+
+  (check-equal? (add-tile state3 (rotate-tile tile-to-add-to-board-3) player-red) state+
                 "drive red player off"))
 
 (module+ test ;; add-tile that causes an infinite loop 
 
   (define inf-tile-to-add-to-board-3 tile1)
-  (check-exn exn:infinite? (λ () (add-tile state-3-players inf-tile-to-add-to-board-3 player-red))
+  (check-exn exn:infinite? (λ () (add-tile state3 inf-tile-to-add-to-board-3 player-red))
              "drive red player into infinite loop"))
 
 ;                                                                                      
@@ -706,9 +699,9 @@
 (define (cons-square board0) (λ (n) (cons (apply matrix-ref board0 n) n)))
 
 (module+ test
-  (define neighbors  (map (cons-square board-3-players) (neighbors* board-3-players 1 0)))
+  (define neighbors  (map (cons-square board3) (neighbors* board3 1 0)))
   (define nu-squares (add-square neighbors tile-to-add-to-board-3 1 0))
-  (define nu-board  (let* ([m board-3-players]
+  (define nu-board  (let* ([m board3]
                            [m (matrix-set m 1 0 (caddr (first nu-squares)))]
                            [m (matrix-set m 0 0 (caddr (second nu-squares)))]
                            [m (matrix-set m 2 0 (caddr (third nu-squares)))])
@@ -716,7 +709,7 @@
     
   (check-equal?
    (matrix->rectangle 
-    (add-new-square-update-neighbors board-3-players tile-to-add-to-board-3 1 0))
+    (add-new-square-update-neighbors board3 tile-to-add-to-board-3 1 0))
    (matrix->rectangle 
     nu-board)))
 ;                                                                                                    
@@ -901,22 +894,19 @@
 (define (logical-coordinates->geometry port x y)
   (values (* x TILE-SIZE)) (* TILE-SIZE y))
 
-#; {(-> State) -> Void}
+#; {State -> Void}
 (define (show-state s)
   (define frame (new frame% [label "hello"][width WIDTH][height HEIGHT]))
   
   (define canvas
     (new canvas%
          [parent frame]
-         [paint-callback (λ (e dc) (draw-state (s) dc))]))
+         [paint-callback (λ (e dc) (draw-state s dc))]))
     
   (send frame show #t))
-;
-;(module+ test (show-state state-with-3-players))
-;(module+ test (show-state (λ () state+)))
-;(module+ test (show-state (λ () intermediate-good-state)))
-;(module+ test (show-state (λ () state+)))
 
+; (module+ test (show-state state+))
+; (module+ test (show-state good-intermediate-state))
 
 ;                              
 ;      ;                       
@@ -957,6 +947,6 @@
        (and candidate-state)]
       [else intermediates]))
   
-  (define s3 (state-with-3-players))
+  (define s3 state3)
   (check-equal? (state-players (jsexpr->state (state->jsexpr s3))) (state-players s3))
   (check-equal? (state-board (jsexpr->state (state->jsexpr s3))) (state-board s3)))
