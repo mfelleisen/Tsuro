@@ -6,13 +6,20 @@
 
 (provide
  SIZE
- OPEN
- WALL
+
+ #; {type Square = [Port -> Next]}
+ #; {type Next = OPEN || WALL || (next port index index)}
+ 
  create-square 
  square-tile
  update-square
 
  looking-at
+ 
+ OPEN
+ WALL
+ outside? 
+ 
  next-port
  next-x
  next-y)
@@ -56,6 +63,9 @@
 
 (define WALL "wall") 
 (define OPEN "open")
+
+(define (outside? x)
+  (member x (list WALL OPEN)))
 
 #; {Square  = (U BLANK                   ;; an unoccupied, blank square 
                  (square Tile PortMap))} ;; a configured tile with connections to neighbors cached 
