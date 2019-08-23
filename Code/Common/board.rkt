@@ -3,8 +3,7 @@
 ;; a data representation for game States, plus basic functions for manipulating them
 
 ;; TODO
-;; -- add state-from-tiles to dsl
-;; -- JSON de/serialozation 
+;; -- factor out squares
 
 ;; safety
 ;; - contract for initialize and add?
@@ -764,11 +763,9 @@
   (match-define (player name port-p x-p y-p) the-player)
   (let/ec return 
     (let move-one-player ([port-p port-p][x-p x-p][y-p y-p][seen `((,x-p ,y-p))])
-      (when to-periphery
-        (match-define (square _ map-p) (matrix-ref board x-p y-p))
-        (unless (next? (vector-ref map-p (port->index port-p)))
+      (when (and to-periphery (member ((matrix-ref board x-p y-p) (port->index port-p)) (list WALL OPEN)))
           ;; the player didn't get to the periphery but an open square 
-          (return the-player)))
+          (return the-player))
       (match-define (list port x y external) (move-one-square board port-p x-p y-p))
       (cond
         [(member `(,x ,y) seen) (inf (player name port x y))]
@@ -781,13 +778,11 @@
 ;; move player at (x-p, y-p) on port port-p "thru" the tile of the next square
 ;; ASSUME the square is occupired with a tile 
 (define (move-one-square board port x-p y-p)
-  (match-define (square _ map-p)        (matrix-ref board x-p y-p))
-  (match-define (next port-in x-next y-next) (vector-ref map-p (port->index port)))
-  (define next-square (matrix-ref board x-next y-next))
-  (match-define (square _ map-next)  next-square)
-  (define port-out ((square-tile next-square) port-in))
-  (define external (vector-ref map-next (port->index port-out)))
-  (list port-out x-next y-next external))
+  (define next ((matrix-ref board x-p y-p) (port->index port)))
+  (define next-square (matrix-ref board (next-x next) (next-y next)))
+  (define port-out    ((square-tile next-square) (next-port next)))
+  (define external    (next-square (port->index port-out)))
+  (list port-out (next-x next) (next-y next) external))
 
 (module+ test ;; move player  
   (check-equal? (move-one-square board+ (player-port red-player) 0 0) (list (index->port 1) 1 0 WALL)
@@ -870,7 +865,7 @@
          (define row (first l))
          (define picts
            (for/list ((n (in-list row)) (x (in-naturals)))
-             (define tile   (or (and (not (eq? BLANK n)) (square-tile n)) blank-tile))
+             (define tile     (or (and (not (equal? BLANK n)) (square-tile n)) blank-tile))
              (define pict     (tile->pict tile))
              (define p-on-x-y (is-player-on players x y))
              (cond

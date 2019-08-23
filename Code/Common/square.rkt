@@ -11,13 +11,13 @@
  
  BLANK
  create-square 
- square
  square-tile
  update-square
 
  looking-at
- next
- next?)
+ next-port
+ next-x
+ next-y)
 
 ;                                                                                      
 ;       ;                                  ;                                           
@@ -69,7 +69,11 @@
                (next Port Index Index))} ;; points to a port on this or a neigboring square 
 
 (define SIZE 10) ; Tsuro is played on a board with SIZE x SIZE configured tiles
-(struct square [tile map] #:transparent)
+
+(struct square [tile map]
+  #:transparent
+  #:property prop:procedure (lambda (this-square from) (vector-ref (square-map this-square) from)))
+
 (struct next [port x y] #:transparent)
 
 #; {[Listof [List Index Index]] Tile Index Index -> square}
