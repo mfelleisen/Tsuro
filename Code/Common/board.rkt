@@ -781,8 +781,8 @@
 (define (seen? x y seen) (set-member? seen `(,x ,y)))
 
 #; {Board Square Port Name Seen -> (U Player (out Player) (inf Player) [List Port Index Index Seen])}
-;; move player at (x-p, y-p) on port-in to the tile on the next square
-;; ASSUME the square is occupired with a tile 
+;; move player at (x-p, y-p) on player-port to port-in on the neighboring square and then to port-out 
+;; ASSUME there is a tile at the player-square
 (define (move-player-one-square board player-square player-port name seen)
   (define next        (player-square player-port))
   (define port-in     (next-port next))
