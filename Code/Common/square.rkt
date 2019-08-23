@@ -8,8 +8,6 @@
  SIZE
  OPEN
  WALL
- 
- BLANK
  create-square 
  square-tile
  update-square
@@ -56,7 +54,6 @@
 ;                                                    ;            
 ;                                                    ;            
 
-(define BLANK #false)
 (define WALL "wall") 
 (define OPEN "open")
 

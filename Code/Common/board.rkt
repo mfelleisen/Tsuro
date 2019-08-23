@@ -349,6 +349,7 @@
 ;                                                                  ;                          
 ;                                                                  ;                          
 
+(define BLANK #false)
 (define the-empty-board (build-matrix SIZE SIZE (λ (_i _j) BLANK)))
 
 (match-define `(,port-2 ,port-3 ,port-4) (map index->port '(2 3 4)))
