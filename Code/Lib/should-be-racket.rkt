@@ -1,7 +1,12 @@
 #lang racket
 
 (provide
-  =>
+
+ #; {[Setof X] [X -> X] -> (U False [Setof X])}
+ set-member
+ set-such-that
+
+ =>
  when*
  unless*
  and*)
@@ -39,3 +44,13 @@
   (check-true (and* #t))
   (check-true (and* (+ 1 1) => (λ (it) (> 3 it))))
   (check-false (and* (+ 1 1) => (λ (it) (> 3 it)) #f)))
+
+;; ---------------------------------------------------------------------------------------------------
+(define (set-member s prop)
+  (for/set ((x (in-set s)) #:when (prop x)) x))
+
+(define set-such-that set-member)
+
+(module+ test
+  (check-equal? (set-member (set 1 2 3) (λ (x) (> x 1))) (set 3 2)))
+  
