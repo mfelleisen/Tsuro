@@ -27,13 +27,10 @@
 ;                                                                 
 ;                                                                 
   
-(require (only-in Tsuro/Code/Common/square SIZE looking-at square-tile))
+(require (only-in Tsuro/Code/Common/square index? SIZE looking-at square-tile))
 (require (only-in Tsuro/Code/Common/tiles tile?))
 (require (only-in Tsuro/Code/Common/port-alphabetic port?))
 (require Tsuro/Code/Lib/or)
-
-#; {Nat -> Boolean : Index}
-(define (index? z) (< -1 z SIZE))
 
 ;                                                                                             
 ;                                                                                             
@@ -375,11 +372,13 @@
 (define red-player (first 3players-list))
 (define 3players (apply set 3players-list))
 
+(define the-one-square (compose third first))
+
 ;; this is a function because it uses create-portmap explicitly 
 (define (state-with-3-players #:with (with #false))
-  (define square-00 (create-square '() tile-00 0 0))
-  (define square-02 (create-square '() tile-02 0 2))
-  (define square-20 (create-square '() tile-20 2 0))
+  (define square-00 (the-one-square (add-square '() tile-00 0 0)))
+  (define square-02 (the-one-square (add-square '() tile-02 0 2)))
+  (define square-20 (the-one-square (add-square '() tile-20 2 0)))
   (define boatd3
     (let* ([m the-empty-board]
            [m (matrix-set m 0 0 square-00)]
@@ -501,11 +500,12 @@
                 inits-for-state-with-3-players)
 
   (match-define (state board3 _) state-3-players)
-  
+
+  (require Tsuro/Code/Lib/diff)
   (check-equal? (state-from
                  [[tile-00-index "red" #:on port-2] #f [tile-20-index "blue" #:on port-4]]
                  (#f)
-                 [[tile-02-index #:rotate 90 "white" #:on port-3]])
+                 [[tile-02-index "white" #:on port-3]])
                 state-3-players))
 
 (module+ test ;; intermediate boards, states, and contracts 
@@ -555,7 +555,7 @@
   (define board
     (for/fold ((m the-empty-board)) ((placement (in-list lo-placements)))
       (match-define `(,tile ,_  ,_ ,x ,y) placement)
-      (matrix-set m x y (create-square '() tile x y))))
+      (matrix-set m x y (the-one-square (add-square '() tile x y)))))
   (state board players))
 
 (module+ test ;; initialize 
@@ -697,21 +697,21 @@
 
 #; {Board Confguration Index Index -> Matrix}
 
-(define (add-new-square-update-neighbors board tile x y)
-  (define neighbors  (neighbors* board x y))
-  (define new-square (create-square neighbors tile x y))
-  (for*/fold ((m (matrix-set board x y new-square))) ((g neighbors))
-    (match-define (list x-n y-n) g)
-    (define old-neighbor-square  (matrix-ref m x-n y-n))
-    (define updated-neighbor-sq  (update-square old-neighbor-square x-n y-n x y))
-    (matrix-set m x-n y-n updated-neighbor-sq)))
+(define (add-new-square-update-neighbors board0 tile x y)
+  (define neighbors (map (cons-square board0) (neighbors* board0 x y)))
+  (define squares*  (add-square neighbors tile x y))
+  (for*/fold ((board board0)) ((sq+x+y squares*))
+    (apply matrix-set board sq+x+y)))
+
+(define (cons-square board0) (λ (n) (cons (apply matrix-ref board0 n) n)))
 
 (module+ test
-  (define nu-square (create-square (neighbors* board-3-players 1 0) tile-to-add-to-board-3 1 0))
+  (define neighbors  (map (cons-square board-3-players) (neighbors* board-3-players 1 0)))
+  (define nu-squares (add-square neighbors tile-to-add-to-board-3 1 0))
   (define nu-board  (let* ([m board-3-players]
-                           [m (matrix-set m 1 0 nu-square)]
-                           [m (matrix-set m 0 0 (update-square square-00 0 0 1 0))]
-                           [m (matrix-set m 2 0 (update-square square-20 2 0 1 0))])
+                           [m (matrix-set m 1 0 (caddr (first nu-squares)))]
+                           [m (matrix-set m 0 0 (caddr (second nu-squares)))]
+                           [m (matrix-set m 2 0 (caddr (third nu-squares)))])
                       m))
     
   (check-equal?
@@ -911,11 +911,11 @@
          [paint-callback (λ (e dc) (draw-state (s) dc))]))
     
   (send frame show #t))
-
-; (module+ test (show-state state-with-3-players))
-; (module+ test (show-state (λ () state+)))
-; (module+ test (show-state (λ () intermediate-good-state)))
-; (module+ test (show-state (λ () state+)))
+;
+;(module+ test (show-state state-with-3-players))
+;(module+ test (show-state (λ () state+)))
+;(module+ test (show-state (λ () intermediate-good-state)))
+;(module+ test (show-state (λ () state+)))
 
 
 ;                              

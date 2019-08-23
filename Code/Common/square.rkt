@@ -4,15 +4,28 @@
 ;; a data representation for squares on a board
 ;; -- a square is aware of neighbors but not the actual board size 
 
+(require (only-in Tsuro/Code/Common/tiles tile?))
+
 (provide
  SIZE
+ index?
 
  #; {type Square = [Port -> Next]}
- #; {type Next = OPEN || WALL || (next port index index)}
- 
- create-square 
- square-tile
- update-square
+ #; {type Next = open? || wall? || next?}
+
+ (contract-out
+  [add-square
+   ;; create a square at (x,y) from tile, with current neighbor coordinates 
+   (->i ([neighbors [listof [list/c square? index? index?]]]
+         [tile tile?]
+         [x index?]
+         [y index?])
+        [result (neighbors)
+         (and/c
+          [listof [list/c index? index? square?]]
+          (flat-named-contract 'added-one (λ (r) (= (length r) (+ (length neighbors) 1)))))])]
+
+  [square-tile (-> square? tile?)])
 
  looking-at
  
@@ -44,6 +57,7 @@
 (require (except-in Tsuro/Code/Common/port-alphabetic port?))
   
 (module+ test
+  (require (submod ".."))
   (require rackunit))
 
 ;                                                                 
@@ -61,8 +75,8 @@
 ;                                                    ;            
 ;                                                    ;            
 
-(struct wall []) (define WALL (wall))
-(struct open []) (define OPEN (open))
+(struct wall [] #:transparent) (define WALL (wall))
+(struct open [] #:transparent) (define OPEN (open))
 
 (define (outside? x)
   (member x (list WALL OPEN)))
@@ -76,38 +90,48 @@
                (next Port Index Index))} ;; points to a port on this or a neigboring square 
 
 (define SIZE 10) ; Tsuro is played on a board with SIZE x SIZE configured tiles
+#; {Nat -> Boolean : Index}
+(define (index? z) (< -1 z SIZE))
 
 (define (to-port this-square from-port) (vector-ref (square-map this-square) (port->index from-port)))
 (struct square [tile map] #:transparent #:property prop:procedure to-port)
 
 (struct next [port x y] #:transparent)
 
-#; {[Listof [List Index Index]] Tile Index Index -> square}
-;; create a square at (x,y) from Tile with current matrix n*
-(define (create-square neighbors tile x y)
+(define (add-square neighbors tile x y)
   (define portmap
     (for*/fold ((portmap (create-portmap x y))) ((g neighbors))
-      (apply update-portmap portmap x y g)))
-  (square tile portmap))
-
-
-#; {Square Index Index Index Index -> square}
+      (apply update-portmap portmap x y (rest g))))
+  (cons (list x y (square tile portmap))
+        (for/list ((g neighbors))
+          (match-define (list neighbor-sq x-sq y-sq) g)
+          (list x-sq y-sq (update-square neighbor-sq x-sq y-sq x y)))))
+  
 (define (update-square old x-old y-old x-new y-new)
   (square (square-tile old) (update-portmap (square-map old) x-old y-old x-new y-new)))
 
 (module+ test ;; operating on squares
-  (define t (tile-index->tile 33))
-  (check-equal? (create-square '((2 0) (0 0)) t 1 0)
-                (square t
-                        (let* ([pm (create-portmap 1 0)]
-                               [pm (update-portmap pm 1 0 2 0)]
-                               [pm (update-portmap pm 1 0 0 0)])
-                          pm)))
 
-  (define tile34    (tile-index->tile 34))
-  (define square-00 (create-square '() tile34 0 0))
+  (check-equal? (wall) (wall))
+
+  (define tile-00 (tile-index->tile 34))
+  (define tile-20 (tile-index->tile 33))  
+  (define square-00 (third (first (add-square '() tile-00 0 0))))
+  (define square-20 (third (first (add-square '() tile-20 0 0))))
+
   (check-equal? (update-square square-00 0 0 1 0)
-                (square tile34 (update-portmap (square-map square-00) 0 0 1 0))))
+                (square tile-00 (update-portmap (square-map square-00) 0 0 1 0)))
+  
+  (define tile-10 (tile-index->tile 33))
+  (check-equal? (add-square `((,square-20 2 0) (,square-00 0 0)) tile-10 1 0)
+                (list 
+                 (list 1 0 (square tile-10
+                                   (let* ([pm (create-portmap 1 0)]
+                                          [pm (update-portmap pm 1 0 2 0)]
+                                          [pm (update-portmap pm 1 0 0 0)])
+                                     pm)))
+                 (list 2 0 (square tile-20 (update-portmap (square-map square-20) 2 0 1 0)))
+                 (list 0 0 (square tile-00 (update-portmap (square-map square-00) 0 0 1 0))))))
 
   
 ;                                                   
