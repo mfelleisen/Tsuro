@@ -28,11 +28,10 @@
 ;                                                                 
 ;                                                                 
   
-(require (only-in Tsuro/Code/Common/port-alphabetic port?))
+(require (only-in Tsuro/Code/Common/square SIZE looking-at square-tile))
 (require (only-in Tsuro/Code/Common/tiles tile?))
+(require (only-in Tsuro/Code/Common/port-alphabetic port?))
 (require Tsuro/Code/Lib/or)
-
-(define SIZE 10) ; Tsuro is played on a board with SIZE x SIZE configured tiles
 
 #; {Nat -> Boolean : Index}
 (define (index? z) (< -1 z SIZE))
@@ -211,7 +210,7 @@
   (match-define (state board players) s)
   (for/and ((p (in-set players)))
     (match-define (player name port x y) p)
-    (match-define (square tile _portmap) (matrix-ref board x y))
+    (define tile (square-tile (matrix-ref board x y)))
     (or~ #:let exit-port (tile port)
          (and (bordering-periphery? x y) (player-facing-inward? port x y))
          #:let player-moved-to-exit-port (player name (tile port) x y)
@@ -286,6 +285,7 @@
 ;                 ;                                                                    
 ;                 ;                                                                    
 
+(require (except-in Tsuro/Code/Common/square SIZE looking-at square-tile))
 (require (except-in Tsuro/Code/Common/tiles tile? table))
 (require (except-in Tsuro/Code/Common/port-alphabetic port?))
 (require Tsuro/Code/Common/matrix)
@@ -297,9 +297,7 @@
 (module+ test
   (require (submod ".."))
   (require (for-syntax syntax/parse))
-  (require rackunit)
-  #;
-  (require racket/gui/base))
+  (require rackunit))
 
 (module+ json
   (require (submod Tsuro/Code/Common/tiles json))
@@ -330,32 +328,27 @@
 #; {PlayerName = String}
 #; {Board   = [Matrixof Square] :: {Index x Index}}
 #; {Index   = [0 .. SIZE]}
-#; {Square  = (U BLANK                   ;; an unoccupied, blank square 
-                 (square Tile PortMap))} ;; a configured tile with connections to neighbors cached 
 
 (struct state  [board players] #:transparent)
 (struct player [name port x y] #:transparent)
-(struct square [tile map] #:transparent)
-(define BLANK #false)
 
 (define (survivors s)
   (map player-name (set->list (state-players s))))
 
-;; a fast means for looking up the "bridges" to neighboring squares
-;; ------------------------------------------------------------------
-#; {PortMap = (Vectorof Next) :: [Port ->f Next]}
-#; {Next    = (U
-               WALL                      ;; periphery of board 
-               OPEN                      ;; no neighboring tile yet 
-               (next Port Index Index))} ;; points to a port on this or a neigboring square 
-
-(struct next [port x y] #:transparent)
-
-(define WALL "wall") 
-(define OPEN "open")
-
-;; ---------------------------------------------------------------------------------------------------
-;; data examples
+;                                                                                             
+;       ;                                                                                     
+;       ;           ;                                                     ;;;                 
+;       ;           ;                                                       ;                 
+;    ;;;;  ;;;;   ;;;;;  ;;;;           ;;;   ;   ;  ;;;;  ;;;;;;  ;;;;     ;     ;;;    ;;;  
+;   ;; ;;      ;    ;        ;         ;;  ;   ; ;       ; ;  ;  ; ;; ;;    ;    ;;  ;  ;   ; 
+;   ;   ;      ;    ;        ;         ;   ;;  ;;;       ; ;  ;  ; ;   ;    ;    ;   ;; ;     
+;   ;   ;   ;;;;    ;     ;;;;         ;;;;;;   ;     ;;;; ;  ;  ; ;   ;    ;    ;;;;;;  ;;;  
+;   ;   ;  ;   ;    ;    ;   ;         ;       ;;;   ;   ; ;  ;  ; ;   ;    ;    ;          ; 
+;   ;; ;;  ;   ;    ;    ;   ;         ;       ; ;   ;   ; ;  ;  ; ;; ;;    ;    ;      ;   ; 
+;    ;;;;   ;;;;    ;;;   ;;;;          ;;;;  ;   ;   ;;;; ;  ;  ; ;;;;      ;;   ;;;;   ;;;  
+;                                                                  ;                          
+;                                                                  ;                          
+;                                                                  ;                          
 
 (define the-empty-board (build-matrix SIZE SIZE (λ (_i _j) BLANK)))
 
@@ -382,10 +375,11 @@
 (define red-player (first 3players-list))
 (define 3players (apply set 3players-list))
 
+;; this is a function because it uses create-portmap explicitly 
 (define (state-with-3-players #:with (with #false))
-  (define square-00 (square tile-00 (create-portmap 0 0)))
-  (define square-02 (square tile-02 (create-portmap 0 2)))
-  (define square-20 (square tile-20 (create-portmap 2 0)))
+  (define square-00 (create-square '() tile-00 0 0))
+  (define square-02 (create-square '() tile-02 0 2))
+  (define square-20 (create-square '() tile-20 2 0))
   (define boatd3
     (let* ([m the-empty-board]
            [m (matrix-set m 0 0 square-00)]
@@ -397,19 +391,19 @@
       (values the-board square-00 square-02 square-20)
       the-board))
 
-(module+ test ;; additional data samples 
+(module+ test ;; additional data samples
   (define-values (state-3-players square-00 square-02 square-20) (state-with-3-players #:with #true))
   (define board-3-players (state-board state-3-players))
   (define tile-to-add-to-board-3-index 33)
   (define tile-to-add-to-board-3 (tile-index->tile tile-to-add-to-board-3-index))
   (define placement1 (first inits-for-state-with-3-players))
 
-  (check-equal? (survivors (state-with-3-players)) (set-map 3players player-name) "survivors"))
+  (check-equal? (survivors state-3-players) (set-map 3players player-name) "survivors"))
 
 (module+ test ;; contracts for initial placements 
   (check-true (player-on-tile/c placement1))
   (check-true (initial-player-on-tile*/c inits-for-state-with-3-players))
-  (check-true ((takes-part-in-game (state-with-3-players)) player-red))
+  (check-true ((takes-part-in-game state-3-players) player-red))
 
   (check-true (intermediate*/c inits-for-state-with-3-players)
               "an initial configuration of tiles is also intermediate"))
@@ -506,13 +500,13 @@
                  ((33 "white" #:on port-3)))
                 inits-for-state-with-3-players)
 
-  (match-define (state board3 _) (state-with-3-players))
+  (match-define (state board3 _) state-3-players)
   
   (check-equal? (state-from
                  [[tile-00-index "red" #:on port-2] #f [tile-20-index "blue" #:on port-4]]
                  (#f)
                  [[tile-02-index #:rotate 90 "white" #:on port-3]])
-                (state-with-3-players)))
+                state-3-players))
 
 (module+ test ;; intermediate boards, states, and contracts 
 
@@ -561,12 +555,12 @@
   (define board
     (for/fold ((m the-empty-board)) ((placement (in-list lo-placements)))
       (match-define `(,tile ,_  ,_ ,x ,y) placement)
-      (matrix-set m x y (square tile (create-portmap x y)))))
+      (matrix-set m x y (create-square '() tile x y))))
   (state board players))
 
 (module+ test ;; initialize 
   (check-exn exn:fail:contract? (λ () (initialize `((,tile1 "x" 2 0 0)))) "port, not index")
-  (check-equal? (initialize inits-for-state-with-3-players) (state-with-3-players)))
+  (check-equal? (initialize inits-for-state-with-3-players) state-3-players))
 
 ;                                                                                      
 ;                                                        ;                             
@@ -704,15 +698,16 @@
 #; {Board Confguration Index Index -> Matrix}
 
 (define (add-new-square-update-neighbors board tile x y)
-  (define new-square (create-square board tile x y))
-  (for*/fold ((m (matrix-set board x y new-square))) ((g (neighbors* board x y)))
+  (define neighbors  (neighbors* board x y))
+  (define new-square (create-square neighbors tile x y))
+  (for*/fold ((m (matrix-set board x y new-square))) ((g neighbors))
     (match-define (list x-n y-n) g)
     (define old-neighbor-square  (matrix-ref m x-n y-n))
     (define updated-neighbor-sq  (update-square old-neighbor-square x-n y-n x y))
     (matrix-set m x-n y-n updated-neighbor-sq)))
 
 (module+ test
-  (define nu-square (create-square board-3-players tile-to-add-to-board-3 1 0))
+  (define nu-square (create-square (neighbors* board-3-players 1 0) tile-to-add-to-board-3 1 0))
   (define nu-board  (let* ([m board-3-players]
                            [m (matrix-set m 1 0 nu-square)]
                            [m (matrix-set m 0 0 (update-square square-00 0 0 1 0))]
@@ -724,33 +719,6 @@
     (add-new-square-update-neighbors board-3-players tile-to-add-to-board-3 1 0))
    (matrix->rectangle 
     nu-board)))
-
-;; ---------------------------------------------------------------------------------------------------
-;; creating and updatiing squares 
-
-#; {Board Tile Index Index -> square}
-;; create a square at (x,y) from Tile with current matrix n*
-(define (create-square board tile x y)
-  (define portmap
-    (for*/fold ((portmap (create-portmap x y))) ((g (neighbors* board x y)))
-      (apply update-portmap portmap x y g)))
-  (square tile portmap))
-
-#; {Square Index Index Index Index -> square}
-(define (update-square old x-old y-old x-new y-new)
-  (square (square-tile old) (update-portmap (square-map old) x-old y-old x-new y-new)))
-
-(module+ test ;; operating on squares
-  (check-equal? (update-square square-00 0 0 1 0)
-                (square tile-00 (update-portmap (square-map square-00) 0 0 1 0)))
-
-  (check-equal? (create-square board-3-players tile-to-add-to-board-3 1 0)
-                (square tile-to-add-to-board-3
-                        (let* ([pm (create-portmap 1 0)]
-                               [pm (update-portmap pm 1 0 2 0)]
-                               [pm (update-portmap pm 1 0 0 0)])
-                          pm))))
-
 ;                                                                                                    
 ;                                                                                                    
 ;                           ;                               ;;;                                      
@@ -797,7 +765,7 @@
   (let/ec return 
     (let move-one-player ([port-p port-p][x-p x-p][y-p y-p][seen `((,x-p ,y-p))])
       (when to-periphery
-        (match-define (square tile-p map-p) (matrix-ref board x-p y-p))
+        (match-define (square _ map-p) (matrix-ref board x-p y-p))
         (unless (next? (vector-ref map-p (port->index port-p)))
           ;; the player didn't get to the periphery but an open square 
           (return the-player)))
@@ -813,10 +781,11 @@
 ;; move player at (x-p, y-p) on port port-p "thru" the tile of the next square
 ;; ASSUME the square is occupired with a tile 
 (define (move-one-square board port x-p y-p)
-  (match-define (square tile-p map-p)        (matrix-ref board x-p y-p))
+  (match-define (square _ map-p)        (matrix-ref board x-p y-p))
   (match-define (next port-in x-next y-next) (vector-ref map-p (port->index port)))
-  (match-define (square tile-next map-next)  (matrix-ref board x-next y-next))
-  (define port-out (tile-next port-in))
+  (define next-square (matrix-ref board x-next y-next))
+  (match-define (square _ map-next)  next-square)
+  (define port-out ((square-tile next-square) port-in))
   (define external (vector-ref map-next (port->index port-out)))
   (list port-out x-next y-next external))
 
@@ -844,90 +813,6 @@
   
   (check-equal? (move-one-player board-inf red-player-inf) (inf red-player-inf) "move player inf"))
 
-;                                                   
-;                        ;                          
-;                        ;         ;                
-;                        ;                          
-;    ;;;   ;;;;    ;;;   ; ;;    ;;;   ; ;;    ;;;; 
-;   ;;  ;      ;  ;;  ;  ;;  ;     ;   ;;  ;  ;;  ; 
-;   ;          ;  ;      ;   ;     ;   ;   ;  ;   ; 
-;   ;       ;;;;  ;      ;   ;     ;   ;   ;  ;   ; 
-;   ;      ;   ;  ;      ;   ;     ;   ;   ;  ;   ; 
-;   ;;     ;   ;  ;;     ;   ;     ;   ;   ;  ;; ;; 
-;    ;;;;   ;;;;   ;;;;  ;   ;   ;;;;; ;   ;   ;;;; 
-;                                                 ; 
-;                                              ;  ; 
-;                                               ;;  
-
-#; {Index Index -> PortMap }
-;; create the default portmap for a square 
-(define-match-expander ??
-  (λ (stx)
-    (syntax-case stx ()
-      [(_ w) #'(? (curry = (- w 1)))])))
-
-(define (create-portmap x y)
-  (match* (x y)
-    [(0  0)                (west-north)]
-    [(0 (?? SIZE))         (west-south)]
-    [((?? SIZE) 0)         (east-north)]
-    [((?? SIZE) (?? SIZE)) (east-south)]
-    [(0  n)                (west-any)  ]
-    [((?? SIZE) n)         (east-any)  ]
-    [(n 0)                 (any-north) ]
-    [(n (?? SIZE))         (any-south) ]
-    [(n k)                 (any-any)   ]))
-
-;; ---------------- ports:    0   1   2    3    4    5    6    7 ---
-;;                            north    east      south     west  
-[define (west-north) (vector WALL WALL OPEN OPEN OPEN OPEN WALL WALL)]
-[define (west-south) (vector OPEN OPEN OPEN OPEN WALL WALL WALL WALL)]
-[define (east-north) (vector WALL WALL WALL WALL OPEN OPEN OPEN OPEN)]
-[define (east-south) (vector OPEN OPEN WALL WALL WALL WALL OPEN OPEN)]
-[define (west-any)   (vector OPEN OPEN OPEN OPEN OPEN OPEN WALL WALL)]
-[define (east-any)   (vector OPEN OPEN WALL WALL OPEN OPEN OPEN OPEN)]
-[define (any-north)  (vector WALL WALL OPEN OPEN OPEN OPEN OPEN OPEN)]
-[define (any-south)  (vector OPEN OPEN OPEN OPEN WALL WALL OPEN OPEN)]
-[define (any-any)    (vector OPEN OPEN OPEN OPEN OPEN OPEN OPEN OPEN)]
-    
-(module+ test ;; creating a basic portmap 
-  (define s-1 (- SIZE 1))
-  (define ran (λ () (+ (random (- SIZE 2)) 1))) ;; in [1,s-1)
-
-  (check-equal? (create-portmap 0     0   )  (west-north))
-  (check-equal? (create-portmap 0     s-1)   (west-south))
-  (check-equal? (create-portmap s-1   0)     (east-north))
-  (check-equal? (create-portmap s-1   s-1)   (east-south))
-  (check-equal? (create-portmap 0     (ran)) (west-any))
-  (check-equal? (create-portmap s-1   (ran)) (east-any))
-  (check-equal? (create-portmap (ran) 0)     (any-north))
-  (check-equal? (create-portmap (ran) s-1)   (any-south))
-  (check-equal? (create-portmap (ran) (ran)) (any-any)))
-
-#; {PortMap Index Index Index Index -> PortMap}
-;; update the external parts of the portmap at (x-pm,y-pm) to connect with neighbors on n at (x-n,y-n)
-(define (update-portmap portmap x-pm y-pm x-new y-nnew)
-  (for/vector ((pi (in-range (vector-length portmap))))
-    (define port (index->port pi))
-    (define-values (x-look y-look) (looking-at port x-pm y-pm))
-    (if (and (eq? x-look x-new) (eq? y-look y-nnew))
-        (next (facing-port port) x-new y-nnew)
-        (vector-ref portmap pi))))
-
-(module+ test ;; adding external connections to a portmap 
-  (define nu-pm
-    (let* ([pm (create-portmap 1 0)]
-           [pm (update-portmap pm 1 0 2 0)]
-           [pm (update-portmap pm 1 0 0 0)])
-      pm))
-  (define pm3+
-    (let ([v (vector-copy nu-pm)])
-      (vector-set! v 2 (next (facing-port (index->port 2)) 2 0))
-      (vector-set! v 3 (next (facing-port (index->port 3)) 2 0))
-      v))
-          
-  (check-equal? (update-portmap nu-pm 1 0 2 0) pm3+))
-
 ;                                                                 
 ;                               ;      ;                          
 ;                    ;          ;      ;                          
@@ -952,14 +837,6 @@
 (define (neighbor-locations x y)
   (define all `((,x ,(- y 1)) (,x ,(+ y 1)) (,(- x 1) ,y) (,(+ x 1) ,y)))
   (filter (match-lambda [`(,x ,y) (and (index? x) (index? y))]) all))
-
-#; {Port Index Index -> (values Integer Integer)}
-(define (looking-at port x y)
-  (case (port->direction port)
-    [(NORTH) (values x (- y 1))]
-    [(EAST)  (values (+ x 1) y)]
-    [(SOUTH) (values x (+ y 1))]
-    [(WEST)  (values (- x 1) y)]))
 
 ;                                     
 ;                                     
@@ -1008,7 +885,7 @@
 #; {Player* Natural Natural -> (U False Player)}
 (define (is-player-on players x y)
   (define p (set-member players (λ (p) (match-define (player _ _ x0 y0) p) (and (= x x0) (= y y0)))))
-  (if (boolean? p) p (set-first p)))
+  (if (set-empty? p) #f (set-first p)))
 
 #; {PortIndex Natural Natural -> (values Natural Natural)}
 (define (logical-coordinates->geometry port x y)
@@ -1025,12 +902,11 @@
     
   (send frame show #t))
 
-#;
-(module+ test ;; show graphical iterations
-  (show-state state-with-3-players)
-  (show-state (λ () state+))
-  (show-state (λ () intermediate-good-state))
-  (show-state (λ () state+)))
+; (module+ test (show-state state-with-3-players))
+; (module+ test (show-state (λ () state+)))
+; (module+ test (show-state (λ () intermediate-good-state)))
+; (module+ test (show-state (λ () state+)))
+
 
 ;                              
 ;      ;                       
@@ -1046,17 +922,6 @@
 ;      ;                       
 ;      ;                       
 ;    ;;
-
-;; ------------------------------------------------------------------
-#; {State   = (state Board Player*)}
-#; {Player* = [Setof Player]}
-#; {Player  = (player PlayerName p x y)}
-#; {PlayerName = String}
-#; {Board   = [Matrixof Square] :: {Index x Index}}
-#; {Index   = [0 .. SIZE]}
-#; {Square  = (U BLANK                   ;; an unoccupied, blank square 
-                 (square Tile PortMap))} ;; a configured tile with connections to neighbors cached 
-
 
 (module+ json
   (define (square->jsexpr s x y)
