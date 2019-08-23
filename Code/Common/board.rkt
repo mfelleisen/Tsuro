@@ -200,7 +200,7 @@
 ;; for initialize and add-tile and intermediate 
 (define (every-player-faces-an-open-square s)
   (match-define (state board players) s)
-  (for/and ((p players))
+  (for/and ((p (in-set players)))
     (match-define  (player name port x y)      p)
     (define-values (x-look y-look) (looking-at port x y))
     (boolean? (matrix-ref board x-look y-look))))
@@ -209,7 +209,7 @@
 ;; for intermediate, though it also holds for initialize and add-tile
 (define (every-player-can-leave-going-backwards s)
   (match-define (state board players) s)
-  (for/and ((p players))
+  (for/and ((p (in-set players)))
     (match-define (player name port x y) p)
     (match-define (square tile _portmap) (matrix-ref board x y))
     (or~ #:let exit-port (tile port)
@@ -238,7 +238,7 @@
 #; { State -> (-> PlayerName Boolean : the player is on the list of players)}
 ;; adding a tile to a properly built board
 (define ((takes-part-in-game s) pname)
-  (cons? (memf (finder pname) (state-players s))))
+  (player? (find-player (state-players s) pname)))
 
 (provide
  ;; type State
@@ -261,7 +261,7 @@
    (->i ([s state?][c tile?][name (s) (and/c string? (takes-part-in-game s))])
         [result (and/c state? every-player-faces-an-open-square)])]
   
-  [state-players (-> state? (listof player?))]
+  [survivors (-> state? (listof string?))]
 
   [intermediate
    (-> intermediate*/c
@@ -289,6 +289,7 @@
 (require (except-in Tsuro/Code/Common/tiles tile? table))
 (require (except-in Tsuro/Code/Common/port-alphabetic port?))
 (require Tsuro/Code/Common/matrix)
+(require Tsuro/Code/Lib/should-be-racket)
 (require pict)
 
 (require Tsuro/Code/Lib/spy)
@@ -324,7 +325,7 @@
 ;; the game state itself 
 ;; ------------------------------------------------------------------
 #; {State   = (state Board Player*)}
-#; {Player* = [Listof Player]}
+#; {Player* = [Setof Player]}
 #; {Player  = (player PlayerName p x y)}
 #; {PlayerName = String}
 #; {Board   = [Matrixof Square] :: {Index x Index}}
@@ -336,6 +337,9 @@
 (struct player [name port x y] #:transparent)
 (struct square [tile map] #:transparent)
 (define BLANK #false)
+
+(define (survivors s)
+  (map player-name (set->list (state-players s))))
 
 ;; a fast means for looking up the "bridges" to neighboring squares
 ;; ------------------------------------------------------------------
@@ -374,8 +378,9 @@
     (,tile-20 ,player-blue  ,port-4 2 0)
     (,tile-02 ,player-white ,port-3 0 2)))
 
-(define 3players (map (λ (init) (apply player (rest init))) inits-for-state-with-3-players))
-(define red-player (first 3players))
+(define 3players-list (map (λ (init) (apply player (rest init))) inits-for-state-with-3-players))
+(define red-player (first 3players-list))
+(define 3players (apply set 3players-list))
 
 (define (state-with-3-players #:with (with #false))
   (define square-00 (square tile-00 (create-portmap 0 0)))
@@ -397,7 +402,9 @@
   (define board-3-players (state-board state-3-players))
   (define tile-to-add-to-board-3-index 33)
   (define tile-to-add-to-board-3 (tile-index->tile tile-to-add-to-board-3-index))
-  (define placement1 (first inits-for-state-with-3-players)))
+  (define placement1 (first inits-for-state-with-3-players))
+
+  (check-equal? (survivors (state-with-3-players)) (set-map 3players player-name) "survivors"))
 
 (module+ test ;; contracts for initial placements 
   (check-true (player-on-tile/c placement1))
@@ -479,9 +486,9 @@
           (~optional (~seq #:players0 [p ...]))
           (t:index/or-index-w-player ...) ...)
        #:declare p (expr/c #'player?)
-       #'(sft/proc (~? board0 the-empty-board) (~? (list p.c ...) '()) `((,t.square ...) ...))]))
+       #'(sft/proc (~? board0 the-empty-board) (~? (set p.c ...) (set)) `((,t.square ...) ...))]))
 
-  (define (sft/proc board0 players0  rectangle)
+  (define (sft/proc board0 players0 rectangle)
     (define init-list (init-list-from-tiles/proc rectangle))
     (define-values (players board)
       (for/fold ((players players0) (board board0)) ((t init-list))
@@ -489,8 +496,8 @@
           [`(,tile ,x ,y) (values players (add-new-square-update-neighbors board tile x y))]
           [`(,tile ,name ,port ,x ,y)
            (define new-player (player name port x y))
-           (values (cons new-player players) (add-new-square-update-neighbors board tile x y))])))
-    (state board (reverse players))))
+           (values (set-add players new-player) (add-new-square-update-neighbors board tile x y))])))
+    (state board players)))
 
 (module+ test ;; testing the DSL
   (check-equal? (init-list-from-tiles
@@ -499,7 +506,7 @@
                  ((33 "white" #:on port-3)))
                 inits-for-state-with-3-players)
 
-  (match-define (state board3 (list playr1 playr2 playr3)) (state-with-3-players))
+  (match-define (state board3 _) (state-with-3-players))
   
   (check-equal? (state-from
                  [[tile-00-index "red" #:on port-2] #f [tile-20-index "blue" #:on port-4]]
@@ -549,7 +556,7 @@
 
 (define (initialize lo-placements)
   (define players
-    (for/list ([p (in-list lo-placements)])
+    (for/set ([p (in-list lo-placements)])
       (apply player (rest p))))
   (define board
     (for/fold ((m the-empty-board)) ((placement (in-list lo-placements)))
@@ -587,15 +594,15 @@
 (define (intermediate-aux l-intermediate)
   (define board0 the-empty-board)
   (define-values (board players)
-    (for/fold ((board board0) (players '())) ([p l-intermediate])
+    (for/fold ((board board0) (players (set))) ([p l-intermediate])
       (match p
         [(list tile x y)
          (values (add-new-square-update-neighbors board tile x y)
                  players)]
         [(list tile name port x y)
          (values (add-new-square-update-neighbors board tile x y)
-                 (cons (player name port x y) players))])))
-  (state board (reverse players)))
+                 (set-add players (player name port x y)))])))
+  (state board players))
 
 (module+ test 
   (define intermediate-bad-state-2
@@ -651,19 +658,21 @@
   ;; (displayln `(player was thrown out ,out*))
   (state nu-board moved))
 
-#; {(Listof Player) PlayerName -> Player}
+#; {(Setof Player) PlayerName -> Player}
 (define (find-player players p)
-  (first (memf (finder p) players)))
-
+  (define F (finder p))
+  (for/first ((element (in-set players)) #:when (F element)) element))
+  
 #; {PlayerName -> (Player -> Boolean)}
 (define (finder pn)
   (compose (curry equal? pn) player-name))
 
 (module+ test ;; add-tile
-  (match-define (list playr1-3 playr2-3) (remf (finder player-red) (state-players state-3-players)))
+  (check-equal? (find-player 3players "red") red-player)
+  (match-define (list p1 p2) (set->list (set-remove (state-players state-3-players) red-player)))
   (define state+
     (state-from #:board0 board-3-players
-                #:players0 [playr2-3 playr1-3]
+                #:players0 [p2 p1]
                 (#f (tile-to-add-to-board-3-index #:rotate 90))))
 
   (define board+ (state-board state+))
@@ -757,14 +766,14 @@
 ;                                       ;  ;         ;                     ;                         
 ;                                        ;;          ;                    ;;                         
 
-#; {Board Player* Index Index -> (values Player* [Listof Player])}
+#; {Board Player* Index Index -> (values Player* [Setof Player])}
 
 ;; move players facing (x,y), detrmine survivors, return those as the first list;
 ;; the second list are the drop-outs that run into walls
 
 (define (move-players board players x y)
   (define-values (moved out inf)
-    (for/fold ((moved '()) (out '()) (inf '())) ((p (in-list players)))
+    (for/fold ((moved (set)) (out '()) (inf '())) ((p (in-set players)))
       (match-define  (player name port x-p y-p) p)
       (define-values (x-at y-at) (looking-at port x-p y-p))
       (cond
@@ -773,9 +782,9 @@
          (cond
            [(out? p-moved) (values moved (cons p-moved out) inf)]
            [(inf? p-moved) (values moved out (cons p-moved inf))]
-           [else (values (cons p-moved moved) out inf)])]
-        [else (values (cons p moved) out inf)])))
-  (values (reverse moved) out inf))
+           [else (values (set-add moved p-moved) out inf)])]
+        [else (values (set-add moved p) out inf)])))
+  (values moved out inf))
 
 (struct out [player] #:transparent)
 (struct inf [player] #:transparent)
@@ -812,7 +821,6 @@
   (list port-out x-next y-next external))
 
 (module+ test ;; move player  
-  (define red-player (find-player 3players player-red))
   (check-equal? (move-one-square board+ (player-port red-player) 0 0) (list (index->port 1) 1 0 WALL)
                 "moved red player 1 step")
 
@@ -999,8 +1007,8 @@
 
 #; {Player* Natural Natural -> (U False Player)}
 (define (is-player-on players x y)
-  (define p (memf (λ (p) (match-define (player _ _ x0 y0) p) (and (= x x0) (= y y0))) players))
-  (if (boolean? p) p (first p)))
+  (define p (set-member players (λ (p) (match-define (player _ _ x0 y0) p) (and (= x x0) (= y y0)))))
+  (if (boolean? p) p (set-first p)))
 
 #; {PortIndex Natural Natural -> (values Natural Natural)}
 (define (logical-coordinates->geometry port x y)
@@ -1041,7 +1049,7 @@
 
 ;; ------------------------------------------------------------------
 #; {State   = (state Board Player*)}
-#; {Player* = [Listof Player]}
+#; {Player* = [Setof Player]}
 #; {Player  = (player PlayerName p x y)}
 #; {PlayerName = String}
 #; {Board   = [Matrixof Square] :: {Index x Index}}
@@ -1051,23 +1059,29 @@
 
 
 (module+ json
-
-  (define (player->jsexpr p)
-    (match-define (player name port x y) p)
-    (hash 'name name 'port port 'x x 'y y))
-
-  (define (jsexpr->player pj)
-    (match pj
-      [(hash-table ('name name) ('port port) ('x x) ('y y)) (player name port x y)]))
-
   (define (square->jsexpr s x y)
-    (hash 'tile (tile->jsexpr (square-tile s))) 'x x 'y y)
+    (list (tile->jsexpr (square-tile s)) x y))
 
   (define (state->jsexpr s)
-    (hash 'players (state-players s) 'board (matrix-where (state-board s) (λ (n _ _2) n) square->jsexpr)))
+    (define players (state-players s))
+    (matrix-where (state-board s)
+                  (λ (sq x y) sq)
+                  (λ (sq x y)
+                    (define tj (tile->jsexpr (square-tile sq)))
+                    (match (is-player-on players x y)
+                      [(? boolean?) (list tj x y)]
+                      [(player name port _ _) (list tj name port x y)]))))
 
   (define (jsexpr->state sj)
-    #f)
-
+    (define intermediates 
+      (match sj
+        [(list i ...) (for/list ((i sj)) (cons (jsexpr->tile (first i)) (rest i)))]))
+    (cond
+      [(intermediate*/c intermediates)
+       (define candidate-state (intermediate intermediates))
+       (and candidate-state)]
+      [else intermediates]))
+  
   (define s3 (state-with-3-players))
-  (check-equal? (jsexpr->state (state->jsexpr s3)) s3))
+  (check-equal? (state-players (jsexpr->state (state->jsexpr s3))) (state-players s3))
+  (check-equal? (state-board (jsexpr->state (state->jsexpr s3))) (state-board s3)))
