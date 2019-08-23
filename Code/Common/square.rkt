@@ -16,8 +16,8 @@
 
  looking-at
  
- OPEN
- WALL
+ open?
+ wall?
  outside? 
  
  next-port
@@ -61,8 +61,8 @@
 ;                                                    ;            
 ;                                                    ;            
 
-(define WALL "wall") 
-(define OPEN "open")
+(struct wall []) (define WALL (wall))
+(struct open []) (define OPEN (open))
 
 (define (outside? x)
   (member x (list WALL OPEN)))
@@ -77,9 +77,8 @@
 
 (define SIZE 10) ; Tsuro is played on a board with SIZE x SIZE configured tiles
 
-(struct square [tile map]
-  #:transparent
-  #:property prop:procedure (lambda (this-square from) (vector-ref (square-map this-square) from)))
+(define (to-port this-square from-port) (vector-ref (square-map this-square) (port->index from-port)))
+(struct square [tile map] #:transparent #:property prop:procedure to-port)
 
 (struct next [port x y] #:transparent)
 
