@@ -3,6 +3,7 @@
 ;; a data representation for game States, plus basic functions for manipulating them
 
 ;; TODO
+;; -- change #:players to deal with sets/and player specs
 ;; -- pict: square and dependency on tile/pict 
 
 ;                                                                 
@@ -637,12 +638,8 @@
 
 #; {(Setof Player) PlayerName -> Player}
 (define (find-player players pn)
-  (define F (finder pn))
+  (define F (compose (curry equal? pn) player-name))
   (for/first ((element (in-set players)) #:when (F element)) element))
-  
-#; {PlayerName -> (Player -> Boolean)}
-(define (finder pn)
-  (compose (curry equal? pn) player-name))
 
 (module+ test ;; add-tile
 
