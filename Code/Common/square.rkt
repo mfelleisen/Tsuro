@@ -28,7 +28,15 @@
                  [listof [list/c index? index? square?]]
                  (flat-named-contract 'added-one (λ (r) (= (length r) (+ (length neighbors) 1)))))])]
 
+  [the-one-square
+   (-> (and/c [listof [list/c index? index? square?]] (compose (>/c 0) length)) square?)]
+
   [square-tile (-> square? tile?)])
+ 
+ ;; data examples 
+ square-00
+ square-02
+ square-20
 
  looking-at
  
@@ -122,15 +130,9 @@
 (define (update-square old x-old y-old x-new y-new)
   (square (square-tile old) (update-portmap (square-map old) x-old y-old x-new y-new)))
 
+(define the-one-square (compose third first))
+
 (module+ test ;; operating on squares
-
-  (check-equal? (wall) (wall))
-
-  (define tile-00 (tile-index->tile 34))
-  (define tile-20 (tile-index->tile 33))  
-  (define square-00 (third (first (add-square '() tile-00 0 0))))
-  (define square-20 (third (first (add-square '() tile-20 0 0))))
-
   (check-equal? (update-square square-00 0 0 1 0)
                 (square tile-00 (update-portmap (square-map square-00) 0 0 1 0)))
   
@@ -237,6 +239,25 @@
       v))
           
   (check-equal? (update-portmap nu-pm 1 0 2 0) pm3+))
+
+;                                                                                             
+;                                                                                             
+;                                                                         ;;;                 
+;                                                                           ;                 
+;  ;;;;;;   ;;;    ;;;;   ;;;           ;;;   ;   ;  ;;;;  ;;;;;;  ;;;;     ;     ;;;    ;;;  
+;  ;  ;  ; ;; ;;   ;;  ; ;;  ;         ;;  ;   ; ;       ; ;  ;  ; ;; ;;    ;    ;;  ;  ;   ; 
+;  ;  ;  ; ;   ;   ;     ;   ;;        ;   ;;  ;;;       ; ;  ;  ; ;   ;    ;    ;   ;; ;     
+;  ;  ;  ; ;   ;   ;     ;;;;;;        ;;;;;;   ;     ;;;; ;  ;  ; ;   ;    ;    ;;;;;;  ;;;  
+;  ;  ;  ; ;   ;   ;     ;             ;       ;;;   ;   ; ;  ;  ; ;   ;    ;    ;          ; 
+;  ;  ;  ; ;; ;;   ;     ;             ;       ; ;   ;   ; ;  ;  ; ;; ;;    ;    ;      ;   ; 
+;  ;  ;  ;  ;;;    ;      ;;;;          ;;;;  ;   ;   ;;;; ;  ;  ; ;;;;      ;;   ;;;;   ;;;  
+;                                                                  ;                          
+;                                                                  ;                          
+;                                                                  ;                          
+
+(define square-00 (the-one-square (add-square '() tile-00 0 0)))
+(define square-02 (the-one-square (add-square '() tile-02 0 2)))
+(define square-20 (the-one-square (add-square '() tile-20 2 0)))
 
 ;                                     
 ;                                     

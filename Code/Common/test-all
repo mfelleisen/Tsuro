@@ -1,6 +1,7 @@
 #!/bin/sh 
 
 raco test matrix.rkt
+raco test grid.rkt
 raco test square.rkt
 raco test port-alphabetic.rkt 
 raco test tiles.rkt
