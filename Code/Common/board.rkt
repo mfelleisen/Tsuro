@@ -3,14 +3,7 @@
 ;; a data representation for game States, plus basic functions for manipulating them
 
 ;; TODO
-;; -- factor out squares
-
-;; safety
-;; - contract for initialize and add?
-
-;; legality checks: 
-;; - determine whether the addition of a tile for a player P forces P to commit suicide
-;; - determine whether the addition of a tile adds a cyclic path
+;; -- pict: square and dependency on tile/pict 
 
 ;                                                                 
 ;                                                                 
@@ -466,10 +459,11 @@
   (define-syntax (state-from stx)
     (syntax-parse stx
       [(_ (~optional (~seq #:board0 board0))
-          (~optional (~seq #:players0 [p ...]))
+          (~or (~optional (~seq #:players0 [p ...])) (~optional (~seq #:set0 ps)))
           (t:index/or-index-w-player ...) ...)
-       #:declare p (expr/c #'player?)
-       #'(sft/proc (~? board0 the-empty-board) (~? (set p.c ...) (set)) `((,t.square ...) ...))]))
+       #:declare p  (expr/c #'player?)
+       #:declare ps (expr/c #'set?)
+       #'(sft/proc (~? board0 the-empty-board) (~? (set p.c ...) (~? ps (set))) `((,t.square ...) ...))]))
 
   (define (sft/proc board0 players0 rectangle)
     (define init-list (init-list-from-tiles/proc rectangle))
@@ -642,8 +636,8 @@
   (state nu-board moved))
 
 #; {(Setof Player) PlayerName -> Player}
-(define (find-player players p)
-  (define F (finder p))
+(define (find-player players pn)
+  (define F (finder pn))
   (for/first ((element (in-set players)) #:when (F element)) element))
   
 #; {PlayerName -> (Player -> Boolean)}
@@ -656,10 +650,10 @@
   (define tile-to-add-to-board-3 (tile-index->tile tile-to-add-to-board-3-index))
 
   (check-equal? (find-player 3players "red") red-player)
-  (match-define (list p1 p2) (set->list (set-remove (state-players state3) red-player)))
+  
   (define state+
     (state-from #:board0 board3
-                #:players0 [p2 p1]
+                #:set0 (set-remove (state-players state3) red-player)
                 (#f (tile-to-add-to-board-3-index #:rotate 90))))
 
   (define board+ (state-board state+))
