@@ -343,7 +343,7 @@
 (define BLANK #false)
 (define the-empty-board (build-matrix SIZE SIZE (λ (_i _j) BLANK)))
 
-(match-define `(,port-2 ,port-3 ,port-4) (map index->port '(2 3 4)))
+(match-define `(,port-red ,port-white ,port-blue) (map index->port '(2 3 4)))
 
 (define player-red   "red")
 (define player-blue  "blue")
@@ -358,9 +358,9 @@
 (define tile-20 (rotate-tile (tile-index->tile 34)))
 
 (define inits-for-state-with-3-players
-  `((,tile-00 ,player-red   ,port-2 0 0)
-    (,tile-20 ,player-blue  ,port-4 2 0)
-    (,tile-02 ,player-white ,port-3 0 2)))
+  `((,tile-00 ,player-red   ,port-red 0 0)
+    (,tile-20 ,player-blue  ,port-blue 2 0)
+    (,tile-02 ,player-white ,port-white 0 2)))
 
 (define 3players-list (map (λ (init) (apply player (rest init))) inits-for-state-with-3-players))
 (define red-player (first 3players-list))
@@ -464,7 +464,8 @@
           (t:index/or-index-w-player ...) ...)
        #:declare p  (expr/c #'player?)
        #:declare ps (expr/c #'set?)
-       #'(sft/proc (~? board0 the-empty-board) (~? (set p.c ...) (~? ps (set))) `((,t.square ...) ...))]))
+       #:with players #'(~? (set p.c ...) (~? ps (set)))
+       #'(sft/proc (~? board0 the-empty-board) players `((,t.square ...) ...))]))
 
   (define (sft/proc board0 players0 rectangle)
     (define init-list (init-list-from-tiles/proc rectangle))
@@ -479,18 +480,18 @@
 
 (module+ test ;; testing the DSL
   (check-equal? (intermediate-list-from-spec
-                 ((34 "red" #:on port-2) #f (34 #:rotate 90 "blue" #:on port-4))
+                 ((34 "red" #:on port-red) #f (34 #:rotate 90 "blue" #:on port-blue))
                  (#f)
-                 ((33 "white" #:on port-3)))
+                 ((33 "white" #:on port-white)))
                 inits-for-state-with-3-players)
 
   (match-define (state board3 _) state3)
 
   (require Tsuro/Code/Lib/diff)
   (check-equal? (state-from
-                 [[tile-00-index "red" #:on port-2] #f [tile-20-index "blue" #:on port-4]]
+                 [[tile-00-index "red" #:on port-red] #f [tile-20-index "blue" #:on port-blue]]
                  (#f)
-                 [[tile-02-index "white" #:on port-3]])
+                 [[tile-02-index "white" #:on port-white]])
                 state3))
 
 ;                                                                        
@@ -519,7 +520,7 @@
   (state board players))
 
 (module+ test ;; initialize 
-  (check-exn exn:fail:contract? (λ () (initialize `((,tile1 "x" 2 0 0)))) "port, not index")
+  (check-exn exn:fail:contract? (λ () (initialize `((,tile-00 "x" 2 0 0)))) "port, not index")
   (check-equal? (initialize inits-for-state-with-3-players) state3))
 
 ;                                                                                      
@@ -562,9 +563,9 @@
 
   (define bad-intermediate-spec
     (intermediate-list-from-spec
-     ((34 "red" #:on port-2) #f (34 #:rotate 90 "blue" #:on port-4))
+     ((34 "red" #:on port-red) #f (34 #:rotate 90 "blue" #:on port-blue))
      (33 33)
-     ((33 #:rotate 180 "white" #:on port-3))))
+     ((33 #:rotate 180 "white" #:on port-white))))
   (check-false (intermediate*/c bad-intermediate-spec) "an isolated tile that nobody could place")
   
   (define contiguity-for-3-platers `((,(tile-index->tile 33) 0 1) (,(tile-index->tile 33) 1 0)))
@@ -583,28 +584,28 @@
 
   (define bad-intermediate-spec-3
     (intermediate-list-from-spec
-     ((34 "red" #:on port-2) #f (34 #:rotate 90 "blue" #:on port-4))
+     ((34 "red" #:on port-red) #f (34 #:rotate 90 "blue" #:on port-blue))
      (33)
-     (33 (33 #:rotate 180 "white" #:on port-3))))
+     (33 (33 #:rotate 180 "white" #:on port-white))))
 
   (check-true (every-player-faces-an-open-square       (intermediate-aux bad-intermediate-spec-3)))
   (check-false (every-player-can-leave-going-backwards (intermediate-aux bad-intermediate-spec-3))
-               "the white guy can't leave"))
+               "the white player can't leave"))
 
 (module+ test ;; testing intermediate's results 
   (define good-intermediate-spec
     (intermediate-list-from-spec
-     ((34 "red" #:on port-2) #f (34 #:rotate 90 "blue" #:on port-4))
+     ((34 "red" #:on port-red) #f (34 #:rotate 90 "blue" #:on port-blue))
      (33)
-     ((33 #:rotate 180 "white" #:on port-3))))
+     ((33 #:rotate 180 "white" #:on port-white))))
   
   (check-true (every-player-faces-an-open-square      (intermediate-aux good-intermediate-spec)))
   (check-true (every-player-can-leave-going-backwards (intermediate-aux good-intermediate-spec)))
 
   (define good-intermediate-state
-    (state-from ((34 "red" #:on port-2) #f (34 #:rotate 90 "blue" #:on port-4))
+    (state-from ((34 "red" #:on port-red) #f (34 #:rotate 90 "blue" #:on port-blue))
                 (33)
-                ((33 #:rotate 180 "white" #:on port-3))))
+                ((33 #:rotate 180 "white" #:on port-white))))
   
   (check-equal? (intermediate good-intermediate-spec) good-intermediate-state))
 
@@ -642,26 +643,18 @@
   (for/first ((element (in-set players)) #:when (F element)) element))
 
 (module+ test ;; add-tile
+  (check-equal? (find-player 3players "red") red-player)
 
   (define tile-to-add-to-board-3-index 33)
   (define tile-to-add-to-board-3 (tile-index->tile tile-to-add-to-board-3-index))
-
-  (check-equal? (find-player 3players "red") red-player)
-  
   (define state+
     (state-from #:board0 board3
                 #:set0 (set-remove (state-players state3) red-player)
                 (#f (tile-to-add-to-board-3-index #:rotate 90))))
-
-  (define board+ (state-board state+))
-  
   (check-equal? (add-tile state3 (rotate-tile tile-to-add-to-board-3) player-red) state+
-                "drive red player off"))
-
-(module+ test ;; add-tile that causes an infinite loop 
-
-  (define inf-tile-to-add-to-board-3 tile1)
-  (check-exn exn:infinite? (λ () (add-tile state3 inf-tile-to-add-to-board-3 player-red))
+                "drive red player off")
+  
+  (check-exn exn:infinite? (λ () (add-tile state3 (tile-index->tile 34) player-red))
              "drive red player into infinite loop"))
 
 ;                                                                                      
@@ -679,30 +672,29 @@
 ;          ;                                                                           
 ;          ;                                                                           
 
-#; {Board Confguration Index Index -> Matrix}
-
+#; {Board Tile Index Index -> Matrix}
+;; "update neighbors" means inform neighbor squares about the new one 
 (define (add-new-square-update-neighbors board0 tile x y)
   (define neighbors (map (cons-square board0) (neighbors* board0 x y)))
   (define squares*  (add-square neighbors tile x y))
   (for*/fold ((board board0)) ((sq+x+y squares*))
     (apply matrix-set board sq+x+y)))
 
-(define (cons-square board0) (λ (n) (cons (apply matrix-ref board0 n) n)))
+#; {Board -> [List Index Index] -> [List Square Index Index]}
+(define ((cons-square board0) neighbor-coordinates)
+  (cons (apply matrix-ref board0 neighbor-coordinates) neighbor-coordinates))
 
 (module+ test
-  (define neighbors  (map (cons-square board3) (neighbors* board3 1 0)))
-  (define nu-squares (add-square neighbors tile-to-add-to-board-3 1 0))
-  (define nu-board  (let* ([m board3]
-                           [m (matrix-set m 1 0 (caddr (first nu-squares)))]
-                           [m (matrix-set m 0 0 (caddr (second nu-squares)))]
-                           [m (matrix-set m 2 0 (caddr (third nu-squares)))])
-                      m))
+  (define nu-board3
+    (let* ([m board3]
+           (neighbors  (map (cons-square m) (neighbors* m 1 0)))
+           (nu-squares (add-square neighbors tile-to-add-to-board-3 1 0))
+           [m (matrix-set m 1 0 (caddr (first nu-squares)))]
+           [m (matrix-set m 0 0 (caddr (second nu-squares)))]
+           [m (matrix-set m 2 0 (caddr (third nu-squares)))])
+      m))
     
-  (check-equal?
-   (matrix->rectangle 
-    (add-new-square-update-neighbors board3 tile-to-add-to-board-3 1 0))
-   (matrix->rectangle 
-    nu-board)))
+  (check-equal? (add-new-square-update-neighbors board3 tile-to-add-to-board-3 1 0) nu-board3))
 ;                                                                                                    
 ;                                                                                                    
 ;                           ;                               ;;;                                      
@@ -718,10 +710,11 @@
 ;                                       ;  ;         ;                     ;                         
 ;                                        ;;          ;                    ;;                         
 
-#; {Board Player* Index Index -> (values Player* [Setof Player])}
+#; {Board Player* Index Index -> (values Player* [Listof Player] [Listof Player])}
 
 ;; move players facing (x,y), detrmine survivors, return those as the first list;
-;; the second list are the drop-outs that run into walls
+;; -- the second value is the list of drop-outs that run into walls
+;; -- the third value is the list of drop-outs that get into an infinite loop 
 
 (define (move-players board players x y)
   (define-values (moved out inf)
@@ -782,30 +775,26 @@
     [else (list port-out (matrix-ref board x y) (set-add seen `(,x ,y)))]))
 
 (module+ test ;; move player
-  (check-equal?
-   (move-player-one-square board+ (matrix-ref board+ 0 0) (player-port red-player) "red" (set))
-   (out (player "red" (index->port 1) 1 0))
-   "moved red player 1 step")
 
-  (check-equal? (move-one-player board+ red-player) (out (player player-red (index->port 1) 1 0))
-                "move red player out")
+  (define board+  (state-board state+))
+  (define sq-00+  (matrix-ref board+ 0 0))
+  (define (red i) (player "red" (index->port i) 1 0))
+  (define red-out (out (red 1)))
+
+  (check-equal? (move-player-one-square board+ sq-00+ port-red "red" (set)) red-out "move red 1 step")
+  (check-equal? (move-one-player board+ red-player) red-out "move red player out")
   
   (match-define (state board-good-move _)
-    (state-from [(34 "red" #:on port-2) 33 (34 #:rotate 90 "blue" #:on port-4)]
+    (state-from [(34 "red" #:on port-red) 33 (34 #:rotate 90 "blue" #:on port-blue)]
                 [33]
-                [(33 #:rotate 180 "white" #:on port-3)]))
-
-  (check-equal? (move-one-player board-good-move (player "red" port-2 0 0))
-                (player player-red (index->port 5) 1 0)
-                "move red player to internal square")
+                [(33 #:rotate 180 "white" #:on port-white)]))
+  (check-equal? (move-one-player board-good-move (player "red" port-red 0 0)) (red 5) "move red good")
 
   (match-define (state board-inf _)
-    (state-from [(34 "red" #:on port-2) 34 (34 #:rotate 90 "blue" #:on port-4)]
+    (state-from [(34 "red" #:on port-red) 34 (34 #:rotate 90 "blue" #:on port-blue)]
                 [33]
-                [(33 #:rotate 180 "white" #:on port-3)]))
-  (define red-player-inf (player "red" port-2 0 0))
-  
-  (check-equal? (move-one-player board-inf red-player-inf) (inf red-player-inf) "move player inf"))
+                [(33 #:rotate 180 "white" #:on port-white)]))
+  (check-equal? (move-one-player board-inf red-player) (inf red-player) "move player inf"))
 
 ;                                                                 
 ;                               ;      ;                          
@@ -938,6 +927,5 @@
        (and candidate-state)]
       [else intermediates]))
   
-  (define s3 state3)
-  (check-equal? (state-players (jsexpr->state (state->jsexpr s3))) (state-players s3))
-  (check-equal? (state-board (jsexpr->state (state->jsexpr s3))) (state-board s3)))
+  (check-equal? (state-players (jsexpr->state (state->jsexpr state3))) (state-players state3))
+  (check-equal? (state-board (jsexpr->state (state->jsexpr state3))) (state-board state3)))
