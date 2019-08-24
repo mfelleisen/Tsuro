@@ -10,10 +10,13 @@
  SIZE
  index?
 
- #; {type Square = [Port -> Next]}
+ BLANK
+
+ #; {type Square = BLANK || [Port -> Next]}
  #; {type Next = open? || wall? || next?}
 
  (contract-out
+  
   [add-square
    ;; create a square at (x,y) from tile, with current neighbor coordinates 
    (->i ([neighbors [listof [list/c square? index? index?]]]
@@ -21,9 +24,9 @@
          [x index?]
          [y index?])
         [result (neighbors)
-         (and/c
-          [listof [list/c index? index? square?]]
-          (flat-named-contract 'added-one (λ (r) (= (length r) (+ (length neighbors) 1)))))])]
+                (and/c
+                 [listof [list/c index? index? square?]]
+                 (flat-named-contract 'added-one (λ (r) (= (length r) (+ (length neighbors) 1)))))])]
 
   [square-tile (-> square? tile?)])
 
@@ -35,7 +38,9 @@
  
  next-port
  next-x
- next-y)
+ next-y
+
+ #;square->pict)
 
 ;                                                                                      
 ;       ;                                  ;                                           
@@ -55,6 +60,7 @@
 
 (require (except-in Tsuro/Code/Common/tiles tile? table))
 (require (except-in Tsuro/Code/Common/port-alphabetic port?))
+(require pict)
   
 (module+ test
   (require (submod ".."))
@@ -92,6 +98,8 @@
 (define SIZE 10) ; Tsuro is played on a board with SIZE x SIZE configured tiles
 #; {Nat -> Boolean : Index}
 (define (index? z) (< -1 z SIZE))
+
+(define BLANK #false)
 
 (define (to-port this-square from-port) (vector-ref (square-map this-square) (port->index from-port)))
 (struct square [tile map] #:transparent #:property prop:procedure to-port)
@@ -225,3 +233,31 @@
       v))
           
   (check-equal? (update-portmap nu-pm 1 0 2 0) pm3+))
+
+;                                     
+;                                     
+;             ;            ;          
+;                          ;          
+;   ;;;;    ;;;    ;;;   ;;;;;   ;;;  
+;   ;; ;;     ;   ;;  ;    ;    ;   ; 
+;   ;   ;     ;   ;        ;    ;     
+;   ;   ;     ;   ;        ;     ;;;  
+;   ;   ;     ;   ;        ;        ; 
+;   ;; ;;     ;   ;;       ;    ;   ; 
+;   ;;;;    ;;;;;  ;;;;    ;;;   ;;;  
+;   ;                                 
+;   ;                                 
+;   ;                                 
+
+(module+ picts 
+
+  (provide square->pict)
+  (define PLAYER-SIZE (quotient TILE-SIZE 5)) 
+
+  #; {Square (U False [List Color Port]) -> Pict}
+  (define (square->pict square p)
+    (define tile (or (and (not (equal? BLANK square)) (square-tile square)) blank-tile))
+    (define pict (tile->pict tile))
+    (match p
+      [#f pict]
+      [(list color port) (add-player pict (jack-o-lantern PLAYER-SIZE color) port)])))
