@@ -276,7 +276,7 @@
 ;                 ;                                                                    
 
 (require (except-in Tsuro/Code/Common/square SIZE looking-at square-tile))
-(require (except-in Tsuro/Code/Common/tiles tile? table))
+(require (except-in Tsuro/Code/Common/tiles tile?))
 (require (except-in Tsuro/Code/Common/port-alphabetic port?))
 (require Tsuro/Code/Common/matrix)
 (require Tsuro/Code/Lib/should-be-racket)
@@ -292,6 +292,10 @@
 (module+ json
   (require (submod Tsuro/Code/Common/tiles json))
   (require rackunit))
+
+(module+ picts
+  (require (submod Tsuro/Code/Common/tiles picts))
+  (require (submod Tsuro/Code/Common/square picts)))
 
 ;                                                                 
 ;       ;                                                         
@@ -340,7 +344,6 @@
 ;                                                                  ;                          
 ;                                                                  ;                          
 
-(define BLANK #false)
 (define the-empty-board (build-matrix SIZE SIZE (λ (_i _j) BLANK)))
 
 (match-define `(,port-red ,port-white ,port-blue) (map index->port '(2 3 4)))
@@ -821,6 +824,14 @@
   (define all `((,x ,(- y 1)) (,x ,(+ y 1)) (,(- x 1) ,y) (,(+ x 1) ,y)))
   (filter (match-lambda [`(,x ,y) (and (index? x) (index? y))]) all))
 
+#; {Player* Natural Natural -> (U False Player)}
+(define (is-player-on players x y)
+  (define p (set-member players (λ (p) (match-define (player _ _ x0 y0) p) (and (= x x0) (= y y0)))))
+  (cond
+    [(set-empty? p) #f]
+    [else (define p-on-x-y (set-first p))
+          (list (player-name p-on-x-y) (player-port p-on-x-y))]))
+
 ;                                     
 ;                                     
 ;             ;            ;          
@@ -836,57 +847,42 @@
 ;   ;                                 
 ;   ;                                 
 
-(define PLAYER-SIZE (quotient TILE-SIZE 5)) 
+(module+ picts
+  (define INSET  (+ 20 TILE-SIZE))
+  (define WIDTH  (+ INSET (* 10 TILE-SIZE) INSET))
+  (define HEIGHT (+ INSET (* 10 TILE-SIZE) INSET))
 
-(define INSET  (+ 20 TILE-SIZE))
-(define WIDTH  (+ INSET (* 10 TILE-SIZE) INSET))
-(define HEIGHT (+ INSET (* 10 TILE-SIZE) INSET))
-
-#; {State (Instanceof DC<%>) -> Pict}
-(define (draw-state b dc)
-  (match-define (state squares players) b)
-  (define board-as-pict
-    (let loop ([l (matrix->rectangle squares)][y 0])
-      (cond
-        [(empty? l) (blank)]
-        [else
-         (define row (first l))
-         (define picts
-           (for/list ((n (in-list row)) (x (in-naturals)))
-             (define tile     (or (and (not (equal? BLANK n)) (square-tile n)) blank-tile))
-             (define pict     (tile->pict tile))
-             (define p-on-x-y (is-player-on players x y))
-             (cond
-               [(boolean? p-on-x-y) pict]
-               [else
-                (define color (player-name p-on-x-y))
-                (define port  (player-port p-on-x-y))
-                (add-player pict (jack-o-lantern PLAYER-SIZE color) port)])))
-         (vl-append (apply hc-append picts) (loop (rest l) (+ y 1)))])))
-  (draw-pict board-as-pict dc INSET INSET))
-
-#; {Player* Natural Natural -> (U False Player)}
-(define (is-player-on players x y)
-  (define p (set-member players (λ (p) (match-define (player _ _ x0 y0) p) (and (= x x0) (= y y0)))))
-  (if (set-empty? p) #f (set-first p)))
-
-#; {PortIndex Natural Natural -> (values Natural Natural)}
-(define (logical-coordinates->geometry port x y)
-  (values (* x TILE-SIZE)) (* TILE-SIZE y))
-
-#; {State -> Void}
-(define (show-state s)
-  (define frame (new frame% [label "hello"][width WIDTH][height HEIGHT]))
+  #; {State (Instanceof DC<%>) -> Pict}
+  (define (draw-state b dc)
+    (match-define (state squares players) b)
+    (define board-as-pict
+      (let loop ([l (matrix->rectangle squares)][y 0])
+        (cond
+          [(empty? l) (blank)]
+          [else
+           (define row (first l))
+           (define picts
+             (for/list ((square (in-list row)) (x (in-naturals)))
+               (square->pict square (is-player-on players x y))))
+           (vl-append (apply hc-append picts) (loop (rest l) (+ y 1)))])))
+    (draw-pict board-as-pict dc INSET INSET))
   
-  (define canvas
-    (new canvas%
-         [parent frame]
-         [paint-callback (λ (e dc) (draw-state s dc))]))
-    
-  (send frame show #t))
+  #; {PortIndex Natural Natural -> (values Natural Natural)}
+  (define (logical-coordinates->geometry port x y)
+    (values (* x TILE-SIZE)) (* TILE-SIZE y))
 
-; (module+ test (show-state state+))
-; (module+ test (show-state good-intermediate-state))
+  #; {State -> Void}
+  (define (show-state s)
+    (define frame (new frame% [label "hello"][width WIDTH][height HEIGHT]))
+  
+    (define canvas
+      (new canvas%
+           [parent frame]
+           [paint-callback (λ (e dc) (draw-state s dc))]))
+    
+    (send frame show #t)))
+
+(module+ picts (show-state state3))
 
 ;                              
 ;      ;                       
@@ -915,7 +911,7 @@
                     (define tj (tile->jsexpr (square-tile sq)))
                     (match (is-player-on players x y)
                       [(? boolean?) (list tj x y)]
-                      [(player name port _ _) (list tj name port x y)]))))
+                      [(list name port) (list tj name port x y)]))))
 
   (define (jsexpr->state sj)
     (define intermediates 

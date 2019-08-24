@@ -3,7 +3,11 @@
 (provide
  #; {Pict Pict Pict (Instanceof Color%) Natural -> Pict}
  ;; add a spline from dot1 to dot2 via the center of sq 
- pin-curve)
+ pin-curve
+
+ #;{Pict Pict -> Pict}
+ ;; does the second pict occur in the first one?
+ sub-pict?)
 
 ;; ---------------------------------------------------------------------------------------------------
 (require pict)
@@ -30,3 +34,6 @@
   (define-values (x y) (finder pict sub-pict))
   (values (+ dx x) (+ dy y)))
 
+;; ---------------------------------------------------------------------------------------------------
+(define ((sub-pict? p1) p2)
+  (with-handlers ([exn:fail? (λ (x) (displayln x) #f)]) (define-values (x y) (lc-find p2 p1)) #t))

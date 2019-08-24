@@ -38,9 +38,10 @@
  
  next-port
  next-x
- next-y
+ next-y)
 
- #;square->pict)
+(module+ picts 
+  (provide square->pict))
 
 ;                                                                                      
 ;       ;                                  ;                                           
@@ -58,13 +59,16 @@
 ;                 ;                                                                    
 
 
-(require (except-in Tsuro/Code/Common/tiles tile? table))
+(require (except-in Tsuro/Code/Common/tiles tile?))
 (require (except-in Tsuro/Code/Common/port-alphabetic port?))
-(require pict)
-  
+
 (module+ test
   (require (submod ".."))
   (require rackunit))
+
+(module+ picts
+  (require (except-in (submod Tsuro/Code/Common/tiles picts) table))
+  (require pict))
 
 ;                                                                 
 ;       ;                                                         
@@ -249,9 +253,7 @@
 ;   ;                                 
 ;   ;                                 
 
-(module+ picts 
-
-  (provide square->pict)
+(module+ picts   
   (define PLAYER-SIZE (quotient TILE-SIZE 5)) 
 
   #; {Square (U False [List Color Port]) -> Pict}
