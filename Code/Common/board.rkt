@@ -17,7 +17,7 @@
 ;                                                                 
 ;                                                                 
   
-(require (only-in Tsuro/Code/Common/square index? SIZE looking-at square-tile))
+(require (only-in Tsuro/Code/Common/grid index? SIZE looking-at square-tile))
 (require (only-in Tsuro/Code/Common/tiles tile?))
 (require (only-in Tsuro/Code/Common/port-alphabetic port?))
 (require Tsuro/Code/Lib/or)
@@ -271,10 +271,9 @@
 ;                 ;                                                                    
 ;                 ;                                                                    
 
-(require (except-in Tsuro/Code/Common/square SIZE looking-at square-tile))
+(require (except-in Tsuro/Code/Common/grid SIZE looking-at square-tile))
 (require (except-in Tsuro/Code/Common/tiles tile?))
 (require (except-in Tsuro/Code/Common/port-alphabetic port?))
-(require Tsuro/Code/Common/grid)
 (require Tsuro/Code/Common/matrix)
 (require Tsuro/Code/Lib/should-be-racket)
 (require pict)
@@ -295,7 +294,7 @@
 
 (module+ picts
   (require (submod Tsuro/Code/Common/tiles picts))
-  (require (submod Tsuro/Code/Common/square picts)))
+  (require (submod Tsuro/Code/Common/grid picts)))
 
 ;                                                                 
 ;       ;                                                         
@@ -488,9 +487,9 @@
     (for/set ([p (in-list lo-placements)])
       (apply player (rest p))))
   (define grid
-    (for/fold ((m the-empty-grid)) ((placement (in-list lo-placements)))
+    (for/fold ((grid the-empty-grid)) ((placement (in-list lo-placements)))
       (match-define `(,tile ,_  ,_ ,x ,y) placement)
-      (matrix-set m x y (caddar (add-square '() tile x y)))))
+      (add-new-square-update-neighbors grid tile x y)))
   (state grid players))
 
 (module+ test ;; initialize 
@@ -645,7 +644,7 @@
 ;                                       ;  ;         ;                     ;                         
 ;                                        ;;          ;                    ;;                         
 
-#; {grid Player* Index Index -> (values Player* [Listof Player] [Listof Player])}
+#; {Grid Player* Index Index -> (values Player* [Listof Player] [Listof Player])}
 
 ;; move players facing (x,y), detrmine survivors, return those as the first list;
 ;; -- the second value is the list of drop-outs that run into walls
@@ -669,7 +668,7 @@
 (struct out [player] #:transparent)
 (struct inf [player] #:transparent)
 
-#; {grid Player [#:to-periphery Boolean] -> (U Player (out Player) (inf Player))}
+#; {Grid Player [#:to-periphery Boolean] -> (U Player (out Player) (inf Player))}
 ;; (1) move a player forward to the first open square or the wall
 ;; (2) when to-periphery?: move a player backwards to the a square on the periphery or to the wall 
 (define (move-one-player grid the-player #:to-periphery? (to-periphery #f))
@@ -692,7 +691,7 @@
 #; {Index Index Seen -> Boolean}
 (define (seen? x y seen) (set-member? seen `(,x ,y)))
 
-#; {grid Square Port Name Seen -> (U Player (out Player) (inf Player) [List Port Index Index Seen])}
+#; {Grid Square Port Name Seen -> (U Player (out Player) (inf Player) [List Port Index Index Seen])}
 ;; move player at (x-p, y-p) on player-port to port-in on the neighboring square and then to port-out 
 ;; ASSUME there is a tile at the player-square
 (define (move-player-one-square grid player-square player-port name seen)
