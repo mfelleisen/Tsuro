@@ -3,8 +3,6 @@
 ;; a data representation for game States, plus basic functions for manipulating them
 
 ;; TODO
-;; -- change #:players to deal with sets/and player specs
-;; -- pict: square and dependency on tile/pict 
 
 ;                                                                 
 ;                                                                 
@@ -640,7 +638,7 @@
   ;; (displayln `(player was thrown out ,out*))
   (state nu-board moved))
 
-#; {(Setof Player) PlayerName -> Player}
+#; {Player* PlayerName -> Player}
 (define (find-player players pn)
   (define F (compose (curry equal? pn) player-name))
   (for/first ((element (in-set players)) #:when (F element)) element))
@@ -900,18 +898,17 @@
 ;    ;;
 
 (module+ json
-  (define (square->jsexpr s x y)
-    (list (tile->jsexpr (square-tile s)) x y))
-
   (define (state->jsexpr s)
     (define players (state-players s))
-    (matrix-where (state-board s)
-                  (λ (sq x y) sq)
-                  (λ (sq x y)
-                    (define tj (tile->jsexpr (square-tile sq)))
-                    (match (is-player-on players x y)
-                      [(? boolean?) (list tj x y)]
-                      [(list name port) (list tj name port x y)]))))
+    (matrix-where (state-board s) (λ (sq x y) sq) (square->jsexpr players)))
+
+  #; {Player* -> [Square Index Index -> JSexpr]}
+  ;; does not belong into square.rkt because that one doesn't know about (x,y)
+  (define ((square->jsexpr players) sq x y)
+    (define tj (tile->jsexpr (square-tile sq)))
+    (match (is-player-on players x y)
+      [(? boolean?) (list tj x y)]
+      [(list name port) (list tj name port x y)]))
 
   (define (jsexpr->state sj)
     (define intermediates 
