@@ -2,6 +2,10 @@
 
 ;; a data representation for game States, plus basic functions for manipulating them
 
+;; TDOO:
+;; -- can init and intermediate tiles accept rotated tiles? 
+
+
 ;                                                                 
 ;                                                                 
 ;                          ;                           ;          
@@ -256,6 +260,12 @@
                     #; every-player-faces-an-open-square
                     #; every-player-can-leave-going-backwards)))]))
 
+(module+ json
+  (provide
+   state-pat
+   jsexpr->state
+   state->jsexpr))
+
 ;                                                                                      
 ;       ;                                  ;                                           
 ;       ;                                  ;                          ;                
@@ -348,9 +358,9 @@
 (define player-white "white")
 
 (define inits-for-state-with-3-players
-   `((,tile-00 ,player-red   ,port-red 0 0)
-     (,tile-20 ,player-blue  ,port-blue 2 0)
-     (,tile-02 ,player-white ,port-white 0 2)))
+  `((,tile-00 ,player-red   ,port-red 0 0)
+    (,tile-20 ,player-blue  ,port-blue 2 0)
+    (,tile-02 ,player-white ,port-white 0 2)))
 
 (define 3players-list (map (λ (init) (apply player (rest init))) inits-for-state-with-3-players))
 (define red-player (first 3players-list))
@@ -768,13 +778,15 @@
 ;   ;                                 
 ;   ;                                 
 
-(module+ picts
+(module+ json
+  (require (submod Tsuro/Code/Common/tiles picts))
+  (require (submod Tsuro/Code/Common/grid picts))
   (define INSET  (+ 20 TILE-SIZE))
   (define WIDTH  (+ INSET (* 10 TILE-SIZE) INSET))
   (define HEIGHT (+ INSET (* 10 TILE-SIZE) INSET))
 
   #; {State (Instanceof DC<%>) -> Pict}
-  (define (draw-state b dc)
+  (define (state->pict b dc)
     (match-define (state squares players) b)
     (define grid-as-pict
       (let loop ([l (matrix->rectangle squares)][y 0])
@@ -799,11 +811,11 @@
     (define canvas
       (new canvas%
            [parent frame]
-           [paint-callback (λ (e dc) (draw-state s dc))]))
+           [paint-callback (λ (e dc) (state->pict s dc))]))
     
     (send frame show #t)))
 
-(module+ picts (show-state state3))
+; (module+ picts (show-state state3))
 
 ;                              
 ;      ;                       
@@ -821,6 +833,7 @@
 ;    ;;
 
 (module+ json
+  
   (define (state->jsexpr s)
     (define players (state-players s))
     (matrix-where (state-grid s) (λ (sq x y) sq) (square->jsexpr players)))
@@ -833,15 +846,37 @@
       [(? boolean?) (list tj x y)]
       [(list name port) (list tj name port x y)]))
 
+  (define-match-expander tile-pat
+    (λ (stx)
+      (syntax-case stx ()
+        [(_) #'`(,(? tile-index?) ,(? degree?))])))
+
+  (define-match-expander init-pat
+    (λ (stx)
+      (syntax-case stx ()
+        [(_) #'`(tile-pat ,(? string?) ,(? port?) ,(? index?) ,(? index?))])))
+
+  (define-match-expander intermediate-pat
+    (λ (stx)
+      (syntax-case stx ()
+        [(_) #'`(tile-pat ,(? index?) ,(? index?))])))
+
+  (define-match-expander state-pat
+    (λ (stx)
+      (syntax-case stx ()
+        [(_) #'`((or init-pat intermediate-pat) (... ...))])))
+
+  (struct bad [intermediate] #:transparent)
+
   (define (jsexpr->state sj)
     (define intermediates 
       (match sj
-        [(list i ...) (for/list ((i sj)) (cons (jsexpr->tile (first i)) (rest i)))]))
+        [state-pat (for/list ((i sj)) (cons (jsexpr->tile (first i)) (rest i)))]))
     (cond
       [(intermediate*/c intermediates)
        (define candidate-state (intermediate intermediates))
        (and candidate-state)]
-      [else intermediates]))
+      [else #f]))
   
-  (check-equal? (state-players (jsexpr->state (state->jsexpr state3))) (state-players state3))
-  (check-equal? (state-grid (jsexpr->state (state->jsexpr state3))) (state-grid state3)))
+  (check-equal? (jsexpr->state (state->jsexpr state3)) state3)
+  (check-equal? (jsexpr->state (state->jsexpr good-intermediate-state)) good-intermediate-state))
