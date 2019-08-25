@@ -33,7 +33,7 @@
        (define row (first l))
        (define picts
          (for/list ((n (in-list row)) (y (in-naturals)) #:when (p n x y))
-           (f n x y)))
+           (f n y x)))
        (append picts (loop (rest l) (+ x 1)))])))
 
 (module+ test
