@@ -1,0 +1,57 @@
+
+#! /bin/sh
+#| -*- racket -*-
+exec racket -tm "$0" ${1+"$@"}
+|#
+#lang racket
+
+(provide
+ ;; -> Void 
+ main)
+
+;; ---------------------------------------------------------------------------------------------------
+(require (submod Tsuro/Code/Common/board json))
+(require Tsuro/Code/Common/board)
+
+(require SwDev/Testing/communication)
+(require SwDev/Debugging/spy)
+(require json)
+
+(module+ test
+  (require SwDev/Testing/testing)
+  (require rackunit))
+
+;; ---------------------------------------------------------------------------------------------------
+(define ILL-FORMED "ill-formed input")
+(define INVALID    "invalid input")
+(define OK-FOR-NOW "okay for now, but not for rule checking")
+(define UNEXPECTED "unexpected end of file") 
+(define BAD-BOARD  "ill-formed board specification")
+(define NOT-BOARD  "intermediate state specification expected")
+
+(define (main)
+  (define next #; JSexpr (read-message))
+  (define board-0 #; State
+    (match next
+      [(? eof-object?) (error 'main UNEXPECTED)]
+      [(state-pat)
+       (define board-candidate (jsexpr->state next))
+       (unless board-candidate (error 'main (format "~a, given ~e" BAD-BOARD next)))
+       board-candidate]
+      [_ (error 'main (format "~a, given ~e" NOT-BOARD next))]))
+  (send-message (state->jsexpr board-0)))
+
+;; ---------------------------------------------------------------------------------------------------
+
+(module+ test
+  (recording "board-tests/")
+
+  (define state3* (list state3-jsexpr))
+  (r-check-equal? main state3* state3* "no action state3")
+  (define gstate* (list good-intermediate-state-jsexpr))
+  (r-check-equal? main gstate* gstate* "no action good intermediate state")
+
+  (r-check-exn main bad-intermediate-spec-jsexpr NOT-BOARD "bad 1")
+  (r-check-exn main bad-intermediate-spec-2-jsexpr NOT-BOARD "bad 1")
+  
+  (check-exn (regexp NOT-BOARD) (λ () (with-input-from-string "[1]" main)) NOT-BOARD))
