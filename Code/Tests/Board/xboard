@@ -1,4 +1,3 @@
-
 #! /bin/sh
 #| -*- racket -*-
 exec racket -tm "$0" ${1+"$@"}
@@ -12,14 +11,12 @@ exec racket -tm "$0" ${1+"$@"}
 ;; ---------------------------------------------------------------------------------------------------
 (require (submod Tsuro/Code/Common/board json))
 (require Tsuro/Code/Common/board)
-
 (require SwDev/Testing/communication)
+
 (require SwDev/Debugging/spy)
-(require json)
 
 (module+ test
-  (require SwDev/Testing/testing)
-  (require rackunit))
+  (require SwDev/Testing/testing))
 
 ;; ---------------------------------------------------------------------------------------------------
 (define ILL-FORMED "ill-formed input")
@@ -39,10 +36,10 @@ exec racket -tm "$0" ${1+"$@"}
        (unless board-candidate (error 'main (format "~a, given ~e" BAD-BOARD next)))
        board-candidate]
       [_ (error 'main (format "~a, given ~e" NOT-BOARD next))]))
-  (send-message (state->jsexpr board-0)))
+  (send-message (state->jsexpr board-0))
+  (newline))
 
 ;; ---------------------------------------------------------------------------------------------------
-
 (module+ test
   (recording "board-tests/")
 
@@ -53,5 +50,7 @@ exec racket -tm "$0" ${1+"$@"}
 
   (r-check-exn main bad-intermediate-spec-jsexpr NOT-BOARD "bad 1")
   (r-check-exn main bad-intermediate-spec-2-jsexpr NOT-BOARD "bad 1")
-  
-  (check-exn (regexp NOT-BOARD) (λ () (with-input-from-string "[1]" main)) NOT-BOARD))
+
+  (r-check-exn main "[1]"      NOT-BOARD "just an array")
+  (r-check-exn main "[[1, 0]," NOT-BOARD "the prefix of an intermediate")
+  (r-check-exn main "[1,\""    NOT-BOARD "an open string"))
