@@ -2,7 +2,7 @@
 
 (require (only-in Tsuro/Code/Common/tiles tile?))
 (require (only-in Tsuro/Code/Common/port-alphabetic port?))
-(require Tsuro/Code/Lib/or)
+(require SwDev/Lib/or)
 
 #; {Nat -> Boolean : Index}
 (define (index? z) (< -1 z SIZE))
@@ -71,7 +71,7 @@
 (require (except-in Tsuro/Code/Common/tiles tile?))
 (require (except-in Tsuro/Code/Common/port-alphabetic port?))
 (require Tsuro/Code/Common/matrix)
-(require Tsuro/Code/Lib/should-be-racket)
+(require SwDev/Lib/should-be-racket)
 (require pict)
 
 (module+ test

@@ -24,7 +24,7 @@
 (require (only-in Tsuro/Code/Common/grid index? SIZE looking-at square-tile))
 (require (only-in Tsuro/Code/Common/tiles tile?))
 (require (only-in Tsuro/Code/Common/port-alphabetic port?))
-(require Tsuro/Code/Lib/or)
+(require SwDev/Lib/or)
 
 ;                                                                                             
 ;                                                                                             
@@ -270,7 +270,15 @@
    #; {JSexpr -> (U State #false)}
    ;; it produces #false if intermediates produces #false because it's an illegal state
    (contract-out
-    [jsexpr->state (-> (λ (x) (match x [state-pat #t][_ #f])) state?)])))
+    [jsexpr->state (-> (λ (x) (match x [state-pat #t][_ #f])) state?)])
+
+   ;; States as JSexpr 
+   state3-jsexpr
+   good-intermediate-state-jsexpr
+
+   ;; Intermediates as JSexpr
+   bad-intermediate-spec-jsexpr
+   bad-intermediate-spec-2-jsexpr))
 
 ;                                                                                      
 ;       ;                                  ;                                           
@@ -291,14 +299,13 @@
 (require (except-in Tsuro/Code/Common/tiles tile?))
 (require (except-in Tsuro/Code/Common/port-alphabetic port?))
 (require Tsuro/Code/Common/matrix)
-(require Tsuro/Code/Lib/should-be-racket)
-(require pict)
 
+(require SwDev/Lib/should-be-racket)
+(require pict)
 (require (for-syntax syntax/parse))
 
-;; debugging 
-(require Tsuro/Code/Lib/spy)
-(require Tsuro/Code/Lib/diff)
+(require SwDev/Debugging/spy)
+(require SwDev/Debugging/diff)
 
 (module+ test
   (require (submod ".."))
@@ -784,7 +791,7 @@
 ;   ;                                 
 ;   ;                                 
 
-(module+ json
+(module+ picts
   (require (submod Tsuro/Code/Common/tiles picts))
   (require (submod Tsuro/Code/Common/grid picts))
   (define INSET  (+ 20 TILE-SIZE))
@@ -889,5 +896,12 @@
   ;; -------------------------------------------------------------------------------------------------
   (check-equal? (jsexpr->state (state->jsexpr state3)) state3)
   (check-equal? (jsexpr->state (state->jsexpr good-intermediate-state)) good-intermediate-state)
+
+  (define state3-jsexpr (state->jsexpr state3))
+  (define good-intermediate-state-jsexpr (state->jsexpr good-intermediate-state))
+  
   (check-false (jsexpr->state (intermediate*->jsexpr bad-intermediate-spec)))
-  (check-false (jsexpr->state (intermediate*->jsexpr bad-intermediate-spec-2))))
+  (check-false (jsexpr->state (intermediate*->jsexpr bad-intermediate-spec-2)))
+
+  (define bad-intermediate-spec-jsexpr (intermediate*->jsexpr bad-intermediate-spec))
+  (define bad-intermediate-spec-2-jsexpr (intermediate*->jsexpr bad-intermediate-spec-2)))
