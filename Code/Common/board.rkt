@@ -262,9 +262,15 @@
 
 (module+ json
   (provide
+   state->jsexpr
+
+   ;; if JSexpr matches state-pat, it is a candidate for the creation of an intermediate board
    state-pat
-   jsexpr->state
-   state->jsexpr))
+
+   #; {JSexpr -> (U State #false)}
+   ;; it produces #false if intermediates produces #false because it's an illegal state
+   (contract-out
+    [jsexpr->state (-> (λ (x) (match x [state-pat #t][_ #f])) state?)])))
 
 ;                                                                                      
 ;       ;                                  ;                                           
@@ -833,7 +839,8 @@
 ;    ;;
 
 (module+ json
-  
+
+  ;; -------------------------------------------------------------------------------------------------
   (define (state->jsexpr s)
     (define players (state-players s))
     (matrix-where (state-grid s) (λ (sq x y) sq) (square->jsexpr players)))
@@ -844,39 +851,43 @@
     (define tj (tile->jsexpr (square-tile sq)))
     (match (is-player-on players x y)
       [(? boolean?) (list tj x y)]
-      [(list name port) (list tj name port x y)]))
+      [(list name port) (list tj name (string port) x y)]))
 
-  (define-match-expander tile-pat
-    (λ (stx)
-      (syntax-case stx ()
-        [(_) #'`(,(? tile-index?) ,(? degree?))])))
+  (define (intermediate*->jsexpr intermediates)
+    (for/list ((i intermediates))
+      (define ti (tile->jsexpr (first i)))
+      (match i
+        [`(,t ,x ,y) `(,ti ,x ,y)]
+        [`(,t ,name ,port ,x ,y) `(,ti ,name ,(string port) ,x ,y)])))
 
-  (define-match-expander init-pat
-    (λ (stx)
-      (syntax-case stx ()
-        [(_) #'`(tile-pat ,(? string?) ,(? port?) ,(? index?) ,(? index?))])))
+  ;; -------------------------------------------------------------------------------------------------
+  (define-syntax-rule (def/mp name pat exp)
+    (define-match-expander name (λ (stx) (syntax-parse stx [pat exp]))))
 
-  (define-match-expander intermediate-pat
-    (λ (stx)
-      (syntax-case stx ()
-        [(_) #'`(tile-pat ,(? index?) ,(? index?))])))
-
-  (define-match-expander state-pat
-    (λ (stx)
-      (syntax-case stx ()
-        [(_) #'`((or init-pat intermediate-pat) (... ...))])))
-
-  (struct bad [intermediate] #:transparent)
+  (def/mp tile-pat
+    (_ ti-d) #'(and `(,(? tile-index?) ,(? degree?)) ti-d))
+  (def/mp port-pat
+    (_ p) #'(? (λ (s) (and (string? s) (= (string-length s) 1) (port? (string-ref s 0)))) p))
+  (def/mp init-pat
+    (_ t n p x y) #'`(,(tile-pat t) ,(? string? n) ,(port-pat p) ,(? index? x) ,(? index? y)))
+  (def/mp intermediate-pat
+    (_ ti-d x y) #'`(,(tile-pat ti-d) ,(? index? x) ,(? index? y)))
+  (def/mp state-pat
+    (_) #'`(,(or (init-pat ti-d _ _ x y) (intermediate-pat ti-d x y)) (... ...)))
+  
+  (define (jsexpr->intermediate j)
+    (match j
+      [(init-pat ti-d name p x y)  (list (jsexpr->tile ti-d) name (string-ref p 0) x y)]
+      [(intermediate-pat ti-d x y) (list (jsexpr->tile ti-d) x y)]))
 
   (define (jsexpr->state sj)
-    (define intermediates 
-      (match sj
-        [state-pat (for/list ((i sj)) (cons (jsexpr->tile (first i)) (rest i)))]))
+    (define ims (match sj [(state-pat) (map jsexpr->intermediate sj)]))
     (cond
-      [(intermediate*/c intermediates)
-       (define candidate-state (intermediate intermediates))
-       (and candidate-state)]
+      [(intermediate*/c ims) (intermediate ims)]
       [else #f]))
-  
+
+  ;; -------------------------------------------------------------------------------------------------
   (check-equal? (jsexpr->state (state->jsexpr state3)) state3)
-  (check-equal? (jsexpr->state (state->jsexpr good-intermediate-state)) good-intermediate-state))
+  (check-equal? (jsexpr->state (state->jsexpr good-intermediate-state)) good-intermediate-state)
+  (check-false (jsexpr->state (intermediate*->jsexpr bad-intermediate-spec)))
+  (check-false (jsexpr->state (intermediate*->jsexpr bad-intermediate-spec-2))))
