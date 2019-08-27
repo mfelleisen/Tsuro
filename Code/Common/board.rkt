@@ -313,6 +313,7 @@
 
 (module+ json
   (require (submod Tsuro/Code/Common/tiles json))
+  (require Tsuro/Code/Common/pattern-matching)
   (require rackunit))
 
 (module+ picts
@@ -868,13 +869,6 @@
         [`(,t ,name ,port ,x ,y) `(,ti ,name ,(string port) ,x ,y)])))
 
   ;; -------------------------------------------------------------------------------------------------
-  (define-syntax-rule (def/mp name pat exp)
-    (define-match-expander name (λ (stx) (syntax-parse stx [pat exp]))))
-
-  (def/mp tile-pat
-    (_ ti-d) #'(and `(,(? tile-index?) ,(? degree?)) ti-d))
-  (def/mp port-pat
-    (_ p) #'(? (λ (s) (and (string? s) (= (string-length s) 1) (port? (string-ref s 0)))) p))
   (def/mp init-pat
     (_ t n p x y) #'`(,(tile-pat t) ,(? string? n) ,(port-pat p) ,(? index? x) ,(? index? y)))
   (def/mp intermediate-pat

@@ -4,6 +4,8 @@
 
 (require Tsuro/Code/Common/port-signature) (provide-port-signature)
 
+(require Tsuro/Code/Common/pattern-matching)
+
 ;; -----------------------------------------------------------------------------
 (define PORTS (build-list PORT# identity))
 (define (port? x) (< -1 x PORT#))
@@ -29,3 +31,6 @@
     [(5) 0]
     [(6) 3]
     [(7) 2]))
+
+(def/mp port-pat
+  (_ p) #'(? (λ (s) (and (integer? s) (<= 0 s PORT#))) p))

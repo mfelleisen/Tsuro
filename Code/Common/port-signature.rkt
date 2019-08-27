@@ -8,30 +8,32 @@
 
 (define-syntax (provide-port-signature stx)
   (datum->syntax stx 
-   '(provide
-     ;; type Port 
+                 '(provide
+                   ;; type Port 
      
-      ;; [Listof Portlabels]
-      PORTS
+                   ;; [Listof Portlabels]
+                   PORTS
 
-      #; {Any -> Boolean : member of PORTS}
-      port?
+                   port-pat
 
-      #; {Nat -> Port}
-      index->port
+                   #; {Any -> Boolean : member of PORTS}
+                   port?
 
-      #; {Port -> Nat}
-      port->index
+                   #; {Nat -> Port}
+                   index->port
 
-      #; {Port -> (U 'NORTH 'EAST 'SOUTH 'WEST)}
-      port->direction 
+                   #; {Port -> Nat}
+                   port->index
 
-      #; {Port Port -> Boolean}
-      <-port
+                   #; {Port -> (U 'NORTH 'EAST 'SOUTH 'WEST)}
+                   port->direction 
 
-      #; {Port -> Port}
-      ;; rotate a port by 90 degrees
-      90degrees
+                   #; {Port Port -> Boolean}
+                   <-port
 
-      #; {Port -> Port}
-      facing-port)))
+                   #; {Port -> Port}
+                   ;; rotate a port by 90 degrees
+                   90degrees
+
+                   #; {Port -> Port}
+                   facing-port)))
