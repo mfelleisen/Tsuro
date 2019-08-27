@@ -242,7 +242,7 @@
   [add-tile
    ;; place a configured tile on the empty square that the player pn neighbors
    ;; EFFECT may raise (exn:infinite String CMS Player) to signal an infinite loop
-   (->i ([s state?][c tile?][name (s) (and/c string? (λ (pn) (member pn (survivors s))))])
+   (->i ([s state?][c tile?][name (s) (and/c string? (curry set-member? (survivors state3)))])
         [result (and/c state? every-player-faces-an-open-square)])]
   
   [survivors (-> state? (listof string?))]
@@ -381,7 +381,7 @@
   (check-equal? (survivors state3) (set-map 3players player-name) "survivors")
   (check-true (player-on-tile/c (first inits-for-state-with-3-players)))
   (check-true (initial-player-on-tile*/c inits-for-state-with-3-players))
-  (check-true ((takes-part-in-game state3) player-red))
+  (check-true (set-member? (survivors state3) player-red))
   (check-true (intermediate*/c inits-for-state-with-3-players)
               "an initial configuration of tiles is also intermediate"))
 
