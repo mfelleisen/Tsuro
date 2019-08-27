@@ -19,24 +19,22 @@ exec racket -tm "$0" ${1+"$@"}
   (require SwDev/Testing/testing))
 
 ;; ---------------------------------------------------------------------------------------------------
-(define ILL-FORMED "ill-formed input")
-(define INVALID    "invalid input")
-(define OK-FOR-NOW "okay for now, but not for rule checking")
 (define UNEXPECTED "unexpected end of file") 
 (define BAD-BOARD  "ill-formed board specification")
 (define NOT-BOARD  "intermediate state specification expected")
 
 (define (main)
-  (define next #; JSexpr (read-message))
+  (define next #; (U JSexpr EOF X) (read-message))
   (define stat #; State
     (match next
-      [(? eof-object?) (error 'main UNEXPECTED)]
+      [(? eof-object?) (send-message UNEXPECTED)]
       [(state-pat)
        (define board-candidate (jsexpr->state next))
-       (unless board-candidate (error 'main (format "~a, given ~e" BAD-BOARD next)))
-       board-candidate]
-      [_ (error 'main (format "~a, given ~e" NOT-BOARD next))]))
-  (send-message (state->jsexpr stat)))
+       (if board-candidate
+           (send-message (state->jsexpr board-candidate))
+           (send-message (format "~a, given ~e" BAD-BOARD next)))]
+      [_ (send-message (format "~a, given ~e" NOT-BOARD next))]))
+  (void))
 
 ;; ---------------------------------------------------------------------------------------------------
 (module+ test
@@ -47,9 +45,9 @@ exec racket -tm "$0" ${1+"$@"}
   (define gstate* (list good-intermediate-state-jsexpr))
   (r-check-equal? main gstate* gstate* "no action good intermediate state")
 
-  (r-check-exn main bad-intermediate-spec-jsexpr NOT-BOARD "bad 1")
-  (r-check-exn main bad-intermediate-spec-2-jsexpr NOT-BOARD "bad 1")
+  (r-check-exn main (list bad-intermediate-spec-jsexpr) BAD-BOARD "bad 1")
+  (r-check-exn main (list bad-intermediate-spec-2-jsexpr) BAD-BOARD "bad 2")
 
-  (r-check-exn main "[1]"      NOT-BOARD "just an array")
-  (r-check-exn main "[[1, 0]," NOT-BOARD "the prefix of an intermediate")
-  (r-check-exn main "[1,\""    NOT-BOARD "an open string"))
+  (r-check-exn main (list '[1]) NOT-BOARD "just an array")
+  (r-check-exn main "[[1, 0],"  NOT-BOARD "the prefix of an intermediate")
+  (r-check-exn main "[1,\""     NOT-BOARD "an open string"))
