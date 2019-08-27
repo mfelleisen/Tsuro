@@ -1,4 +1,4 @@
-#! /bin/sh
+ #! /bin/sh
 #|
 exec racket -tm "$0" ${1+"$@"}
 |#
@@ -10,7 +10,7 @@ exec racket -tm "$0" ${1+"$@"}
 (provide main)
 
 ;; -----------------------------------------------------------------------------
-(require SwDev/Testing/xmain)
+(require SwDev/Testing/harness)
 
 (test-plain-and-pretty-json?             #f)
 (test-fast-and-slow-delivery?            #f)
