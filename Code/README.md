@@ -15,7 +15,7 @@ This directory implements a distributed Tsuro game
 
 [x] JSON de/serialization of map 	  
 
-[ ] batch test harness 
+[ ] batch test harness for board 
   
 [ ] legal move: suicide, circular paths? 
 

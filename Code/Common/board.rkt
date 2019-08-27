@@ -242,7 +242,7 @@
   [add-tile
    ;; place a configured tile on the empty square that the player pn neighbors
    ;; EFFECT may raise (exn:infinite String CMS Player) to signal an infinite loop
-   (->i ([s state?][c tile?][name (s) (and/c string? (curry set-member? (survivors state3)))])
+   (->i ([s state?][name (s) (and/c string? (curry set-member? (survivors state3)))][t tile?])
         [result (and/c state? every-player-faces-an-open-square)])]
   
   [survivors (-> state? (listof string?))]
@@ -262,6 +262,9 @@
    ;; if JSexpr matches state-pat, it is a candidate for the creation of an intermediate board
    state-pat
 
+   ;; if JSExpr matches action-pat, it is a candidate for a add-tile action 
+   action-pat
+
    #; {JSexpr -> (U State #false)}
    ;; it produces #false if intermediates produces #false because it's an illegal state
    (contract-out
@@ -273,7 +276,12 @@
 
    ;; Intermediates as JSexpr
    bad-intermediate-spec-jsexpr
-   bad-intermediate-spec-2-jsexpr))
+   bad-intermediate-spec-2-jsexpr
+
+   ;; actions on states 
+   state3-action
+   state+-jsexpr
+   ))
 
 ;                                                                                      
 ;       ;                                  ;                                           
@@ -618,7 +626,7 @@
 
 (struct exn:infinite exn (player))
 
-(define (add-tile state0 tile player-name)
+(define (add-tile state0 player-name tile)
   (match-define  (state grid players) state0)
   (match-define  (player _ port x y) (find-player players player-name))
   (define-values (x-new y-new) (looking-at port x y))
@@ -635,7 +643,7 @@
   (for/first ((element (in-set players)) #:when (F element)) element))
 
 (define tile-to-add-to-grid-3-index 33)
-(define tile-to-add-to-grid-3 (tile-index->tile tile-to-add-to-grid-3-index))
+(define tile-to-add-to-grid-3 (rotate-tile (tile-index->tile tile-to-add-to-grid-3-index)))
 (define state+
   (state-from #:grid0 grid3
               #:set0 (set-remove (state-players state3) red-player)
@@ -643,9 +651,9 @@
 
 (module+ test ;; add-tile
   (check-equal? (find-player 3players "red") red-player)
-  (check-equal? (add-tile state3 (rotate-tile tile-to-add-to-grid-3) player-red) state+
+  (check-equal? (add-tile state3 player-red tile-to-add-to-grid-3) state+
                 "drive red player off")
-  (check-exn exn:infinite? (λ () (add-tile state3 (tile-index->tile 34) player-red))
+  (check-exn exn:infinite? (λ () (add-tile state3 player-red (tile-index->tile 34)))
              "drive red player into infinite loop"))
 
 ;                                                                                                    
@@ -881,6 +889,13 @@
     (cond
       [(intermediate*/c ims) (intermediate ims)]
       [else #f]))
+  
+  (def/mp action-pat
+    (_ pn ti) #'`(,(? string? pn) ,(tile-pat ti)))
+
+  (define state3-action (list player-red (tile->jsexpr tile-to-add-to-grid-3)))
+  (check-true (match state3-action [(action-pat pn ti) #t]))
+  (define state+-jsexpr (state->jsexpr state+))
 
   ;; -------------------------------------------------------------------------------------------------
   (check-equal? (jsexpr->state (state->jsexpr state3)) state3)

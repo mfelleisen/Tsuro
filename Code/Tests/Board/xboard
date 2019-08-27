@@ -10,6 +10,7 @@ exec racket -tm "$0" ${1+"$@"}
 
 ;; ---------------------------------------------------------------------------------------------------
 (require (submod Tsuro/Code/Common/board json))
+(require (submod Tsuro/Code/Common/tiles json))
 (require Tsuro/Code/Common/board)
 (require SwDev/Testing/communication)
 
@@ -19,22 +20,39 @@ exec racket -tm "$0" ${1+"$@"}
   (require SwDev/Testing/testing))
 
 ;; ---------------------------------------------------------------------------------------------------
-(define UNEXPECTED "unexpected end of file") 
-(define BAD-BOARD  "ill-formed board specification")
-(define NOT-BOARD  "intermediate state specification expected")
+(define UNEXPECTED "unexpected end of file")
+(define ILLF-STATE "board specification yields ill-formed state")
+(define NOT-BOARD  "board specification expected")
+(define BAD-ACTION "bad action: player not part of the game")
+(define NOT-ACTION "action expected")
+(define INFINITE   "player goes into infinite loop")
+(define (fmt x y) (format "~a, given ~e" x y))
 
 (define (main)
   (define next #; (U JSexpr EOF X) (read-message))
-  (define stat #; State
-    (match next
-      [(? eof-object?) (send-message UNEXPECTED)]
-      [(state-pat)
-       (define board-candidate (jsexpr->state next))
-       (if board-candidate
-           (send-message (state->jsexpr board-candidate))
-           (send-message (format "~a, given ~e" BAD-BOARD next)))]
-      [_ (send-message (format "~a, given ~e" NOT-BOARD next))]))
-  (void))
+  (match next
+    [(? eof-object?) (send-message UNEXPECTED)]
+    [(state-pat)
+     (define board-candidate (jsexpr->state next))
+     (if board-candidate
+         (actions board-candidate)
+         (send-message (fmt ILLF-STATE next)))]
+    [_ (send-message (fmt NOT-BOARD next))]))
+
+#; {State -> Void}
+;; read actions from current-input-port until EOF and apply to state
+;; write the final state as JSON 
+(define (actions state)
+  (define next #; (U JSExpr EOF X) (read-message))
+  (match next
+    [(? eof-object?) (send-message (state->jsexpr state))]
+    [(action-pat pn ti)
+     (if (set-member? (survivors state) pn)
+         (actions 
+          (with-handlers ([exn:infinite? (λ (xn) (send-message (fmt INFINITE next)))])
+            (add-tile state pn (jsexpr->tile ti))))
+         (send-message (fmt BAD-ACTION next)))]
+    [_ (send-message (fmt NOT-ACTION next))]))
 
 ;; ---------------------------------------------------------------------------------------------------
 (module+ test
@@ -45,8 +63,10 @@ exec racket -tm "$0" ${1+"$@"}
   (define gstate* (list good-intermediate-state-jsexpr))
   (r-check-equal? main gstate* gstate* "no action good intermediate state")
 
-  (r-check-exn main (list bad-intermediate-spec-jsexpr) BAD-BOARD "bad 1")
-  (r-check-exn main (list bad-intermediate-spec-2-jsexpr) BAD-BOARD "bad 2")
+  (r-check-equal? main (list state3-jsexpr state3-action) (list state+-jsexpr) "state3 -> state+")
+
+  (r-check-exn main (list bad-intermediate-spec-jsexpr) ILLF-STATE "bad 1")
+  (r-check-exn main (list bad-intermediate-spec-2-jsexpr) ILLF-STATE "bad 2")
 
   (r-check-exn main (list '[1]) NOT-BOARD "just an array")
   (r-check-exn main "[[1, 0],"  NOT-BOARD "the prefix of an intermediate")
