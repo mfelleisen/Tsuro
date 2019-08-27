@@ -859,14 +859,14 @@
     (define tj (tile->jsexpr (square-tile sq)))
     (match (is-player-on players x y)
       [(? boolean?) (list tj x y)]
-      [(list name port) (list tj name (string port) x y)]))
+      [(list name port) (list tj name (port->jsexpr port) x y)]))
 
   (define (intermediate*->jsexpr intermediates)
     (for/list ((i intermediates))
       (define ti (tile->jsexpr (first i)))
       (match i
         [`(,t ,x ,y) `(,ti ,x ,y)]
-        [`(,t ,name ,port ,x ,y) `(,ti ,name ,(string port) ,x ,y)])))
+        [`(,t ,name ,port ,x ,y) `(,ti ,name ,(port->jsexpr port) ,x ,y)])))
 
   ;; -------------------------------------------------------------------------------------------------
   (def/mp init-pat
@@ -878,7 +878,7 @@
   
   (define (jsexpr->intermediate j)
     (match j
-      [(init-pat ti-d name p x y)  (list (jsexpr->tile ti-d) name (string-ref p 0) x y)]
+      [(init-pat ti-d name p x y)  (list (jsexpr->tile ti-d) name (jsexpr->port p) x y)]
       [(intermediate-pat ti-d x y) (list (jsexpr->tile ti-d) x y)]))
 
   (define (jsexpr->state sj)

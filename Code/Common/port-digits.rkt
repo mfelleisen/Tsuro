@@ -34,3 +34,9 @@
 
 (def/mp port-pat
   (_ p) #'(? (λ (s) (and (integer? s) (<= 0 s PORT#))) p))
+
+(define (port->jsexpr p)
+  p)
+
+(define (jsexpr->port pj)
+  pj)

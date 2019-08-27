@@ -38,3 +38,9 @@
 
 (def/mp port-pat
   (_ p) #'(? (λ (s) (and (string? s) (= (string-length s) 1) (port? (string-ref s 0)))) p))
+
+(define (port->jsexpr p)
+  (string p))
+
+(define (jsexpr->port pj)
+  (string-ref pj 0))

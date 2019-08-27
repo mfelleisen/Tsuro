@@ -36,4 +36,13 @@
                    90degrees
 
                    #; {Port -> Port}
-                   facing-port)))
+                   facing-port
+
+                   #; {Port -> JSexpr}
+                   port->jsexpr
+
+                   #; {JSexrpr -> Port}
+                   ;; satisfies port-pat
+                   jsexpr->port)))
+
+  
