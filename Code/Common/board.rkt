@@ -270,7 +270,7 @@
    #; {JSexpr -> (U State #false)}
    ;; it produces #false if intermediates produces #false because it's an illegal state
    (contract-out
-    [jsexpr->state (-> (λ (x) (match x [state-pat #t][_ #f])) state?)])
+    [jsexpr->state (-> (λ (x) (match x [state-pat #t][_ #f])) (or/c state? #false))])
 
    ;; States as JSexpr 
    state3-jsexpr
