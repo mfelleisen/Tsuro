@@ -224,11 +224,6 @@
 ;                 ;                                 
 ;                 ;
 
-#; { State -> (-> PlayerName Boolean : the player is on the list of players)}
-;; adding a tile to a properly built grid
-(define ((takes-part-in-game s) pname)
-  (player? (find-player (state-players s) pname)))
-
 (provide
  ;; type State
  ;; all players are on ports that face empty squares on the grid 
@@ -247,7 +242,7 @@
   [add-tile
    ;; place a configured tile on the empty square that the player pn neighbors
    ;; EFFECT may raise (exn:infinite String CMS Player) to signal an infinite loop
-   (->i ([s state?][c tile?][name (s) (and/c string? (takes-part-in-game s))])
+   (->i ([s state?][c tile?][name (s) (and/c string? (λ (pn) (member pn (survivors s))))])
         [result (and/c state? every-player-faces-an-open-square)])]
   
   [survivors (-> state? (listof string?))]
