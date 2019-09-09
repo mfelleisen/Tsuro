@@ -316,7 +316,7 @@
 
 (module+ json
   (require (submod Tsuro/Code/Common/tiles json))
-  (require Tsuro/Code/Common/pattern-matching)
+  (require SwDev/Lib/pattern-matching)
   (require rackunit))
 
 (module+ picts

@@ -4,7 +4,7 @@
 
 (require Tsuro/Code/Common/port-signature) (provide-port-signature)
 
-(require Tsuro/Code/Common/pattern-matching)
+(require SwDev/Lib/pattern-matching)
 
 ;; -----------------------------------------------------------------------------
 (define PORTS (build-list PORT# identity))
