@@ -1,7 +1,7 @@
 #lang racket
 
 (require (only-in Tsuro/Code/Common/tiles tile?))
-(require (only-in Tsuro/Code/Common/port-alphabetic port?))
+(require (only-in Tsuro/Code/Common/port port?))
 (require SwDev/Lib/or)
 
 #; {Nat -> Boolean : Index}
@@ -69,7 +69,7 @@
 ;                 ;                                                                    
 
 (require (except-in Tsuro/Code/Common/tiles tile?))
-(require (except-in Tsuro/Code/Common/port-alphabetic port?))
+(require (except-in Tsuro/Code/Common/port port?))
 (require Tsuro/Code/Common/matrix)
 (require SwDev/Lib/should-be-racket)
 (require pict)

@@ -23,7 +23,7 @@
   
 (require (only-in Tsuro/Code/Common/grid index? SIZE looking-at square-tile))
 (require (only-in Tsuro/Code/Common/tiles tile?))
-(require (only-in Tsuro/Code/Common/port-alphabetic port?))
+(require (only-in Tsuro/Code/Common/port port?))
 (require SwDev/Lib/or)
 
 ;                                                                                             
@@ -301,7 +301,7 @@
 
 (require (except-in Tsuro/Code/Common/grid SIZE looking-at square-tile))
 (require (except-in Tsuro/Code/Common/tiles tile?))
-(require (except-in Tsuro/Code/Common/port-alphabetic port?))
+(require (except-in Tsuro/Code/Common/port port?))
 (require Tsuro/Code/Common/matrix)
 
 (require SwDev/Lib/should-be-racket)

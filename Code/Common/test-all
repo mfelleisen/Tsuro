@@ -1,9 +1,4 @@
 #!/bin/sh 
 
-raco test matrix.rkt
-raco test grid.rkt
-raco test port-alphabetic.rkt 
-raco test tiles.rkt
-raco test -s json tiles.rkt
-raco test board.rkt 
-raco test -s json board.rkt 
+time raco test matrix.rkt grid.rkt port-alphabetic.rkt tiles.rkt board.rkt 
+time raco test -s json tiles.rkt board.rkt 
