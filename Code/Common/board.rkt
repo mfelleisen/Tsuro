@@ -280,6 +280,7 @@
 
    ;; actions on states 
    state3-action
+   state3-action-infinite
    state+-jsexpr
    ))
 
@@ -648,12 +649,14 @@
   (state-from #:grid0 grid3
               #:set0 (set-remove (state-players state3) red-player)
               (#f (tile-to-add-to-grid-3-index #:rotate 90))))
+(define state3+infinite-index 34)
+(define state3+infinite (tile-index->tile state3+infinite-index))
 
 (module+ test ;; add-tile
   (check-equal? (find-player 3players "red") red-player)
   (check-equal? (add-tile state3 player-red tile-to-add-to-grid-3) state+
                 "drive red player off")
-  (check-exn exn:infinite? (λ () (add-tile state3 player-red (tile-index->tile 34)))
+  (check-exn exn:infinite? (λ () (add-tile state3 player-red state3+infinite))
              "drive red player into infinite loop"))
 
 ;                                                                                                    
@@ -895,6 +898,9 @@
 
   (define state3-action (list player-red (tile->jsexpr tile-to-add-to-grid-3)))
   (check-true (match state3-action [(action-pat pn ti) #t]))
+  (define state3-action-infinite (list player-red (tile->jsexpr state3+infinite)))
+  (check-true (match state3-action-infinite [(action-pat pn ti) #t]))
+
   (define state+-jsexpr (state->jsexpr state+))
 
   ;; -------------------------------------------------------------------------------------------------
