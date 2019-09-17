@@ -21,7 +21,7 @@ exec racket -tm "$0" ${1+"$@"}
 
 ;; ---------------------------------------------------------------------------------------------------
 (define UNEXPECTED "unexpected end of file")
-(define ILLF-STATE "board specification yields ill-formed state")
+(define BAD-STATE  "board specification yields ill-formed state")
 (define NOT-BOARD  "board specification expected")
 (define BAD-ACTION "bad action: player not part of the game")
 (define NOT-ACTION "action expected")
@@ -36,7 +36,7 @@ exec racket -tm "$0" ${1+"$@"}
      (define board-candidate (jsexpr->state next))
      (if board-candidate
          (actions board-candidate)
-         (send-message (fmt ILLF-STATE next)))]
+         (send-message (fmt BAD-STATE next)))]
     [_ (send-message (fmt NOT-BOARD next))]))
 
 #; {State -> Void}
@@ -64,12 +64,29 @@ exec racket -tm "$0" ${1+"$@"}
   (r-check-equal? main state3* state3* "no action state3")
   (define gstate* (list good-intermediate-state-jsexpr))
   (r-check-equal? main gstate* gstate* "no action good intermediate state")
+  
+  (require (submod Tsuro/Code/Common/board picts))
+  ; (show-state (jsexpr->state state3-jsexpr))
+  ; (show-state (jsexpr->state good-intermediate-state-jsexpr))
 
-  (r-check-equal? main (list state3-jsexpr state3-action) (list state+-jsexpr) "state3 -> state+")
+  (r-check-exn main "" UNEXPECTED "eof")
+  
+  (r-check-equal? main (list state3-jsexpr state3-action)
+                  (list state+-jsexpr)
+                  "state3 -> state+")
+  (r-check-equal? main (cons good-intermediate-state-jsexpr good-state-actions)
+                  (list good-intermediate-state+++-jsexpr)
+                  "intermediate good, move red 4x")
+
+  (r-check-exn main (list state3-jsexpr `("black" (33 90))) BAD-ACTION "black isn't playing")
   (r-check-exn main (list state3-jsexpr state3-action-infinite) INFINITE "state3 -> I")
+  (r-check-exn main (list state3-jsexpr `("black" 44)) NOT-ACTION "44 isn't a tile")
+  (r-check-exn main (list state3-jsexpr `(44)) NOT-ACTION "no actor, no an action")
 
-  (r-check-exn main (list bad-intermediate-spec-jsexpr) ILLF-STATE "bad 1")
-  (r-check-exn main (list bad-intermediate-spec-2-jsexpr) ILLF-STATE "bad 2")
+  (r-check-exn main (list bad-intermediate-spec-jsexpr) BAD-STATE "bad 1")
+  (r-check-exn main (list bad-intermediate-spec-2-jsexpr) BAD-STATE "bad 2")
+
+  (recording #f)
 
   (r-check-exn main (list '[1]) NOT-BOARD "just an array")
   (r-check-exn main "[[1, 0],"  NOT-BOARD "the prefix of an intermediate")
