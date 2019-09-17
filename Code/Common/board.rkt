@@ -273,6 +273,8 @@
    ;; States as JSexpr 
    state3-jsexpr
    good-intermediate-state-jsexpr
+   good-state-actions
+   good-intermediate-state+++-jsexpr
 
    ;; Intermediates as JSexpr
    bad-intermediate-spec-jsexpr
@@ -283,6 +285,11 @@
    state3-action-infinite
    state+-jsexpr
    ))
+
+(module+ picts
+  (provide
+   state->pict
+   show-state))
 
 ;                                                                                      
 ;       ;                                  ;                                           
@@ -633,10 +640,17 @@
   (define-values (x-new y-new) (looking-at port x y))
   (define nu-grid (add-new-square-update-neighbors grid tile x-new y-new))
   (define-values (moved out* inf*) (move-players nu-grid players x-new y-new))
-  (when (cons? inf*) (raise (exn:infinite "hello" (current-continuation-marks) (first inf*))))
+  (when (cons? inf*) (raise (exn:infinite player-name (current-continuation-marks) (first inf*))))
   ;; what to do with eliminated ones
   ;; (displayln `(player was thrown out ,out*))
   (state nu-grid moved))
+
+#; {type Action = [List Color [List TileIndex Degree]]}
+
+#; {State Action -> State}
+(define (add-tile/a state action)
+  (match-define (list player-name (list tile-index degree)) action)
+  (add-tile state player-name (rotate-tile (tile-index->tile tile-index) #:degree degree)))
 
 #; {Player* PlayerName -> Player}
 (define (find-player players pn)
@@ -644,7 +658,8 @@
   (for/first ((element (in-set players)) #:when (F element)) element))
 
 (define tile-to-add-to-grid-3-index 33)
-(define tile-to-add-to-grid-3 (rotate-tile (tile-index->tile tile-to-add-to-grid-3-index)))
+(define state3-action `(,player-red (,tile-to-add-to-grid-3-index 90)))
+
 (define state+
   (state-from #:grid0 grid3
               #:set0 (set-remove (state-players state3) red-player)
@@ -652,10 +667,34 @@
 (define state3+infinite-index 34)
 (define state3+infinite (tile-index->tile state3+infinite-index))
 
+(define good-state-actions `[(,player-red (11 0)) (,player-red (12 0)) (,player-red (34 0))])
+(define good-intermediate-state+
+  (state-from (34 (11 "red" #:on #\E) (34 #:rotate 90 "blue" #:on port-blue))
+              (33)
+              ((33 #:rotate 180 "white" #:on port-white))))
+(define good-intermediate-state++
+  (state-from (34 11                   (34 #:rotate 90 "blue" #:on port-blue))
+              (33 (12 "red" #:on #\E))
+              ((33 #:rotate 180 "white" #:on port-white))))
+(define good-intermediate-state+++
+  (state-from (34 11                   (34 #:rotate 90 "blue" #:on port-blue))
+              (33 (12 "red" #:on #\D))
+              ((33 #:rotate 180) 34)))
+
 (module+ test ;; add-tile
   (check-equal? (find-player 3players "red") red-player)
-  (check-equal? (add-tile state3 player-red tile-to-add-to-grid-3) state+
-                "drive red player off")
+  (check-equal? (add-tile/a state3 state3-action) state+ "drive red player off")
+  
+  (check-equal? (add-tile/a good-intermediate-state (first good-state-actions))
+                good-intermediate-state+
+                "red fwd 1")
+  (check-equal? (add-tile/a good-intermediate-state+ (second good-state-actions))
+                good-intermediate-state++
+                "red fwd 2")
+  (check-equal? (add-tile/a good-intermediate-state++ (third good-state-actions))
+                good-intermediate-state+++
+                "red fwd 3")
+  
   (check-exn exn:infinite? (λ () (add-tile state3 player-red state3+infinite))
              "drive red player into infinite loop"))
 
@@ -705,8 +744,9 @@
   ;; start player on (port-p, x-p, y-p) that look at an occupied neighboring square
   (define peri? (if to-periphery bordering-periphery? (λ (x y) #f)))
   (match-define (player name port-p x-p y-p) the-player)
+  (define place `(,x-p ,y-p, port-p))
   (let/ec return 
-    (let move-one-player ([port port-p](square (matrix-ref grid x-p y-p))[seen (set `(,x-p ,y-p))])
+    (let move-one-player ([port port-p](square (matrix-ref grid x-p y-p))[seen (set place)])
       (when (and to-periphery (outside? (square port)))
         ;; the player didn't get to the periphery but an open square 
         (return the-player))
@@ -716,10 +756,11 @@
         [(? inf? it)    it]
         [(list port square seen) (move-one-player port square seen)]))))
 
-#; {type Seen = [Setof [List Index Index]]}
+#; {type Seen  = [Setof Place]}
+#; {type Place = [List Index Index Port]}
 
-#; {Index Index Seen -> Boolean}
-(define (seen? x y seen) (set-member? seen `(,x ,y)))
+#; {Place Seen -> Boolean}
+(define (seen? p seen) (set-member? seen p))
 
 #; {Grid Square Port Name Seen -> (U Player (out Player) (inf Player) [List Port Index Index Seen])}
 ;; move player at (x-p, y-p) on player-port to port-in on the neighboring square and then to port-out 
@@ -732,11 +773,12 @@
   (define next-square (matrix-ref grid (next-x next) (next-y next)))
   (define port-out    ((square-tile next-square) port-in))
   (define external    (next-square port-out))
+  (define place       `(,x ,y ,port-out))
   (cond
-    [(open? external) (player name port-out x y)]
-    [(wall? external) (out (player name port-out x y))]
-    [(seen? x y seen) (inf (player name port-out x y))]
-    [else (list port-out (matrix-ref grid x y) (set-add seen `(,x ,y)))]))
+    [(open? external)   (player name port-out x y)]
+    [(wall? external)   (out (player name port-out x y))]
+    [(seen? place seen) (inf (player name port-out x y))]
+    [else (list port-out (matrix-ref grid x y) (set-add seen place))]))
 
 (define grid+  (state-grid state+))
 (define sq-00+  (matrix-ref grid+ 0 0))
@@ -825,7 +867,7 @@
     (values (* x TILE-SIZE)) (* TILE-SIZE y))
 
   #; {State -> Void}
-  (define (show-state s)
+  (define (show-state s #:visible (v #t))
     (define frame (new frame% [label "hello"][width WIDTH][height HEIGHT]))
   
     (define canvas
@@ -833,9 +875,12 @@
            [parent frame]
            [paint-callback (λ (e dc) (state->pict s dc))]))
     
-    (send frame show #t)))
+    (send frame show v)))
 
-; (module+ picts (show-state state3))
+(module+ picts (show-state good-intermediate-state+ #:visible #f))
+; (module+ picts (show-state good-intermediate-state++))
+; (module+ picts (show-state good-intermediate-state+++))
+; (module+ picts (show-state (add-tile good-intermediate-state++ player-red (tile-index->tile 34))))
 
 ;                              
 ;      ;                       
@@ -895,8 +940,7 @@
   
   (def/mp action-pat
     (_ pn ti) #'`(,(? string? pn) ,(tile-pat ti)))
-
-  (define state3-action (list player-red (tile->jsexpr tile-to-add-to-grid-3)))
+  
   (check-true (match state3-action [(action-pat pn ti) #t]))
   (define state3-action-infinite (list player-red (tile->jsexpr state3+infinite)))
   (check-true (match state3-action-infinite [(action-pat pn ti) #t]))
@@ -909,6 +953,7 @@
 
   (define state3-jsexpr (state->jsexpr state3))
   (define good-intermediate-state-jsexpr (state->jsexpr good-intermediate-state))
+  (define good-intermediate-state+++-jsexpr (state->jsexpr good-intermediate-state+++))
   
   (check-false (jsexpr->state (intermediate*->jsexpr bad-intermediate-spec)))
   (check-false (jsexpr->state (intermediate*->jsexpr bad-intermediate-spec-2)))
