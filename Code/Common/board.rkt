@@ -863,21 +863,24 @@
     (draw-pict grid-as-pict dc INSET INSET))
   
   #; {PortIndex Natural Natural -> (values Natural Natural)}
+  #;
   (define (logical-coordinates->geometry port x y)
     (values (* x TILE-SIZE)) (* TILE-SIZE y))
 
   #; {State -> Void}
   (define (show-state s #:visible (v #t))
     (define frame (new frame% [label "hello"][width WIDTH][height HEIGHT]))
-  
+    
     (define canvas
       (new canvas%
            [parent frame]
            [paint-callback (λ (e dc) (state->pict s dc))]))
-    
+    (send canvas on-paint)
+
     (send frame show v)))
 
 (module+ picts (show-state good-intermediate-state+ #:visible #f))
+
 ; (module+ picts (show-state good-intermediate-state++))
 ; (module+ picts (show-state good-intermediate-state+++))
 ; (module+ picts (show-state (add-tile good-intermediate-state++ player-red (tile-index->tile 34))))
