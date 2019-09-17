@@ -47,11 +47,13 @@ exec racket -tm "$0" ${1+"$@"}
   (match next
     [(? eof-object?) (send-message (state->jsexpr state))]
     [(action-pat pn ti)
-     (if (set-member? (survivors state) pn)
-         (actions 
-          (with-handlers ([exn:infinite? (λ (xn) (send-message (fmt INFINITE next)))])
+     (cond
+       [(not (set-member? (survivors state) pn)) (send-message (fmt BAD-ACTION next))]
+       [else
+        (define next-state
+          (with-handlers ([exn:infinite? (λ (xn) (send-message (fmt INFINITE next)) #f)])
             (add-tile state pn (jsexpr->tile ti))))
-         (send-message (fmt BAD-ACTION next)))]
+        (when next-state (actions next-state))])]
     [_ (send-message (fmt NOT-ACTION next))]))
 
 ;; ---------------------------------------------------------------------------------------------------
@@ -64,6 +66,7 @@ exec racket -tm "$0" ${1+"$@"}
   (r-check-equal? main gstate* gstate* "no action good intermediate state")
 
   (r-check-equal? main (list state3-jsexpr state3-action) (list state+-jsexpr) "state3 -> state+")
+  (r-check-exn main (list state3-jsexpr state3-action-infinite) INFINITE "state3 -> I")
 
   (r-check-exn main (list bad-intermediate-spec-jsexpr) ILLF-STATE "bad 1")
   (r-check-exn main (list bad-intermediate-spec-2-jsexpr) ILLF-STATE "bad 2")
