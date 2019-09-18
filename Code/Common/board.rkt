@@ -20,10 +20,11 @@
 ;                                                                 
 ;                                                                 
 ;                                                                 
-  
+
 (require (only-in Tsuro/Code/Common/grid index? SIZE looking-at square-tile))
 (require (only-in Tsuro/Code/Common/tiles tile?))
 (require (only-in Tsuro/Code/Common/port port?))
+(require Tsuro/Code/Common/tokens)
 (require SwDev/Lib/or)
 
 ;                                                                                             
@@ -78,7 +79,7 @@
 (define (make-placement/c label+good?)
   (match-define (list label good?) label+good?)
   [list/dc
-   [t tile?] [n string?] [p port?] [x index?] [y index?]
+   [t tile?] [n color?] [p port?] [x index?] [y index?]
    #:post label (p x y)
    (and (good? x y)
         (player-facing-inward? p x y))])
@@ -230,9 +231,13 @@
  state?
 
  ;; type Player
- #; [name #;string? port #;port? x #;index? y #;index?]
+ #; [name #;color? port #;port? x #;index? y #;index?]
  (struct-out player)
 
+ player-on-tile/c
+ initial-player-on-tile*/c
+ intermediate*/c
+  
  (contract-out 
   [initialize
    ;; creates a state from a list of initial placements 
@@ -242,10 +247,10 @@
   [add-tile
    ;; place a configured tile on the empty square that the player pn neighbors
    ;; EFFECT may raise (exn:infinite String CMS Player) to signal an infinite loop
-   (->i ([s state?][name (s) (and/c string? (curry set-member? (survivors state3)))][t tile?])
+   (->i ([s state?][name (s) (and/c color? (curry set-member? (survivors state3)))][t tile?])
         [result (and/c state? every-player-faces-an-open-square)])]
   
-  [survivors (-> state? (listof string?))]
+  [survivors (-> state? (listof color?))]
 
   [intermediate
    (-> intermediate*/c
@@ -439,7 +444,7 @@
              #:with square #'#f)
     (pattern
      (index (~optional (~seq #:rotate r:degree) #:defaults ([r #'0])) (~optional (~seq n #:on p)))
-     #:declare n     (expr/c #'string?)
+     #:declare n     (expr/c #'color?)
      #:declare p     (expr/c #'port?)
      #:declare index (expr/c #'(</c TILES#))
      #:with tile   #'(rotate-tile (tile-index->tile index.c) #:degree r)
@@ -924,7 +929,7 @@
 
   ;; -------------------------------------------------------------------------------------------------
   (def/mp init-pat
-    (_ t n p x y) #'`(,(tile-pat t) ,(? string? n) ,(port-pat p) ,(? index? x) ,(? index? y)))
+    (_ t n p x y) #'`(,(tile-pat t) ,(? color? n) ,(port-pat p) ,(? index? x) ,(? index? y)))
   (def/mp intermediate-pat
     (_ ti-d x y) #'`(,(tile-pat ti-d) ,(? index? x) ,(? index? y)))
   (def/mp state-pat
@@ -942,7 +947,7 @@
       [else #f]))
   
   (def/mp action-pat
-    (_ pn ti) #'`(,(? string? pn) ,(tile-pat ti)))
+    (_ pn ti) #'`(,(? color? pn) ,(tile-pat ti)))
   
   (check-true (match state3-action [(action-pat pn ti) #t]))
   (define state3-action-infinite (list player-red (tile->jsexpr state3+infinite)))
