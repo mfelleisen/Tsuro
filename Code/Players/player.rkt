@@ -4,8 +4,10 @@
 
 (define strategy/c
   (class/c 
-   (initial   (-> color? initial-player-on-tile*/c tile-index? tile-index? tile-index? init-action/c))
-   [take-turn (-> color? intermediate*/c tile-index? tile-index? turn-action/c)]))
+   (initial
+    (->m color? initial-player-on-tile*/c tile-index? tile-index? tile-index? init-action/c))
+   [take-turn
+    (->m color? intermediate*/c tile-index? tile-index? turn-action/c)]))
 
 (define internal%/c (class/c {init-field [strategy strategy/c]}))
 
@@ -50,4 +52,18 @@
     [define/public (end-of-tournament results)
       (void)]
     
+    (super-new)))
+
+
+(define first-strategy
+  (class object%
+    
+    (define/public (initial my-name-for-game tiles-placed-so-far tile1 tile2 tile3)
+      (define board (initialize tiles-placed-so-far))
+      (define spot  (find-first-free-spot board))
+      (cons my-name-for-game spot))
+
+    (define (take-turn my-name-for-game tiles-placed-so-far tile1 tile2)
+      (list tile1 0))
+
     (super-new)))
