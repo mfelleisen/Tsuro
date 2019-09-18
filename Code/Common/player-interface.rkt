@@ -4,7 +4,15 @@
 
 (provide
  ;; a contract that describes the player class's interface to the administrator 
- player%/c)
+ player%/c
+
+ init-action/c
+
+ turn-action/c
+
+ (all-from-out Tsuro/Code/Common/board)
+ (all-from-out Tsuro/Code/Common/tiles)
+ (all-from-out Tsuro/Code/Common/tokens))
 
 ;; ---------------------------------------------------------------------------------------------------
 (require Tsuro/Code/Common/board)
