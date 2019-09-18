@@ -15,14 +15,21 @@ This directory implements a distributed Tsuro game
 
 [x] JSON de/serialization of map 	  
 
-[ ] batch test harness for board 
+[x] batch test harness for board 
+  - get all players thrown out? 
   
 [ ] legal move: suicide, circular paths? 
 
-[ ] the referee 
-
 [ ] the player 
   - is placing a tile in some orientation a "good thing" 
+
+[ ] strategy 
+
+[ ] the referee 
+
+[ ] observers, which level? 
+
+[ ] change ports 
 
 [ ] the game administrator 
 
