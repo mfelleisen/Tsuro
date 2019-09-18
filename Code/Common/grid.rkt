@@ -26,7 +26,7 @@
   (-> index? index? [listof (list/c index? index?)])]
 
  [looking-at
-  (-> port? index? index? (values index? index?))]
+  (-> port? index? index? (values integer? integer?))]
 
  ;; data examples 
  [grid3 grid?])
