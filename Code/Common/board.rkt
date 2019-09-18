@@ -42,7 +42,7 @@
 ;                                                    ;                                        
 ;                                                    ;
 
-#; {Location = [List Index Index]}
+#; {type Location = [List Index Index]}
 
 #; ({Any -> Any : X} ([Listof X] -> Boolean) -> Contract)
 (define (make-list-of-places-ctc items/c ctc)
@@ -118,11 +118,16 @@
 
 #; {InitialTile** -> Boolean : distinct non-neighboring locations}
 (define (no-neighbors? tile-spec)
-  (for/and ((t (in-list tile-spec)))
-    (define loc (place-of t))
-    (define all-but (remove loc tile-spec))
+  (define tile-locs (map place-of tile-spec))
+  (for/and ((loc (in-list tile-locs)))
+    (define all-but (remove loc tile-locs))
     (for/and ((n (apply neighbor-locations loc)))
       (not (member n all-but)))))
+
+(module+ test
+  (define (inits0 x) `[ [,(tile-index->tile 1) "white" 4 0 0] [,(tile-index->tile 1) "red" 2 ,x 0] ])
+  (check-true (no-neighbors? (inits0 2)) "2 leaves one empty square")
+  (check-false (no-neighbors? (inits0 1)) "1 means there are neigbors"))
 
 (define player-on-tile/c (make-placement/c at-periphery-facing-inward))
 (define initial-player-on-tile*/c (make-list-of-places-ctc player-on-tile/c no-neighbors?))
@@ -191,7 +196,7 @@
 (define (every-player-faces-an-open-square s)
   (match-define (state grid players) s)
   (for/and ((p (in-set players)))
-    (match-define  (player name port x y)      p)
+    (match-define (player name port x y) p)
     (define-values (x-look y-look) (looking-at port x y))
     (boolean? (matrix-ref grid x-look y-look))))
 
@@ -225,6 +230,8 @@
 ;                 ;                                 
 ;                 ;
 
+(define spot/c (list/c port? index? index?))
+
 (provide
  ;; type State
  ;; all players are on ports that face empty squares on the grid 
@@ -242,6 +249,11 @@
   [initialize
    ;; creates a state from a list of initial placements 
    (-> initial-player-on-tile*/c (and/c state? every-player-faces-an-open-square))]
+
+  [find-first-free-spot
+   ;; search in clock-wise fashion starting from (0,0), a first square w/o neighbors at the periphery
+   ;; search in clock-wise fashion from the left port on the NORTH side that faces inward 
+   (-> state? spot/c)]
   
   [exn:infinite? (-> any/c boolean?)]
   [add-tile
@@ -535,6 +547,44 @@
 (module+ test ;; initialize 
   (check-exn exn:fail:contract? (λ () (initialize `((,tile-00 "x" 2 0 0)))) "port, not index")
   (check-equal? (initialize inits-for-state-with-3-players) state3))
+
+(define (find-first-free-spot s0)
+  (match-define (state grid players) s0)
+  (let loop ([loc (list 0 0)])
+    (if (free-for-init grid loc) (cons (pick-port loc) loc) (loop (next-coordinate loc)))))
+
+#; {Grid Location -> Boolean}
+(define (free-for-init grid loc)
+  (for/and ((n (cons loc (apply neighbor-locations loc))))
+    (not (apply matrix-ref grid n))))
+
+#; {Location -> Location}
+(define (next-coordinate loc)
+  (define-values (x y) (apply values loc))
+  (cond
+    [(and (< (+ x 1) SIZE) (= y 0))          (list (+ x 1) 0)]
+    [(and (= (+ x 1) SIZE) (< (+ y 1) SIZE)) (list x (+ y 1))]
+    [(and (> x 0) (= (+ y 1) SIZE))          (list (- x 1) y)]
+    [(and (= x 0) (>  y 0))                  (list x (- y 1))]
+    [else (error 'find-first-free-spot "out of free periphery positions")]))
+
+#; {Location -> Port}
+;; ASSUME no neighboring tile 
+(define (pick-port loc)
+  (define n (apply neighbor-locations loc))
+  (for/first ((p (in-list PORTS)) #:when (apply player-facing-inward? p loc)) p))
+
+(module+ test
+  (define-syntax-rule (checks init0 spot1 (color p x y) ...)
+    (let*-values ([(init spot) (values init0 spot1)]
+                  [(init spot)
+                   (let ([c (~a 'color)])
+                     (check-equal? (find-first-free-spot (initialize init)) spot c)
+                     (values (cons (list* tile-00 c spot) init) (list (index->port p) x y)))]
+                  ...)
+      (check-equal? (find-first-free-spot (initialize init)) spot "last one")))
+
+  (checks '() `(,port-red 0 0) (red 2 2 0) (black 2 4 0) (blue 2 6 0) (white 2 8 0) (green 0 9 1)))
 
 ;                                                                                      
 ;                                                        ;                             

@@ -15,6 +15,10 @@
    - because it did not keep track of the port in addition to (x,y) 
    - adding a test that moved a player 3 times accidentally discovered it
 
+4. in Common/board 
+   - no-neighbors? removed a location from a list of tile specs
+   - TYPES would have caught this one 
+
 ### Design Bugs 
 
 1. equality for tiles was flawed 
