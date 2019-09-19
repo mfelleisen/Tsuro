@@ -12,6 +12,10 @@
     "typed-racket-more"
     "rackunit-lib"
     "rackunit-lib"
+    "SwDev"
+    "pict-lib"
+    "htdp-lib"
+    "wxme-lib"
     ))
 
 ;; json-type-provider
