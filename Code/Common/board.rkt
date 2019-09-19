@@ -519,6 +519,21 @@
                  [[tile-02-index "white" #:on port-white]])
                 state3))
 
+(define like-state-dsl
+  (state-from ((34 "red" #:on port-red) #f (34 #:rotate 90 "blue" #:on port-blue))
+              ([33 #:rotate 180])
+              ((33 #:rotate 180 "white" #:on port-white))))
+
+(define state-dsl
+  (state-from ((34 "red" #:on port-red) #f (34 #:rotate 90 "blue" #:on port-blue))
+              (33)
+              ((33 #:rotate 180 "white" #:on port-white))))
+
+(module+ test
+  (check-equal? like-state-dsl state-dsl)
+  (check-false (equal? like-state-dsl state-dsl)))
+
+
 ;                                                                        
 ;                                                                        
 ;      ;             ;     ;       ;          ;;;       ;                
@@ -667,7 +682,7 @@
               (33)
               ((33 #:rotate 180 "white" #:on port-white))))
 
-(module+ test ;; testing intermediate's results 
+(module+ test ;; testing intermediate's results
   (check-true (every-player-faces-an-open-square      (intermediate-aux good-intermediate-spec)))
   (check-true (every-player-can-leave-going-backwards (intermediate-aux good-intermediate-spec)))
   (check-equal? (intermediate good-intermediate-spec) good-intermediate-state))
@@ -937,6 +952,10 @@
 (module+ picts (show-state good-intermediate-state+ #:visible #f))
 
 ; (module+ picts (show-state good-intermediate-state++))
+
+(module+ picts (show-state like-state-dsl))
+(module+ picts (show-state state-dsl))
+
 ; (module+ picts (show-state good-intermediate-state+++))
 ; (module+ picts (show-state (add-tile good-intermediate-state++ player-red (tile-index->tile 34))))
 
