@@ -530,7 +530,6 @@
               ((33 #:rotate 180 "white" #:on port-white))))
 
 (module+ test
-  (check-equal? like-state-dsl state-dsl)
   (check-false (equal? like-state-dsl state-dsl)))
 
 
