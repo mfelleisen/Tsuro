@@ -562,10 +562,11 @@
   (check-exn exn:fail:contract? (λ () (initialize `((,tile-00 "x" 2 0 0)))) "port, not index")
   (check-equal? (initialize inits-for-state-with-3-players) state3))
 
+;; ---------------------------------------------------------------------------------------------------
 (define (find-first-free-spot s0)
   (match-define (state grid players) s0)
   (let loop ([loc (list 0 0)])
-    (if (free-for-init grid loc) (cons (pick-port loc) loc) (loop (next-coordinate loc)))))
+    (if (free-for-init grid loc) (cons (pick-port loc) loc) (loop (clock-wise loc)))))
 
 #; {Grid Location -> Boolean}
 (define (free-for-init grid loc)
@@ -573,13 +574,22 @@
     (not (apply matrix-ref grid n))))
 
 #; {Location -> Location}
-(define (next-coordinate loc)
+(define (clock-wise loc)
   (define-values (x y) (apply values loc))
   (cond
     [(and (< (+ x 1) SIZE) (= y 0))          (list (+ x 1) 0)]
     [(and (= (+ x 1) SIZE) (< (+ y 1) SIZE)) (list x (+ y 1))]
     [(and (> x 0) (= (+ y 1) SIZE))          (list (- x 1) y)]
     [(and (= x 0) (>  y 0))                  (list x (- y 1))]
+    [else (error 'find-first-free-spot "out of free periphery positions")]))
+
+(define (counter-clock-wise loc)
+  (define-values (x y) (apply values loc))
+  (cond
+    [(and (= x 0) (< (+ y 1) SIZE))          (list x (+ y 1))]
+    [(and (< (+ x 1) SIZE) (= (+ y 1) SIZE)) (list (+ x 1) y)]
+    [(and (= (+ x 1) SIZE) (> y 0))          (list x (- y 1))]
+    [(and (> x 0) (= y 0))                   (list (- x 1) y)]
     [else (error 'find-first-free-spot "out of free periphery positions")]))
 
 #; {Location -> Port}
