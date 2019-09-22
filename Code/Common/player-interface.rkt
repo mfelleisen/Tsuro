@@ -1,30 +1,29 @@
 #lang racket
 
-;; on the Administrative side, the player has contact with an administrator and many referees
+;; on the Administrative side, the player has contact with
+;; -- an tournament administrator
+;; -- many referees
+;; so there are two interfaces and a combined one for the implementor of the component 
 
 (provide
  ;; a contract that describes the player class's interface to the administrator 
  player%/c
+ admin-player%/c
+ referee-player%/c
 
- init-action/c
-
- turn-action/c
-
+ (all-from-out Tsuro/Code/Common/actions)
  (all-from-out Tsuro/Code/Common/board)
  (all-from-out Tsuro/Code/Common/tiles)
  (all-from-out Tsuro/Code/Common/tokens))
 
 ;; ---------------------------------------------------------------------------------------------------
+(require Tsuro/Code/Common/actions)
 (require Tsuro/Code/Common/board)
 (require Tsuro/Code/Common/tiles)
 (require Tsuro/Code/Common/tokens)
 
 ;; ---------------------------------------------------------------------------------------------------
-
-(define init-action/c player-on-tile/c)
-
-(define turn-action/c (list/c tile-index? degree?)) 
-
+ 
 (define referee-player%/c
   (class/c
    [playing-as   (->m color? any)]
