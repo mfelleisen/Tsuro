@@ -19,6 +19,12 @@
    - no-neighbors? removed a location from a list of tile specs
    - TYPES would have caught this one 
 
+5. in Common/board and Common/grid 
+   - I had convinced myself that at most one player could be on a square: WRONG 
+   - discovered while adding a feature to state->pict for showing multiple players on one tile
+   - this also affected the JSON representation of intermediate boards, and its contracts
+
+
 ### Design Bugs 
 
 1. equality for tiles was flawed 
