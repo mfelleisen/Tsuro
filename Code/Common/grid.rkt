@@ -18,23 +18,23 @@
 
  #; {Grid Tile Index Index -> Grid}
  (contract-out
- [add-new-square-update-neighbors
-  ;; "update neighbors" means inform neighbor squares about the new one 
-  (-> grid? tile? index? index? grid?)]
+  [add-new-square-update-neighbors
+   ;; "update neighbors" means inform neighbor squares about the new one 
+   (-> grid? tile? index? index? grid?)]
 
- [neighbor-locations
-  (-> index? index? [listof (list/c index? index?)])]
+  [neighbor-locations
+   (-> index? index? [listof (list/c index? index?)])]
 
- [looking-at
-  (-> port? index? index? (values integer? integer?))]
+  [looking-at
+   (-> port? index? index? (values integer? integer?))]
 
- ;; data examples 
- [grid3 grid?])
+  ;; data examples 
+  [grid3 grid?])
  
  #; {type Square = BLANK || [Port -> Next]}
  BLANK
  (contract-out
-   [square-tile (-> square? tile?)])
+  [square-tile (-> square? tile?)])
 
  #; {type Next = open? || wall? || next?}
  (contract-out
@@ -50,8 +50,18 @@
  square-02
  square-20)
 
-(module+ picts 
-  (provide square->pict))
+(module+ picts
+  (require Tsuro/Code/Common/tokens)
+
+  (define ((empty-if-blank sq) on-sq) (or (not (equal? sq BLANK)) (empty? on-sq)))
+
+  (provide
+   (contract-out
+    [square->pict
+     ;; if square is BLANK, p must be '()
+     (->i ([sq (or/c BLANK square?)]
+           [on-sq (sq) (and/c (listof (list/c color? port?)) (empty-if-blank sq))])
+          [r pict?])])))
 
 ;                                                                                      
 ;       ;                                  ;                                           
@@ -74,13 +84,14 @@
 (require SwDev/Lib/should-be-racket)
 (require pict)
 
-(module+ test
-  (require (submod ".."))
-  (require rackunit))
-
 (module+ picts
   (require (except-in (submod Tsuro/Code/Common/tiles picts) table))
   (require pict))
+
+(module+ test
+  (require (submod ".." picts))
+  (require (submod ".."))
+  (require rackunit))
 
 ;                                                                 
 ;       ;                                  ;            ;;        
@@ -162,7 +173,7 @@
 
 #; {Grid Index Index -> [Listof Location]}
 ;; determine (occupied) neighbors of the square at (x,y)
- (define (neighbors* grid x y)
+(define (neighbors* grid x y)
   (filter (match-lambda [`(,x ,y) (matrix-ref grid x y)]) (neighbor-locations x y)))
 
 #;
@@ -365,10 +376,23 @@
 (module+ picts   
   (define PLAYER-SIZE (quotient TILE-SIZE 5)) 
 
-  #; {Square (U False [List Color Port]) -> Pict}
+  #; {Square [Listof [List Color Port]] -> Pict}
+  ;; if square is BLANK, p must be '()
   (define (square->pict square p)
-    (define tile (or (and (not (equal? BLANK square)) (square-tile square)) blank-tile))
-    (define pict (tile->pict tile))
-    (match p
-      [#f pict]
-      [(list color port) (add-player pict (jack-o-lantern PLAYER-SIZE color) port)])))
+    (define tile (or (and (equal? BLANK square) blank-tile) (square-tile square)))
+    (match-define (list (list colors ports) ...) p)
+    (define-values (pict _)
+      (for/fold ([pict (tile->pict tile)][seen '()]) ([c colors][p ports])
+        (define often (memf (curry equal? p) seen))
+        (define jack (jack-o-lantern (- PLAYER-SIZE (* 3 (if often (length often) 0))) c))
+        (values (add-player pict jack p) (cons p seen))))
+    pict))
+
+(module+ test
+  (square->pict BLANK '())
+  (define two (index->port 2))
+  (square->pict square-00 '())
+  (square->pict square-00 `[("blue" ,two)])
+  (square->pict square-00 `[["blue" ,two] ["white" ,(index->port 1)]])
+  (square->pict square-00 `[["blue" ,two] ["white" ,two]])
+  (square->pict square-00 `[["blue" ,two] ["white" ,two] ["red" ,two]]))

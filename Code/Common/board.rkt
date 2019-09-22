@@ -5,7 +5,6 @@
 ;; TDOO:
 ;; -- can init and intermediate tiles accept rotated tiles? 
 
-
 ;                                                                 
 ;                                                                 
 ;                          ;                           ;          
@@ -47,18 +46,7 @@
 #; ({Any -> Any : X} ([Listof X] -> Boolean) -> Contract)
 (define (make-list-of-places-ctc items/c ctc)
   (and/c [listof items/c]
-         locations-distinct
          ctc))
-
-#; {[Listof Intermediate] -> Boolean : locations are distinct }
-(define (locations-distinct specifications)
-  (define locations (map place-of specifications))
-  (= (length locations) (set-count (apply set locations))))
-
-#; {Intermediate -> [List Index Index]}
-(define (place-of x) ;; this is a trick; I should place the Index parts first and second 
-  (define r (reverse x))
-  (list (second r) (first r)))
 
 ;                                                                                                    
 ;                                                                                                    
@@ -95,42 +83,6 @@
 
 (define at-periphery-facing-inward (list "at-periphery-facing-inward" bordering-periphery?))
 (define facing-inward (list "facing-inward" (λ (x y) #t)))
-
-;                                                                                      
-;                                                                                      
-;                    ;             ;     ;       ;          ;;;       ;                
-;                                        ;                    ;                        
-;                  ;;;   ; ;;    ;;;   ;;;;;   ;;;   ;;;;     ;     ;;;   ;;;;;   ;;;  
-;                    ;   ;;  ;     ;     ;       ;       ;    ;       ;       ;  ;;  ; 
-;                    ;   ;   ;     ;     ;       ;       ;    ;       ;      ;   ;   ;;
-;   ;;;;;;           ;   ;   ;     ;     ;       ;    ;;;;    ;       ;     ;    ;;;;;;
-;                    ;   ;   ;     ;     ;       ;   ;   ;    ;       ;    ;     ;     
-;                    ;   ;   ;     ;     ;       ;   ;   ;    ;       ;   ;      ;     
-;                  ;;;;; ;   ;   ;;;;;   ;;;   ;;;;;  ;;;;     ;;   ;;;;; ;;;;;   ;;;; 
-;                                                                                      
-;                                                                                      
-;                                                                                      
-
-;; initial placements
-
-#; {InitialTile** = [Listof PlayerOnTile] s.t. distinct non-neigboring locs}
-#; {PlayerOnTile  = [List Tile PlayerName PortIndex Index Index] s.t. constraints}
-
-#; {InitialTile** -> Boolean : distinct non-neighboring locations}
-(define (no-neighbors? tile-spec)
-  (define tile-locs (map place-of tile-spec))
-  (for/and ((loc (in-list tile-locs)))
-    (define all-but (remove loc tile-locs))
-    (for/and ((n (apply neighbor-locations loc)))
-      (not (member n all-but)))))
-
-(module+ test
-  (define (inits0 x) `[ [,(tile-index->tile 1) "white" 4 0 0] [,(tile-index->tile 1) "red" 2 ,x 0] ])
-  (check-true (no-neighbors? (inits0 2)) "2 leaves one empty square")
-  (check-false (no-neighbors? (inits0 1)) "1 means there are neigbors"))
-
-(define player-on-tile/c (make-placement/c at-periphery-facing-inward))
-(define initial-player-on-tile*/c (make-list-of-places-ctc player-on-tile/c no-neighbors?))
 
 ;                                                                                                    
 ;                                                                      ;                             
@@ -174,7 +126,82 @@
 (define tile/c (list/c tile? index? index?))
 (define player-on-any-tile/c (make-placement/c facing-inward))
 (define either-or (or/c tile/c player-on-any-tile/c))
-(define intermediate*/c (make-list-of-places-ctc either-or occupied-periphery-or-2-neighbors))
+
+#; {Intermediate -> [List Index Index]}
+(define (place-of x) ;; this is a trick; I should place the Index parts first and second 
+  (define r (reverse x))
+  (list (second r) (first r)))
+
+#; {Intermediate -> Boolean}
+(define (distinct-x-y-or-player-on=same-tile-different-port intermediates0)
+  (let loop ([intermediates intermediates0]
+             #; [Listof [List [List Index Index] [List Tile Port]]]
+             [seen '()])
+    (cond
+      [(empty? intermediates) #true]
+      [else 
+       (match (first intermediates)
+         [(list tile player port x y)
+          (define place (list x y))
+          (match (assoc place seen)
+            [(? boolean?)
+             (loop (rest intermediates) (cons (list place (list tile port)) seen))]
+            [(list _ 'plain)
+             #f]
+            [(list _ (list t p))
+             (and (equal? tile t) (not (equal? port p))
+                  (loop (rest intermediates) (cons (list place (list tile port)) seen)))])]
+         [(list tile x y)
+          (define place (list x y))
+          (and (not (assoc place seen))
+               (loop (rest intermediates) (cons (list place 'plain) seen)))])])))
+
+(define intermediate*/c
+  (make-list-of-places-ctc
+   either-or
+   (and/c occupied-periphery-or-2-neighbors distinct-x-y-or-player-on=same-tile-different-port)))
+;                                                                                      
+;                                                                                      
+;                    ;             ;     ;       ;          ;;;       ;                
+;                                        ;                    ;                        
+;                  ;;;   ; ;;    ;;;   ;;;;;   ;;;   ;;;;     ;     ;;;   ;;;;;   ;;;  
+;                    ;   ;;  ;     ;     ;       ;       ;    ;       ;       ;  ;;  ; 
+;                    ;   ;   ;     ;     ;       ;       ;    ;       ;      ;   ;   ;;
+;   ;;;;;;           ;   ;   ;     ;     ;       ;    ;;;;    ;       ;     ;    ;;;;;;
+;                    ;   ;   ;     ;     ;       ;   ;   ;    ;       ;    ;     ;     
+;                    ;   ;   ;     ;     ;       ;   ;   ;    ;       ;   ;      ;     
+;                  ;;;;; ;   ;   ;;;;;   ;;;   ;;;;;  ;;;;     ;;   ;;;;; ;;;;;   ;;;; 
+;                                                                                      
+;                                                                                      
+;                                                                                      
+
+;; initial placements: MUST BE PLACE BELOW INTERMEDIATE 
+
+#; {InitialTile** = [Listof PlayerOnTile] s.t. distinct non-neigboring locs}
+#; {PlayerOnTile  = [List Tile PlayerName PortIndex Index Index] s.t. constraints}
+
+#; {InitialTile** -> Boolean : distinct non-neighboring locations}
+(define (no-neighbors? tile-spec)
+  (define tile-locs (map place-of tile-spec))
+  (for/and ((loc (in-list tile-locs)))
+    (define all-but (remove loc tile-locs))
+    (for/and ((n (apply neighbor-locations loc)))
+      (not (member n all-but)))))
+
+(module+ test
+  (define (inits0 x) `[ [,(tile-index->tile 1) "white" 4 0 0] [,(tile-index->tile 1) "red" 2 ,x 0] ])
+  (check-true (no-neighbors? (inits0 2)) "2 leaves one empty square")
+  (check-false (no-neighbors? (inits0 1)) "1 means there are neigbors"))
+
+(define player-on-tile/c (make-placement/c at-periphery-facing-inward))
+
+#; {[Listof Intermediate] -> Boolean : locations are distinct }
+(define (distinct-x-y specifications)
+  (define locations (map place-of specifications))
+  (= (length locations) (set-count (apply set locations))))
+
+(define initial-player-on-tile*/c
+  (make-list-of-places-ctc player-on-tile/c (and/c no-neighbors? distinct-x-y)))
 
 ;                                                   
 ;                                                   
@@ -213,7 +240,6 @@
          (out? (move-one-player grid player-moved-to-exit-port #:to-periphery? #t)))))
 
 ;; for tests of contracts, see below data examples 
-
 
 ;                                                   
 ;                                                   
@@ -377,6 +403,23 @@
 
 (define (survivors s)
   (map player-name (set->list (state-players s))))
+
+(define (players-are-on-distinct-places s)
+  (match-define (state _ players) s)
+  (define places
+    (for/set ((p (in-set players)))
+      (match-define (player _ port x y) p)
+      (list port x y)))
+  (= (set-count players) (set-count places)))
+
+(module+ test
+  (define (player-set other) (set (player "red" (index->port 0) 1 1) other))
+  (define true-player  (player-set (player "blue" (index->port 2) 2 2)))
+  (define false-player (player-set (player "blue" (index->port 0) 1 1)))
+
+  (check-true (players-are-on-distinct-places (state '() true-player)))
+  (check-false (players-are-on-distinct-places (state '() false-player))))
+
 
 ;                                                                                             
 ;       ;                                                                                     
@@ -777,6 +820,28 @@
   (check-exn exn:infinite? (λ () (add-tile state3 player-red state3+infinite))
              "drive red player into infinite loop"))
 
+(define collision-state
+  (state-from (#f                                [34 "blue" #:on (index->port 4)])
+              ([34 "white" #:on (index->port 2)] )))
+
+(define collision-tile (tile-index->tile 4))
+
+(define simultaneous-state
+  (state-from (#f                                [34 "blue" #:on (index->port 4)])
+              ([34 "white" #:on (index->port 3)] )))
+
+(define simultaneous-state++
+  (let* ([s (state-from (#f 34)
+                        (34 [4 "blue" #:on (index->port 2)]))]
+         [p (state-players s)]
+         [p (set-add p (player "white" (index->port 5) 1 1))])
+    (state (state-grid s) p)))
+    
+
+(module+ test
+  (check-false (players-are-on-distinct-places (add-tile collision-state "blue" collision-tile)))
+  (check-equal? (add-tile simultaneous-state "blue" collision-tile) simultaneous-state++))
+
 ;                                                                                                    
 ;                                                                                                    
 ;                           ;                               ;;;                                      
@@ -826,14 +891,17 @@
   (define place `(,x-p ,y-p, port-p))
   (let/ec return 
     (let move-one-player ([port port-p](square (matrix-ref grid x-p y-p))[seen (set place)])
-      (when (and to-periphery (outside? (square port)))
+      (when (and to-periphery (open? (square port)))
         ;; the player didn't get to the periphery but an open square 
-        (return the-player))
+        (return #false))
       (match (move-player-one-square grid square port name seen)
         [(? player? it) it]
         [(? out? it)    it]
         [(? inf? it)    it]
-        [(list port square seen) (move-one-player port square seen)]))))
+        [(list port x y seen)
+         (when (and to-periphery (bordering-periphery? x y))
+           (return (out the-player)))
+         (move-one-player port (matrix-ref grid x y) seen)]))))
 
 #; {type Seen  = [Setof Place]}
 #; {type Place = [List Index Index Port]}
@@ -857,7 +925,7 @@
     [(open? external)   (player name port-out x y)]
     [(wall? external)   (out (player name port-out x y))]
     [(seen? place seen) (inf (player name port-out x y))]
-    [else (list port-out (matrix-ref grid x y) (set-add seen place))]))
+    [else (list port-out x y (set-add seen place))]))
 
 (define grid+  (state-grid state+))
 (define sq-00+  (matrix-ref grid+ 0 0))
@@ -896,13 +964,10 @@
 ;                         ;  ;                                    
 ;                          ;;                                     
 
-#; {Player* Natural Natural -> (U False Player)}
+#; {Player* Natural Natural -> [Listof [List Color Port]]}
 (define (is-player-on players x y)
   (define p (set-member players (λ (p) (match-define (player _ _ x0 y0) p) (and (= x x0) (= y y0)))))
-  (cond
-    [(set-empty? p) #f]
-    [else (define p-on-x-y (set-first p))
-          (list (player-name p-on-x-y) (player-port p-on-x-y))]))
+  (for/list ((p-on-x-y (in-set p))) (list (player-name p-on-x-y) (player-port p-on-x-y))))
 
 ;                                     
 ;                                     
@@ -920,8 +985,6 @@
 ;   ;                                 
 
 (module+ picts
-  (require (submod Tsuro/Code/Common/tiles picts))
-  (require (submod Tsuro/Code/Common/grid picts))
   (define INSET  (+ 20 TILE-SIZE))
   (define WIDTH  (+ INSET (* 10 TILE-SIZE) INSET))
   (define HEIGHT (+ INSET (* 10 TILE-SIZE) INSET))
@@ -941,11 +1004,6 @@
            (vl-append (apply hc-append picts) (loop (rest l) (+ y 1)))])))
     (draw-pict grid-as-pict dc INSET INSET))
   
-  #; {PortIndex Natural Natural -> (values Natural Natural)}
-  #;
-  (define (logical-coordinates->geometry port x y)
-    (values (* x TILE-SIZE)) (* TILE-SIZE y))
-
   #; {State -> Void}
   (define (show-state s #:visible (v #t))
     (define frame (new frame% [label "hello"][width WIDTH][height HEIGHT]))
@@ -962,8 +1020,15 @@
 
 ; (module+ picts (show-state good-intermediate-state++))
 
-(module+ picts (show-state like-state-dsl))
-(module+ picts (show-state state-dsl))
+(module+ picts ;; demonstrate collision 
+  (define cs (add-tile collision-state "blue" collision-tile))
+  (show-state collision-state)
+  (show-state cs)
+
+  (show-state simultaneous-state++))
+
+; (module+ picts (show-state like-state-dsl))
+; (module+ picts (show-state state-dsl))
 
 ; (module+ picts (show-state good-intermediate-state+++))
 ; (module+ picts (show-state (add-tile good-intermediate-state++ player-red (tile-index->tile 34))))
@@ -983,20 +1048,25 @@
 ;      ;                       
 ;    ;;
 
+
 (module+ json
 
   ;; -------------------------------------------------------------------------------------------------
   (define (state->jsexpr s)
     (define players (state-players s))
-    (matrix-where (state-grid s) (λ (sq x y) sq) (square->jsexpr players)))
+    (apply append (matrix-where (state-grid s) (λ (sq x y) sq) (square->jsexpr players))))
 
-  #; {Player* -> [Square Index Index -> JSexpr]}
+  #; {Player* -> [Square Index Index -> [Listof JSexpr]]}
   ;; does not belong into square.rkt because that one doesn't know about (x,y)
   (define ((square->jsexpr players) sq x y)
     (define tj (tile->jsexpr (square-tile sq)))
-    (match (is-player-on players x y)
-      [(? boolean?) (list tj x y)]
-      [(list name port) (list tj name (port->jsexpr port) x y)]))
+    (define players-on-x-y (is-player-on players x y))
+    (match players-on-x-y
+      ['() (list (list tj x y))]
+      [(list (list names ports) ...)
+       ;; all pprts are distinct
+       (for/list ((name names) (port ports))
+         (list tj name (port->jsexpr port) x y))]))
 
   (define (intermediate*->jsexpr intermediates)
     (for/list ((i intermediates))
@@ -1033,9 +1103,14 @@
 
   (define state+-jsexpr (state->jsexpr state+))
 
+  (define simultaneous-state++-jsexpr (state->jsexpr simultaneous-state++))
+
+  (check-true (distinct-x-y-or-player-on=same-tile-different-port simultaneous-state++-jsexpr))
+
   ;; -------------------------------------------------------------------------------------------------
   (check-equal? (jsexpr->state (state->jsexpr state3)) state3)
   (check-equal? (jsexpr->state (state->jsexpr good-intermediate-state)) good-intermediate-state)
+  (check-equal? (jsexpr->state (state->jsexpr simultaneous-state++)) simultaneous-state++)
 
   (define state3-jsexpr (state->jsexpr state3))
   (define good-intermediate-state-jsexpr (state->jsexpr good-intermediate-state))
