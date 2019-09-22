@@ -7,10 +7,11 @@
  turn-action/c)
 
 ;; -----------------------------------------------------------------------------
-(require Tsuro/Code/Common/board)
+(require Tsuro/Code/Common/grid)
 (require Tsuro/Code/Common/tiles)
+(require Tsuro/Code/Common/port)
 
 ;; -----------------------------------------------------------------------------
-(define init-action/c player-on-tile/c)
+(define init-action/c (list/c (list/c tile-index? degree?) port? index? index?))
 
 (define turn-action/c (list/c tile-index? degree?))
