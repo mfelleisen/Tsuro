@@ -56,6 +56,9 @@
   (define ((empty-if-blank sq) on-sq) (or (not (equal? sq BLANK)) (empty? on-sq)))
 
   (provide
+
+   tile+players->pict 
+
    (contract-out
     [square->pict
      ;; if square is BLANK, p must be '()
@@ -319,7 +322,6 @@
 (define square-02 (the-one-square (add-square '() tile-02 0 2)))
 (define square-20 (the-one-square (add-square '() tile-20 2 0)))
 
-
 ;                                                                 
 ;       ;                                                         
 ;       ;           ;                                             
@@ -380,6 +382,10 @@
   ;; if square is BLANK, p must be '()
   (define (square->pict square p)
     (define tile (or (and (equal? BLANK square) blank-tile) (square-tile square)))
+    (tile+players->pict tile p))
+
+  #; {Tile [Listof [List Color Port]] -> Pict}
+  (define (tile+players->pict tile p)
     (match-define (list (list colors ports) ...) p)
     (define-values (pict _)
       (for/fold ([pict (tile->pict tile)][seen '()]) ([c colors][p ports])
@@ -396,3 +402,7 @@
   (square->pict square-00 `[["blue" ,two] ["white" ,(index->port 1)]])
   (square->pict square-00 `[["blue" ,two] ["white" ,two]])
   (square->pict square-00 `[["blue" ,two] ["white" ,two] ["red" ,two]]))
+
+(module+ homework
+  (require (submod ".." picts))
+  (provide tile+players->pict blank-tile))
