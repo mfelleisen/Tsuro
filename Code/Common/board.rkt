@@ -746,13 +746,13 @@
   (define-syntax-rule (checks-place init0 spot1 (color p x y) ...)
     (let*-values ([(init spot) (values init0 spot1)]
                   [(init spot)
-                   (let ([c (~a 'color)])
-                     (check-true (initial-state? (place-first-tile (initialize init) c tile-00 spot)) c)
+                   (let ([c (~a 'color)] [new-state (initialize init)])
+                     (check-true (initial-state? (place-first-tile new-state c tile-00 spot)) c)
                      (values (cons (list* tile-00 c spot) init) (list (index->port p) x y)))]
                   ...)
       (check-equal? (find-first-free-spot (initialize init)) spot "last one")))
 
-  (checks-place '() `(,port-red 0 0) (red 2 2 0) (black 2 4 0) (blue 2 6 0) (white 2 8 0) (green 0 9 1)))
+  (checks-place '() `(,port-red 0 0) (red 2 2 0) (black 2 4 0) (blue 2 6 0) (white 2 8 0)))
 
 
 ;                                                                                      
