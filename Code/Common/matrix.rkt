@@ -5,6 +5,7 @@
  matrix-set
  matrix-ref
  matrix->rectangle
+ matrix-andmap
  matrix-where)
 
 (require (only-in htdp/matrix build-matrix matrix->rectangle))
@@ -25,6 +26,17 @@
            (f n x y)))
        (append picts (loop (rest l) (+ x 1)))])))
 
+(define (matrix-andmap m f)
+  (let loop ([l (matrix->rectangle m)][x 0])
+    (cond
+      [(empty? l) #true]
+      [else
+       (define row (first l))
+       (define picts
+         (for/and ((n (in-list row)) (y (in-naturals)))
+           (f n x y)))
+       (and picts (loop (rest l) (+ x 1)))])))
+
 (define (matrix-where m p f)
   (let loop ([l (matrix->rectangle m)][x 0])
     (cond
@@ -41,4 +53,8 @@
   (check-equal? (matrix-map M (λ (x y z) x)) '((0 0) (1 0) (0 1) (1 1)))
 
   (define K (matrix-set M 0 0 #f))
-  (check-equal? (matrix-where K (λ (x y z) x) (λ (x y z) x)) '((1 0) (0 1) (1 1))))
+  (check-equal? (matrix-where K (λ (x y z) x) (λ (x y z) x)) '((1 0) (0 1) (1 1)))
+
+
+  (check-true (matrix-andmap M (λ (p x y) (>= (apply + p) 0))))
+  (check-false (matrix-andmap M (λ (p x y) (not (= (first p) 0))))))
