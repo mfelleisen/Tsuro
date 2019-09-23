@@ -205,6 +205,12 @@
 
 (define spot/c (list/c port? index? index?))
 
+#; { State -> [Spot -> Boolean] }
+(define ((dont-use-taken-spot/c s) spot)
+  (match-define (list port x y) spot)
+  (match-define (state grid players) s)
+  (equal? (matrix-ref grid x y) BLANK))
+
 ;                                                   
 ;                                                   
 ;                          ;             ;          
@@ -219,6 +225,8 @@
 ;                                                   
 ;                                                   
 ;
+
+;; states satisfy the following porperties: 
 
 #; {State -> Boolean}
 (define (players-are-on-distinct-places s)
@@ -250,6 +258,16 @@
          #:let player-moved-to-exit-port (player name (tile port) x y)
          (out? (move-one-player grid player-moved-to-exit-port #:to-periphery? #t)))))
 
+#; {State -> Boolean}
+(define (all-tiles-are-at-periphery s)
+  (matrix-andmap (state-grid s) (λ (sq x y) (or (equal? sq BLANK) (at-periphery? x y)))))
+
+#; {State -> Boolean}
+(define (initial-state? s)
+  (and (players-are-on-distinct-places s)
+       (all-tiles-are-at-periphery s)
+       (every-player-faces-an-open-square s)))
+
 ;; for tests of contracts, see below data examples 
 
 ;                                                   
@@ -279,14 +297,16 @@
  player-on-tile/c
  initial-player-on-tile*/c
  intermediate*/c
- 
+
+ bad-spot?
+
  (contract-out 
   [initialize
    ;; creates a state from a list of initial placements 
-   (-> initial-player-on-tile*/c
+   (-> initial-player-on-tile*/c 
        (and/c state?
-              #; "and also satisfies"
-              #; every-player-faces-an-open-square))]
+              #; "and also satisfies, /.: by initial-player-on-tile*/c"
+              #; initial-state?))]
   
   [survivors
    ;; all live players in this state 
@@ -295,7 +315,17 @@
   [find-first-free-spot
    ;; search in clock-wise fashion starting from (0,0), a first square w/o neighbors at the periphery
    ;; search in clock-wise fashion from the left port on the NORTH side that faces inward 
-   (-> state? spot/c)])
+   (-> state? spot/c)]
+
+  [place-first-tile
+   (->i ([s (and/c state? initial-state?)]
+         [name (s) (and/c color? (compose not (curry set-member? (survivors s))))]
+         [t tile?]
+         [p (s) (and/c spot/c (dont-use-taken-spot/c s))])
+        [result (or/c bad-spot?
+                      (and/c state?
+                             #; "and also satisfies, to help enforce rules"
+                             #; initial-state?))])])
 
  infinite?
  collided?
@@ -312,13 +342,12 @@
                     #; every-player-can-leave-going-backwards)))]
   
   [add-tile
-   ;; place a configured tile on the empty square that the player pn neighbors in this state
-   ;; EFFECT may raise (exn:infinite String CMS Player) to signal an infinite loop
-   (->i ([s state?][name (s) (and/c color? (curry set-member? (survivors state3)))][t tile?])
+   ;; place a tile on the empty square that the player neighbors in this state
+   (->i ([s state?][name (s) (and/c color? (curry set-member? (survivors s)))][t tile?])
         [result (or/c infinite?
                       collided?
                       (and/c state?
-                             #; "and also satisfies"
+                             #; "and also satisfies, to help enforce rules"
                              #; players-are-on-distinct-places
                              #; every-player-faces-an-open-square
                              #; every-player-can-leave-going-backwards))])]))
@@ -670,6 +699,62 @@
 
   (checks '() `(,port-red 0 0) (red 2 2 0) (black 2 4 0) (blue 2 6 0) (white 2 8 0) (green 0 9 1)))
 
+;                                                                               
+;                                                ;;                             
+;          ;;;                                  ;       ;                   ;   
+;            ;                                  ;                           ;   
+;   ;;;;     ;    ;;;;    ;;;    ;;;          ;;;;;   ;;;    ;;;;   ;;;   ;;;;; 
+;   ;; ;;    ;        ;  ;;  ;  ;;  ;           ;       ;    ;;  ; ;   ;    ;   
+;   ;   ;    ;        ;  ;      ;   ;;          ;       ;    ;     ;        ;   
+;   ;   ;    ;     ;;;;  ;      ;;;;;;          ;       ;    ;      ;;;     ;   
+;   ;   ;    ;    ;   ;  ;      ;               ;       ;    ;         ;    ;   
+;   ;; ;;    ;    ;   ;  ;;     ;               ;       ;    ;     ;   ;    ;   
+;   ;;;;      ;;   ;;;;   ;;;;   ;;;;           ;     ;;;;;  ;      ;;;     ;;; 
+;   ;                                                                           
+;   ;                                                                           
+;   ;                                                                           
+
+(struct bad-spot [state spot] #:transparent)
+
+(define (place-first-tile state0 name tile spot)
+  (let/ec return 
+    (match-define (list port x y) spot)
+    (unless (and (at-periphery? x y) (player-facing-inward? port x y))
+      (return (bad-spot state0 spot)))
+
+    (match-define (state grid players) state0)
+    (unless (all-neighbors-blank grid x y)
+      (return (bad-spot state0 spot)))
+
+    ;; now we know:
+    ;; -- spot is at periphery 
+    ;; -- port faces inwatrd 
+    ;; -- port faces empty spot
+    ;; -- spot has no occupied neighbors, so port faces empty spot
+    ;; ERGO it is an initial state 
+
+    (define grid+1    (matrix-set grid x y tile))
+    (define players+1 (set-add players (player name port x y)))
+    (state grid+1 players+1)))
+
+#; {Grid Index Index -> }
+(define (all-neighbors-blank grid x y)
+  (for/and ((n (neighbor-locations x y)))
+    (equal? (apply matrix-ref grid n) BLANK)))
+
+(module+ test
+  (define-syntax-rule (checks-place init0 spot1 (color p x y) ...)
+    (let*-values ([(init spot) (values init0 spot1)]
+                  [(init spot)
+                   (let ([c (~a 'color)])
+                     (check-true (initial-state? (place-first-tile (initialize init) c tile-00 spot)) c)
+                     (values (cons (list* tile-00 c spot) init) (list (index->port p) x y)))]
+                  ...)
+      (check-equal? (find-first-free-spot (initialize init)) spot "last one")))
+
+  (checks-place '() `(,port-red 0 0) (red 2 2 0) (black 2 4 0) (blue 2 6 0) (white 2 8 0) (green 0 9 1)))
+
+
 ;                                                                                      
 ;                                                        ;                             
 ;      ;            ;                                    ;     ;            ;          
@@ -775,12 +860,12 @@
 (struct collided [state] #:transparent)
 
 (define (add-tile state0 player-name tile)
-  (match-define  (state grid players) state0)
-  (match-define  (player _ port x y) (find-player players player-name))
-  (define-values (x-new y-new) (looking-at port x y))
+  (match-define   (state grid players) state0)
+  (match-define   (player _ port x y) (find-player players player-name))
+  (define-values  (x-new y-new) (looking-at port x y))
   (define nu-grid (add-new-square-update-neighbors grid tile x-new y-new))
-  (define-values (moved out* inf*) (move-players nu-grid players x-new y-new))
-  (define col* (players-are-on-distinct-places (state '_ moved)))
+  (define-values  (moved out* inf*) (move-players nu-grid players x-new y-new))
+  (define col*    (players-are-on-distinct-places (state '_ moved)))
   (cond
     [(cons? inf*) (infinite (state nu-grid moved) (first inf*))]
     [(not col*)   (collided (state nu-grid moved))]
@@ -833,7 +918,6 @@
   (check-equal? (add-tile/a good-intermediate-state++ (third good-state-actions))
                 good-intermediate-state+++
                 "red fwd 3"))
-
 
 (define state3+infinite-index 34)
 (define state3+infinite (tile-index->tile state3+infinite-index))
@@ -978,20 +1062,20 @@
   
   (check-equal? (move-one-player grid-inf red-player) (inf red-player) "move player inf"))
 
-;                                                                 
-;                               ;      ;                          
-;                    ;          ;      ;                          
-;                               ;      ;                          
-;   ; ;;    ;;;    ;;;    ;;;;  ; ;;   ;;;;    ;;;    ;;;;   ;;;  
-;   ;;  ;  ;;  ;     ;   ;;  ;  ;;  ;  ;; ;;  ;; ;;   ;;  ; ;   ; 
-;   ;   ;  ;   ;;    ;   ;   ;  ;   ;  ;   ;  ;   ;   ;     ;     
-;   ;   ;  ;;;;;;    ;   ;   ;  ;   ;  ;   ;  ;   ;   ;      ;;;  
-;   ;   ;  ;         ;   ;   ;  ;   ;  ;   ;  ;   ;   ;         ; 
-;   ;   ;  ;         ;   ;; ;;  ;   ;  ;; ;;  ;; ;;   ;     ;   ; 
-;   ;   ;   ;;;;   ;;;;;  ;;;;  ;   ;  ;;;;    ;;;    ;      ;;;  
-;                            ;                                    
-;                         ;  ;                                    
-;                          ;;                                     
+;                                                                        
+;                                                                        
+;          ;;;                                                           
+;            ;                                                           
+;   ;;;;     ;    ;;;;   ;   ;   ;;;    ;;;;   ;;;           ;;;   ; ;;  
+;   ;; ;;    ;        ;  ;   ;  ;;  ;   ;;  ; ;   ;         ;; ;;  ;;  ; 
+;   ;   ;    ;        ;   ; ;   ;   ;;  ;     ;             ;   ;  ;   ; 
+;   ;   ;    ;     ;;;;   ; ;   ;;;;;;  ;      ;;;          ;   ;  ;   ; 
+;   ;   ;    ;    ;   ;   ; ;   ;       ;         ;         ;   ;  ;   ; 
+;   ;; ;;    ;    ;   ;   ;;    ;       ;     ;   ;         ;; ;;  ;   ; 
+;   ;;;;      ;;   ;;;;    ;     ;;;;   ;      ;;;           ;;;   ;   ; 
+;   ;                      ;                                             
+;   ;                     ;                                              
+;   ;                    ;;                                              
 
 #; {Player* Natural Natural -> [Listof [List Color Port]]}
 (define (is-player-on players x y)
