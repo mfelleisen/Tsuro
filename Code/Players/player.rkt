@@ -3,12 +3,18 @@
 (require Tsuro/Code/Common/player-interface)
 (require Tsuro/Code/Players/strategies)
 
-(define internal%/c (class/c {init-field [strategy strategy/c]}))
+(define internal%/c (class/c {init-field [strategy (instanceof/c strategy/c)]}))
 (define internal-player (and/c internal%/c player%/c))
 
 (provide
  (contract-out
   [player% internal-player]))
+
+
+(module+ test
+  (require (submod ".."))
+  (require Tsuro/Code/Common/port)
+  (require rackunit))
 
 ;; ---------------------------------------------------------------------------------------------------
 ;; internals of players
@@ -30,12 +36,12 @@
     #; (-> initial-player-on-tile*/c tile-index? tile-index? tile-index? init-action/c)
     (define/public (initial tiles-placed-so-far tile1 tile2 tile3)
       ;; checkable ~~ the placed players are among others; what's my position in the game
-      (send strategy initial my-name-for-game tiles-placed-so-far tile1 tile2 tile3))
+      (send strategy initial tiles-placed-so-far tile1 tile2 tile3))
 
     #; (-> intermediate*/c tile-index? tile-index? turn-action/c)
     [define/public (take-turn tiles-placed-so-far tile1 tile2)
       ;; optional: update _others_ because some may no longer be with us 
-      (send strategy take-turn my-name-for-game tiles-placed-so-far tile1 tile2)]
+      (send strategy take-turn tiles-placed-so-far tile1 tile2)]
 
     #; (-> [listof color?] any)
     [define/public (end-of-game order-of-exist)
@@ -46,3 +52,20 @@
       (void)]
     
     (super-new)))
+
+(module+ test
+  (define-syntax-rule (checks init0 spot1 (color p x y) ...)
+    (let*-values ([(player) (new player% [strategy (new first-strategy%)])]
+                  [(init spot) (values init0 spot1)]
+                  [(init spot)
+                   (let ([c (~a 'color)])
+                     (check-equal? (send player initial init 1 2 3) (cons `(3 0) spot) c)
+                     (values (cons (list* tile-00 c spot) init) (list (index->port p) x y)))]
+                  ...)
+      (check-equal? (send player initial init 1 2 3) (cons `(3 0) spot) "last one")))
+
+  (define port-red (index->port 2))
+
+  (checks '() `(,port-red 0 0) (red 2 2 0) (black 2 4 0) (blue 2 6 0) (white 2 8 0) (green 0 9 1))
+
+  (check-equal? (send (new player% [strategy (new first-strategy%)]) take-turn '[] 1 2) (list 1 0)))
