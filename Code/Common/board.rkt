@@ -73,7 +73,7 @@
         (player-facing-inward? p x y))])
 
 #; (Index Index -> Boolean : index is near boder)
-(define (bordering-periphery? x y)
+(define (at-periphery? x y)
   (or (= x 0) (= x SIZE) (= y 0) (= y SIZE)))
 
 #; { PortIndex Index Index -> Boolean : p on (x,y) looks at an interior square}
@@ -81,7 +81,7 @@
   (define-values (x-facing y-facing) (looking-at p x y))
   (and (index? x-facing) (index? y-facing)))
 
-(define at-periphery-facing-inward (list "at-periphery-facing-inward" bordering-periphery?))
+(define at-periphery-facing-inward (list "at-periphery-facing-inward" at-periphery?))
 (define facing-inward (list "facing-inward" (λ (x y) #t)))
 
 ;                                                                                                    
@@ -116,7 +116,7 @@
 (define (occupied-periphery-or-2-neighbors tile-spec)
   (for/and ((t (in-list tile-spec)))
     (or~ (> (length t) 3)
-         (apply bordering-periphery? (place-of t))
+         (apply at-periphery? (place-of t))
          #:let x-y (place-of t)
          #:let locations (map place-of tile-spec)
          #:let all-but (remove x-y locations)
@@ -132,8 +132,8 @@
   (define r (reverse x))
   (list (second r) (first r)))
 
-#; {Intermediate -> Boolean}
-(define (distinct-x-y-or-player-on=same-tile-different-port intermediates0)
+#; {Intermediate* -> Boolean}
+(define (distinct-x-y-or-player-on-same-tile-different-port intermediates0)
   (let loop ([intermediates intermediates0]
              #; [Listof [List [List Index Index] [List Tile Port]]]
              [seen '()])
@@ -159,7 +159,7 @@
 (define intermediate*/c
   (make-list-of-places-ctc
    either-or
-   (and/c occupied-periphery-or-2-neighbors distinct-x-y-or-player-on=same-tile-different-port)))
+   (and/c occupied-periphery-or-2-neighbors distinct-x-y-or-player-on-same-tile-different-port)))
 ;                                                                                      
 ;                                                                                      
 ;                    ;             ;     ;       ;          ;;;       ;                
@@ -203,6 +203,8 @@
 (define initial-player-on-tile*/c
   (make-list-of-places-ctc player-on-tile/c (and/c no-neighbors? distinct-x-y)))
 
+(define spot/c (list/c port? index? index?))
+
 ;                                                   
 ;                                                   
 ;                          ;             ;          
@@ -216,7 +218,16 @@
 ;                  ;;;     ;;;   ;;;;    ;;;   ;;;; 
 ;                                                   
 ;                                                   
-;                                                   
+;
+
+#; {State -> Boolean}
+(define (players-are-on-distinct-places s)
+  (match-define (state _ players) s)
+  (define places
+    (for/set ((p (in-set players)))
+      (match-define (player _ port x y) p)
+      (list port x y)))
+  (= (set-count players) (set-count places)))
 
 #; { State -> Boolean : every player faces an open square }
 ;; for initialize and add-tile and intermediate 
@@ -235,7 +246,7 @@
     (match-define (player name port x y) p)
     (define tile (square-tile (matrix-ref grid x y)))
     (or~ #:let exit-port (tile port)
-         (and (bordering-periphery? x y) (player-facing-inward? port x y))
+         (and (at-periphery? x y) (player-facing-inward? port x y))
          #:let player-moved-to-exit-port (player name (tile port) x y)
          (out? (move-one-player grid player-moved-to-exit-port #:to-periphery? #t)))))
 
@@ -256,8 +267,6 @@
 ;                 ;                                 
 ;                 ;
 
-(define spot/c (list/c port? index? index?))
-
 (provide
  ;; type State
  ;; all players are on ports that face empty squares on the grid 
@@ -270,33 +279,49 @@
  player-on-tile/c
  initial-player-on-tile*/c
  intermediate*/c
-  
+ 
  (contract-out 
   [initialize
    ;; creates a state from a list of initial placements 
-   (-> initial-player-on-tile*/c (and/c state? every-player-faces-an-open-square))]
+   (-> initial-player-on-tile*/c
+       (and/c state?
+              #; "and also satisfies"
+              #; every-player-faces-an-open-square))]
+  
+  [survivors
+   ;; all live players in this state 
+   (-> state? (listof color?))]
 
   [find-first-free-spot
    ;; search in clock-wise fashion starting from (0,0), a first square w/o neighbors at the periphery
    ;; search in clock-wise fashion from the left port on the NORTH side that faces inward 
-   (-> state? spot/c)]
-  
-  [exn:infinite? (-> any/c boolean?)]
-  [add-tile
-   ;; place a configured tile on the empty square that the player pn neighbors
-   ;; EFFECT may raise (exn:infinite String CMS Player) to signal an infinite loop
-   (->i ([s state?][name (s) (and/c color? (curry set-member? (survivors state3)))][t tile?])
-        [result (and/c state? every-player-faces-an-open-square)])]
-  
-  [survivors (-> state? (listof color?))]
+   (-> state? spot/c)])
 
+ infinite?
+ collided?
+
+ (contract-out
   [intermediate
+   ;; create a state from a list of intermediate placements 
    (-> intermediate*/c
        (or/c #false 
              (and/c state?
                     #; "and it also satisfies"
+                    #; players-are-on-distinct-places ;; by intermediate*/c
                     #; every-player-faces-an-open-square
-                    #; every-player-can-leave-going-backwards)))]))
+                    #; every-player-can-leave-going-backwards)))]
+  
+  [add-tile
+   ;; place a configured tile on the empty square that the player pn neighbors in this state
+   ;; EFFECT may raise (exn:infinite String CMS Player) to signal an infinite loop
+   (->i ([s state?][name (s) (and/c color? (curry set-member? (survivors state3)))][t tile?])
+        [result (or/c infinite?
+                      collided?
+                      (and/c state?
+                             #; "and also satisfies"
+                             #; players-are-on-distinct-places
+                             #; every-player-faces-an-open-square
+                             #; every-player-can-leave-going-backwards))])]))
 
 (module+ json
   (provide
@@ -403,14 +428,6 @@
 
 (define (survivors s)
   (map player-name (set->list (state-players s))))
-
-(define (players-are-on-distinct-places s)
-  (match-define (state _ players) s)
-  (define places
-    (for/set ((p (in-set players)))
-      (match-define (player _ port x y) p)
-      (list port x y)))
-  (= (set-count players) (set-count places)))
 
 (module+ test
   (define (player-set other) (set (player "red" (index->port 0) 1 1) other))
@@ -754,7 +771,8 @@
 ;                                                                        
 ;                                                                        
 
-(struct exn:infinite exn (player))
+(struct infinite [state player] #:transparent)
+(struct collided [state] #:transparent)
 
 (define (add-tile state0 player-name tile)
   (match-define  (state grid players) state0)
@@ -762,10 +780,11 @@
   (define-values (x-new y-new) (looking-at port x y))
   (define nu-grid (add-new-square-update-neighbors grid tile x-new y-new))
   (define-values (moved out* inf*) (move-players nu-grid players x-new y-new))
-  (when (cons? inf*) (raise (exn:infinite player-name (current-continuation-marks) (first inf*))))
-  ;; what to do with eliminated ones
-  ;; (displayln `(player was thrown out ,out*))
-  (state nu-grid moved))
+  (define col* (players-are-on-distinct-places (state '_ moved)))
+  (cond
+    [(cons? inf*) (infinite (state nu-grid moved) (first inf*))]
+    [(not col*)   (collided (state nu-grid moved))]
+    [else (state nu-grid moved)]))
 
 #; {type Action = [List Color [List TileIndex Degree]]}
 
@@ -786,8 +805,6 @@
   (state-from #:grid0 grid3
               #:set0 (set-remove (state-players state3) red-player)
               (#f (tile-to-add-to-grid-3-index #:rotate 90))))
-(define state3+infinite-index 34)
-(define state3+infinite (tile-index->tile state3+infinite-index))
 
 (define good-state-actions `[(,player-red (11 0)) (,player-red (12 0)) (,player-red (34 0))])
 (define good-intermediate-state+
@@ -815,16 +832,30 @@
                 "red fwd 2")
   (check-equal? (add-tile/a good-intermediate-state++ (third good-state-actions))
                 good-intermediate-state+++
-                "red fwd 3")
-  
-  (check-exn exn:infinite? (λ () (add-tile state3 player-red state3+infinite))
-             "drive red player into infinite loop"))
+                "red fwd 3"))
+
+
+(define state3+infinite-index 34)
+(define state3+infinite (tile-index->tile state3+infinite-index))
+
+(module+ test 
+  (check-true (infinite? (add-tile state3 player-red state3+infinite)) "red player goes infinite"))
 
 (define collision-state
   (state-from (#f                                [34 "blue" #:on (index->port 4)])
               ([34 "white" #:on (index->port 2)] )))
 
 (define collision-tile (tile-index->tile 4))
+
+(define collision-state++
+  (let* ([s (state-from (#f 34)
+                        (34 [4 "blue" #:on (index->port 2)]))]
+         [p (state-players s)]
+         [p (set-add p (player "white" (index->port 2) 1 1))])
+    (state (state-grid s) p)))
+
+(module+ test
+  (check-equal? (add-tile collision-state "blue" collision-tile) (collided collision-state++)))
 
 (define simultaneous-state
   (state-from (#f                                [34 "blue" #:on (index->port 4)])
@@ -837,9 +868,7 @@
          [p (set-add p (player "white" (index->port 5) 1 1))])
     (state (state-grid s) p)))
     
-
 (module+ test
-  (check-false (players-are-on-distinct-places (add-tile collision-state "blue" collision-tile)))
   (check-equal? (add-tile simultaneous-state "blue" collision-tile) simultaneous-state++))
 
 ;                                                                                                    
@@ -886,7 +915,7 @@
 ;; (2) when to-periphery?: move a player backwards to the a square on the periphery or to the wall 
 (define (move-one-player grid the-player #:to-periphery? (to-periphery #f))
   ;; start player on (port-p, x-p, y-p) that look at an occupied neighboring square
-  (define peri? (if to-periphery bordering-periphery? (λ (x y) #f)))
+  (define peri? (if to-periphery at-periphery? (λ (x y) #f)))
   (match-define (player name port-p x-p y-p) the-player)
   (define place `(,x-p ,y-p, port-p))
   (let/ec return 
@@ -899,7 +928,7 @@
         [(? out? it)    it]
         [(? inf? it)    it]
         [(list port x y seen)
-         (when (and to-periphery (bordering-periphery? x y))
+         (when (and to-periphery (at-periphery? x y))
            (return (out the-player)))
          (move-one-player port (matrix-ref grid x y) seen)]))))
 
@@ -1023,7 +1052,7 @@
 (module+ picts ;; demonstrate collision 
   (define cs (add-tile collision-state "blue" collision-tile))
   (show-state collision-state)
-  (show-state cs)
+  (show-state (collided-state cs))
 
   (show-state simultaneous-state++))
 
@@ -1105,7 +1134,7 @@
 
   (define simultaneous-state++-jsexpr (state->jsexpr simultaneous-state++))
 
-  (check-true (distinct-x-y-or-player-on=same-tile-different-port simultaneous-state++-jsexpr))
+  (check-true (distinct-x-y-or-player-on-same-tile-different-port simultaneous-state++-jsexpr))
 
   ;; -------------------------------------------------------------------------------------------------
   (check-equal? (jsexpr->state (state->jsexpr state3)) state3)
