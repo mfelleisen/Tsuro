@@ -31,6 +31,9 @@
   [free-for-init
    (-> grid? location/c boolean?)]
   
+  [all-neighbors-blank
+   (-> grid? location/c boolean?)]
+   
   [port-facing-inward?
    ;; p on (x,y) looks at an interior square}
    (-> port? index? index? boolean?)]
@@ -180,10 +183,13 @@
     [(SOUTH) (values x (+ y 1))]
     [(WEST)  (values (- x 1) y)]))
 
-#; {Grid Location -> Boolean}
 (define (free-for-init grid loc)
   (for/and ((n (cons loc (apply neighbor-locations loc))))
-    (not (apply matrix-ref grid n))))
+    (not (equal? (apply matrix-ref grid n) BLANK))))
+
+(define (all-neighbors-blank grid loc)
+  (for/and ((n (neighbor-locations loc)))
+    (equal? (apply matrix-ref grid n) BLANK)))
 
 (define (add-new-square-update-neighbors grid0 tile x y)
   (define neighbors (map (cons-square grid0) (neighbors* grid0 x y)))

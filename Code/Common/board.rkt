@@ -678,7 +678,7 @@
       (return (bad-spot state0 spot)))
 
     (match-define (state grid players) state0)
-    (unless (all-neighbors-blank grid x y)
+    (unless (all-neighbors-blank grid (list x y))
       (return (bad-spot state0 spot)))
 
     ;; now we know:
@@ -691,11 +691,6 @@
     (define grid+1    (matrix-set grid x y tile))
     (define players+1 (set-add players (player name port x y)))
     (state grid+1 players+1)))
-
-#; {Grid Index Index -> }
-(define (all-neighbors-blank grid x y)
-  (for/and ((n (neighbor-locations (list x y))))
-    (equal? (apply matrix-ref grid n) BLANK)))
 
 (module+ test
   (define (checks-initialization-sequence actual expected spot0 player-placements)
