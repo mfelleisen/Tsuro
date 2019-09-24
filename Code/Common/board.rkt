@@ -70,9 +70,6 @@
    (and (good? x y)
         (port-facing-inward? p x y))])
 
-#; (Index Index -> Boolean : index is near boder)
-(define (at-periphery? x y)
-  (or (= x 0) (= x SIZE) (= y 0) (= y SIZE)))
 
 (define at-periphery-facing-inward (list "at-periphery-facing-inward" at-periphery?))
 (define facing-inward (list "facing-inward" (λ (x y) #t)))

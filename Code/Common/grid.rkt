@@ -31,6 +31,9 @@
   [free-for-init
    (-> grid? location/c boolean?)]
   
+  [at-periphery?
+   (-> index? index? boolean?)]
+  
   [all-neighbors-blank
    (-> grid? location/c boolean?)]
    
@@ -170,6 +173,9 @@
 
 (define (outside? x)
   (member x (list WALL OPEN)))
+
+(define (at-periphery? x y)
+  (or (= x 0) (= x SIZE) (= y 0) (= y SIZE)))
 
 (define (neighbor-locations loc)
   (match-define (list x y) loc)
