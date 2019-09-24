@@ -26,7 +26,7 @@
    (-> grid? tile? index? index? grid?)]
 
   [neighbor-locations
-   (-> index? index? [listof location/c])]
+   (-> location/c [listof location/c])]
   
   [free-for-init
    (-> grid? location/c boolean?)]
@@ -168,7 +168,8 @@
 (define (outside? x)
   (member x (list WALL OPEN)))
 
-(define (neighbor-locations x y)
+(define (neighbor-locations loc)
+  (match-define (list x y) loc)
   (define all `((,x ,(- y 1)) (,x ,(+ y 1)) (,(- x 1) ,y) (,(+ x 1) ,y)))
   (filter (match-lambda [`(,x ,y) (and (index? x) (index? y))]) all))
 
@@ -197,7 +198,7 @@
 #; {Grid Index Index -> [Listof Location]}
 ;; determine (occupied) neighbors of the square at (x,y)
 (define (neighbors* grid x y)
-  (filter (match-lambda [`(,x ,y) (matrix-ref grid x y)]) (neighbor-locations x y)))
+  (filter (match-lambda [`(,x ,y) (matrix-ref grid x y)]) (neighbor-locations (list x y))))
 
 #;
 (->i ([neighbors [listof [list/c square? index? index?]]]

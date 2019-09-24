@@ -41,8 +41,6 @@
 ;                                                    ;                                        
 ;                                                    ;
 
-#; {type Location = [List Index Index]}
-
 #; ({Any -> Any : X} ([Listof X] -> Boolean) -> Contract)
 (define (make-list-of-places-ctc items/c ctc)
   (and/c [listof items/c]
@@ -115,7 +113,7 @@
          #:let x-y (place-of t)
          #:let locations (map place-of tile-spec)
          #:let all-but (remove x-y locations)
-         #:let neigbors# (for/sum ((n (apply neighbor-locations x-y)) #:when (member n all-but)) 1)
+         #:let neigbors# (for/sum ((n (neighbor-locations x-y)) #:when (member n all-but)) 1)
          (> neigbors# 1))))
 
 (define tile/c (list/c tile? index? index?))
@@ -180,7 +178,7 @@
   (define tile-locs (map place-of tile-spec))
   (for/and ((loc (in-list tile-locs)))
     (define all-but (remove loc tile-locs))
-    (for/and ((n (apply neighbor-locations loc)))
+    (for/and ((n (neighbor-locations loc)))
       (not (member n all-but)))))
 
 (module+ test
@@ -696,7 +694,7 @@
 
 #; {Grid Index Index -> }
 (define (all-neighbors-blank grid x y)
-  (for/and ((n (neighbor-locations x y)))
+  (for/and ((n (neighbor-locations (list x y))))
     (equal? (apply matrix-ref grid n) BLANK)))
 
 (module+ test
