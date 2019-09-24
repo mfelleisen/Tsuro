@@ -70,7 +70,6 @@
    (and (good? x y)
         (port-facing-inward? p x y))])
 
-
 (define at-periphery-facing-inward (list "at-periphery-facing-inward" at-periphery?))
 (define facing-inward (list "facing-inward" (λ (x y) #t)))
 
@@ -227,7 +226,7 @@
       (list port x y)))
   (= (set-count players) (set-count places)))
 
-#; { State -> Boolean : every player faces an open square }
+#; {State -> Boolean : every player faces an open square}
 ;; for initialize and add-tile and intermediate 
 (define (every-player-faces-an-open-square s)
   (match-define (state grid players) s)
