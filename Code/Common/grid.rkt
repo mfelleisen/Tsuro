@@ -8,6 +8,7 @@
 (define (index? z) (< -1 z SIZE))
 
 (define grid? object?)
+(define location/c (list/c index? index?))
 
 (provide
  #; {type Grid}
@@ -16,6 +17,8 @@
 
  the-empty-grid
 
+ location/c
+
  #; {Grid Tile Index Index -> Grid}
  (contract-out
   [add-new-square-update-neighbors
@@ -23,7 +26,14 @@
    (-> grid? tile? index? index? grid?)]
 
   [neighbor-locations
-   (-> index? index? [listof (list/c index? index?)])]
+   (-> index? index? [listof location/c])]
+  
+  [free-for-init
+   (-> grid? location/c boolean?)]
+  
+  [port-facing-inward?
+   ;; p on (x,y) looks at an interior square}
+   (-> port? index? index? boolean?)]
 
   [looking-at
    (-> port? index? index? (values integer? integer?))]
@@ -150,6 +160,11 @@
 
 (define the-empty-grid (build-matrix SIZE SIZE (λ (_i _j) BLANK)))
 
+#; { PortIndex Index Index -> Boolean : p on (x,y) looks at an interior square}
+(define (port-facing-inward? p x y)
+  (define-values (x-facing y-facing) (looking-at p x y))
+  (and (index? x-facing) (index? y-facing)))
+
 (define (outside? x)
   (member x (list WALL OPEN)))
 
@@ -163,6 +178,11 @@
     [(EAST)  (values (+ x 1) y)]
     [(SOUTH) (values x (+ y 1))]
     [(WEST)  (values (- x 1) y)]))
+
+#; {Grid Location -> Boolean}
+(define (free-for-init grid loc)
+  (for/and ((n (cons loc (apply neighbor-locations loc))))
+    (not (apply matrix-ref grid n))))
 
 (define (add-new-square-update-neighbors grid0 tile x y)
   (define neighbors (map (cons-square grid0) (neighbors* grid0 x y)))
