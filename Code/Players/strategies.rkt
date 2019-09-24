@@ -8,9 +8,12 @@
 
 ;; ---------------------------------------------------------------------------------------------------
 (require Tsuro/Code/Common/player-interface)
+(require Tsuro/Code/Common/grid)
+(require Tsuro/Code/Common/port)
 
 (module+ test
   (require (submod ".."))
+  (require (submod Tsuro/Code/Common/board test))
   (require Tsuro/Code/Common/port)
   (require rackunit))
 
@@ -29,7 +32,7 @@
     ;; then find the first free port facing an empty tile 
     (define/public (initial tiles-placed-so-far tile1 tile2 tile3)
       (define board (initialize tiles-placed-so-far))
-      (define spot  (find-first-free-spot board))
+      (define spot  (find-first-free-spot board clock-wise pick-port))
       (cons (list tile3 0) spot))
 
     ;; use the first tile, don't rotate 
@@ -38,19 +41,39 @@
 
     (super-new)))
 
+#; {Location -> Location}
+(define (clock-wise loc)
+  (define-values (x y) (apply values loc))
+  (cond
+    [(and (< (+ x 1) SIZE) (= y 0))          (list (+ x 1) 0)]
+    [(and (= (+ x 1) SIZE) (< (+ y 1) SIZE)) (list x (+ y 1))]
+    [(and (> x 0) (= (+ y 1) SIZE))          (list (- x 1) y)]
+    [(and (= x 0) (>  y 0))                  (list x (- y 1))]
+    [else (error 'find-first-free-spot "out of free periphery positions")]))
+
+(define (counter-clock-wise loc)
+  (define-values (x y) (apply values loc))
+  (cond
+    [(and (= x 0) (< (+ y 1) SIZE))          (list x (+ y 1))]
+    [(and (< (+ x 1) SIZE) (= (+ y 1) SIZE)) (list (+ x 1) y)]
+    [(and (= (+ x 1) SIZE) (> y 0))          (list x (- y 1))]
+    [(and (> x 0) (= y 0))                   (list (- x 1) y)]
+    [else (error 'find-first-free-spot "out of free periphery positions")]))
+
+#; {Location -> Port}
+;; ASSUME no neighboring tile 
+(define (pick-port loc)
+  (define n (apply neighbor-locations loc))
+  (for/first ((p (in-list PORTS)) #:when (apply port-facing-inward? p loc)) p))
+
 (module+ test
-  (define-syntax-rule (checks init0 spot1 (color p x y) ...)
-    (let*-values ([(strategy) (new first-strategy%)]
-                  [(init spot) (values init0 spot1)]
-                  [(init spot)
-                   (let ([c (~a 'color)])
-                     (check-equal? (send strategy initial init 1 2 3) (cons `(3 0) spot) c)
-                     (values (cons (list* tile-00 c spot) init) (list (index->port p) x y)))]
-                  ...)
-      (check-equal? (send strategy initial init 1 2 3) (cons `(3 0) spot) "last one")))
-
   (define port-red (index->port 2))
-
-  (checks '() `(,port-red 0 0) (red 2 2 0) (black 2 4 0) (blue 2 6 0) (white 2 8 0) (green 0 9 1))
+  (define two (index->port 2))
+  (define strategy (new first-strategy%))
+  (checks-initialization-sequence
+   (λ (color port x y spot init state) (send strategy initial init 1 2 3))
+   (λ (color port x y spot init state) (cons `(3 0) spot))
+   `(,port-red 0 0)
+   `[("red" ,two 2 0) ("black" ,two 4 0) ("blue" ,two 6 0) ("white" ,two 8 0) ("green" 0 9 1)])
 
   (check-equal? (send (new first-strategy%) take-turn '[] 1 2) (list 1 0)))

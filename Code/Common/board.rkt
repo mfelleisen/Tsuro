@@ -70,16 +70,11 @@
    [t tile?] [n color?] [p port?] [x index?] [y index?]
    #:post label (p x y)
    (and (good? x y)
-        (player-facing-inward? p x y))])
+        (port-facing-inward? p x y))])
 
 #; (Index Index -> Boolean : index is near boder)
 (define (at-periphery? x y)
   (or (= x 0) (= x SIZE) (= y 0) (= y SIZE)))
-
-#; { PortIndex Index Index -> Boolean : p on (x,y) looks at an interior square}
-(define (player-facing-inward? p x y)
-  (define-values (x-facing y-facing) (looking-at p x y))
-  (and (index? x-facing) (index? y-facing)))
 
 (define at-periphery-facing-inward (list "at-periphery-facing-inward" at-periphery?))
 (define facing-inward (list "facing-inward" (λ (x y) #t)))
@@ -254,7 +249,7 @@
     (match-define (player name port x y) p)
     (define tile (square-tile (matrix-ref grid x y)))
     (or~ #:let exit-port (tile port)
-         (and (at-periphery? x y) (player-facing-inward? port x y))
+         (and (at-periphery? x y) (port-facing-inward? port x y))
          #:let player-moved-to-exit-port (player name (tile port) x y)
          (out? (move-one-player grid player-moved-to-exit-port #:to-periphery? #t)))))
 
@@ -315,7 +310,7 @@
   [find-first-free-spot
    ;; search in clock-wise fashion starting from (0,0), a first square w/o neighbors at the periphery
    ;; search in clock-wise fashion from the left port on the NORTH side that faces inward 
-   (-> state? spot/c)]
+   (-> state? (-> location/c location/c) (-> location/c port?) spot/c)]
 
   [place-first-tile
    (->i ([s (and/c state? initial-state?)]
@@ -387,6 +382,10 @@
   (provide
    state->pict
    show-state))
+
+(module+ test
+  (provide 
+   checks-initialization-sequence))
 
 ;                                                                                      
 ;       ;                                  ;                                           
@@ -652,52 +651,10 @@
   (check-equal? (initialize inits-for-state-with-3-players) state3))
 
 ;; ---------------------------------------------------------------------------------------------------
-(define (find-first-free-spot s0)
+(define (find-first-free-spot s0 clock-wise pick-port)
   (match-define (state grid players) s0)
   (let loop ([loc (list 0 0)])
     (if (free-for-init grid loc) (cons (pick-port loc) loc) (loop (clock-wise loc)))))
-
-#; {Grid Location -> Boolean}
-(define (free-for-init grid loc)
-  (for/and ((n (cons loc (apply neighbor-locations loc))))
-    (not (apply matrix-ref grid n))))
-
-#; {Location -> Location}
-(define (clock-wise loc)
-  (define-values (x y) (apply values loc))
-  (cond
-    [(and (< (+ x 1) SIZE) (= y 0))          (list (+ x 1) 0)]
-    [(and (= (+ x 1) SIZE) (< (+ y 1) SIZE)) (list x (+ y 1))]
-    [(and (> x 0) (= (+ y 1) SIZE))          (list (- x 1) y)]
-    [(and (= x 0) (>  y 0))                  (list x (- y 1))]
-    [else (error 'find-first-free-spot "out of free periphery positions")]))
-
-(define (counter-clock-wise loc)
-  (define-values (x y) (apply values loc))
-  (cond
-    [(and (= x 0) (< (+ y 1) SIZE))          (list x (+ y 1))]
-    [(and (< (+ x 1) SIZE) (= (+ y 1) SIZE)) (list (+ x 1) y)]
-    [(and (= (+ x 1) SIZE) (> y 0))          (list x (- y 1))]
-    [(and (> x 0) (= y 0))                   (list (- x 1) y)]
-    [else (error 'find-first-free-spot "out of free periphery positions")]))
-
-#; {Location -> Port}
-;; ASSUME no neighboring tile 
-(define (pick-port loc)
-  (define n (apply neighbor-locations loc))
-  (for/first ((p (in-list PORTS)) #:when (apply player-facing-inward? p loc)) p))
-
-(module+ test
-  (define-syntax-rule (checks init0 spot1 (color p x y) ...)
-    (let*-values ([(init spot) (values init0 spot1)]
-                  [(init spot)
-                   (let ([c (~a 'color)])
-                     (check-equal? (find-first-free-spot (initialize init)) spot c)
-                     (values (cons (list* tile-00 c spot) init) (list (index->port p) x y)))]
-                  ...)
-      (check-equal? (find-first-free-spot (initialize init)) spot "last one")))
-
-  (checks '() `(,port-red 0 0) (red 2 2 0) (black 2 4 0) (blue 2 6 0) (white 2 8 0) (green 0 9 1)))
 
 ;                                                                               
 ;                                                ;;                             
@@ -719,7 +676,7 @@
 (define (place-first-tile state0 name tile spot)
   (let/ec return 
     (match-define (list port x y) spot)
-    (unless (and (at-periphery? x y) (player-facing-inward? port x y))
+    (unless (and (at-periphery? x y) (port-facing-inward? port x y))
       (return (bad-spot state0 spot)))
 
     (match-define (state grid players) state0)
@@ -743,16 +700,22 @@
     (equal? (apply matrix-ref grid n) BLANK)))
 
 (module+ test
-  (define-syntax-rule (checks-place init0 spot1 (color p x y) ...)
-    (let*-values ([(init spot) (values init0 spot1)]
-                  [(init spot)
-                   (let ([c (~a 'color)] [new-state (initialize init)])
-                     (check-true (initial-state? (place-first-tile new-state c tile-00 spot)) c)
-                     (values (cons (list* tile-00 c spot) init) (list (index->port p) x y)))]
-                  ...)
-      (check-equal? (find-first-free-spot (initialize init)) spot "last one")))
+  (define (checks-initialization-sequence actual expected spot0 player-placements)
+    (define-values (_1 _2)
+      (for/fold ([init '()][spot spot0]) ([pp player-placements])
+        (match-define [list color port x y] pp)
+        (define state (initialize init))
+        (check-equal? (actual color port x y spot init state)
+                      (expected color port x y spot init state)
+                      color)
+        (values (cons (list* tile-00 color spot) init) (list port x y))))
+    (void))
 
-  (checks-place '() `(,port-red 0 0) (red 2 2 0) (black 2 4 0) (blue 2 6 0) (white 2 8 0)))
+  (define two (index->port 2))
+  (checks-initialization-sequence
+   (λ (color port x y spot init state) (initial-state? (place-first-tile state color tile-00 spot)))
+   (λ (color port x y spot init state) #true)
+   `(,port-red 0 0) `[("red" ,two 2 0) ("black" ,two 4 0) ("blue" ,two 6 0) ("white" ,two 8 0)]))
 
 
 ;                                                                                      
