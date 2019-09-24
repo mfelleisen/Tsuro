@@ -63,7 +63,7 @@
 #; {Location -> Port}
 ;; ASSUME no neighboring tile 
 (define (pick-port loc)
-  (define n (apply neighbor-locations loc))
+  (define n (neighbor-locations loc))
   (for/first ((p (in-list PORTS)) #:when (apply port-facing-inward? p loc)) p))
 
 (module+ test
