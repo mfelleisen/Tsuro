@@ -4,6 +4,8 @@ This directory implements a distributed Tsuro game
 
 ### PLAN 
 
+[ ] can intermediate describe islands of tiles without an avatar on them?
+
 [x] tiles, rendering tiles 
 
 [x] unique tile configs 
