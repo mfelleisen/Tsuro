@@ -1070,8 +1070,8 @@
     (draw-pict grid-as-pict dc INSET INSET))
   
   #; {State -> Void}
-  (define (show-state s #:visible (v #t))
-    (define frame (new frame% [label "hello"][width WIDTH][height HEIGHT]))
+  (define (show-state s #:visible (v #t) #:name (name "hello"))
+    (define frame (new frame% [label name][width WIDTH][height HEIGHT]))
     
     (define canvas
       (new canvas%
@@ -1087,10 +1087,14 @@
 
 (module+ picts ;; demonstrate collision 
   (define cs (add-tile collision-state "blue" collision-tile))
-  (show-state collision-state)
-  (show-state (collided-state cs))
+  (show-state collision-state #:name "pre-collision")
+  (show-state (collided-state cs) #:name "collision")
 
-  (show-state simultaneous-state++))
+  (show-state simultaneous-state++ #:name "simul"))
+
+; (module+ picts (show-state state3))
+; (module+ picts (show-state state+ #:name "expected red off"))
+; (module+ picts (show-state (add-tile/a state3 state3-action) #:name "red off"))
 
 ; (module+ picts (show-state like-state-dsl))
 ; (module+ picts (show-state state-dsl))
