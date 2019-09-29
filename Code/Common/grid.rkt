@@ -409,13 +409,12 @@
 
 
 (module+ picts   
-  (define PLAYER-SIZE (quotient TILE-SIZE 5)) 
-
+  (define PLAYER-SIZE (quotient TILE-SIZE 5))
+  
   #; {Square [Listof [List Color Port]] -> Pict}
   ;; if square is BLANK, p must be '()
   (define (square->pict square p)
-    (define tile (or (and (equal? BLANK square) blank-tile) (square-tile square)))
-    (tile+players->pict tile p))
+    (if (equal? BLANK square) BLANK-TILE (tile+players->pict  (square-tile square) p)))
 
   #; {Tile [Listof [List Color Port]] -> Pict}
   (define (tile+players->pict tile p)
@@ -438,4 +437,4 @@
 
 (module+ homework
   (require (submod ".." picts))
-  (provide tile+players->pict blank-tile))
+  (provide tile+players->pict))
