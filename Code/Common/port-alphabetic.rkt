@@ -5,6 +5,10 @@
 (require Tsuro/Code/Common/port-signature) (provide-port-signature)
 
 (require SwDev/Lib/pattern-matching)
+(require SwDev/Lib/should-be-racket)
+
+(module+ test
+  (require rackunit))
 
 (define PORTS (build-list PORT# (λ (i) (integer->char (+ 65 i)))))
 (define (port? x) (member x PORTS))
@@ -43,4 +47,11 @@
   (string p))
 
 (define (jsexpr->port pj)
-  (string-ref pj 0))
+  (and* (string? pj) (= (string-length pj) 1) (string-ref pj 0) => (λ (p) (and (port? p) p))))
+
+(module+ test
+
+  (check-equal? (jsexpr->port (port->jsexpr #\A)) #\A)
+  
+  (check-equal? (jsexpr->port "A") #\A)
+  (check-equal? (jsexpr->port "X") #false))

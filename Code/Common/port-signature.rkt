@@ -41,7 +41,7 @@
                    #; {Port -> JSexpr}
                    port->jsexpr
 
-                   #; {JSexrpr -> Port}
+                   #; {JSexrpr -> (U False Port)}
                    ;; satisfies port-pat
                    jsexpr->port)))
 
