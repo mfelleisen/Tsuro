@@ -10,6 +10,21 @@
 (define grid? object?)
 (define location/c (list/c index? index?))
 
+;                                                   
+;                                                   
+;                                        ;          
+;                                        ;          
+;    ;;;   ;   ;  ;;;;    ;;;    ;;;;  ;;;;;   ;;;  
+;   ;;  ;   ; ;   ;; ;;  ;; ;;   ;;  ;   ;    ;   ; 
+;   ;   ;;  ;;;   ;   ;  ;   ;   ;       ;    ;     
+;   ;;;;;;   ;    ;   ;  ;   ;   ;       ;     ;;;  
+;   ;       ;;;   ;   ;  ;   ;   ;       ;        ; 
+;   ;       ; ;   ;; ;;  ;; ;;   ;       ;    ;   ; 
+;    ;;;;  ;   ;  ;;;;    ;;;    ;       ;;;   ;;;  
+;                 ;                                 
+;                 ;                                 
+;                 ;                                 
+
 (provide
  #; {type Grid}
  SIZE
@@ -426,6 +441,7 @@
         (values (add-player pict jack p) (cons p seen))))
     pict))
 
+#;
 (module+ test
   (square->pict BLANK '())
   (define two (index->port 2))

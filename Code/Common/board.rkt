@@ -348,6 +348,8 @@
    ;; if JSexpr matches state-pat, it is a candidate for the creation of an intermediate board
    state-pat
 
+   intermediate-pat
+
    ;; if JSExpr matches action-pat, it is a candidate for a add-tile action 
    action-pat
 
@@ -356,6 +358,8 @@
    (contract-out
     [jsexpr->state (-> (λ (x) (match x [state-pat #t][_ #f])) (or/c state? #false))])
 
+   jsexpr->intermediate
+   
    ;; States as JSexpr 
    state3-jsexpr
    good-intermediate-state-jsexpr
