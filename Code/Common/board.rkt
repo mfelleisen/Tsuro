@@ -145,10 +145,17 @@
           (and (not (assoc place seen))
                (loop (rest intermediates) (cons (list place 'plain) seen)))])])))
 
+#;{Intermediate* -> Boolean}
+(define (at-least-one-player-left intermediates0)
+  (ormap (λ (spec) (> (length spec) 3)) intermediates0))
+
 (define intermediate*/c
   (make-list-of-places-ctc
    either-or
-   (and/c occupied-periphery-or-2-neighbors distinct-x-y-or-player-on-same-tile-different-port)))
+   (and/c
+    at-least-one-player-left
+    occupied-periphery-or-2-neighbors
+    distinct-x-y-or-player-on-same-tile-different-port)))
 ;                                                                                      
 ;                                                                                      
 ;                    ;             ;     ;       ;          ;;;       ;                
@@ -364,7 +371,7 @@
    state3-jsexpr
    good-intermediate-state-jsexpr
    good-state-actions
-   good-intermediate-state+++-jsexpr
+   good-intermediate-state++-jsexpr
 
    ;; Intermediates as JSexpr
    bad-intermediate-spec-jsexpr
@@ -373,7 +380,7 @@
    ;; actions on states 
    state3-action
    state3-action-infinite
-   state+-jsexpr
+   state++-jsexpr
    ))
 
 (module+ picts
@@ -1174,7 +1181,7 @@
   (define state3-action-infinite (list player-red (tile->jsexpr state3+infinite)))
   (check-true (match state3-action-infinite [(action-pat pn ti) #t]))
 
-  (define state+-jsexpr (state->jsexpr state+))
+  (define state++-jsexpr (state->jsexpr state+))
 
   (define simultaneous-state++-jsexpr (state->jsexpr simultaneous-state++))
 
@@ -1187,7 +1194,7 @@
 
   (define state3-jsexpr (state->jsexpr state3))
   (define good-intermediate-state-jsexpr (state->jsexpr good-intermediate-state))
-  (define good-intermediate-state+++-jsexpr (state->jsexpr good-intermediate-state+++))
+  (define good-intermediate-state++-jsexpr (state->jsexpr good-intermediate-state+++))
   
   (check-false (jsexpr->state (intermediate*->jsexpr bad-intermediate-spec)))
   (check-false (jsexpr->state (intermediate*->jsexpr bad-intermediate-spec-2)))
