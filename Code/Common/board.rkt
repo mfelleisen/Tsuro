@@ -404,7 +404,9 @@
 
    pass-thru-state-jsexpr
    pass-thru-action
-   pass-thru-state++-jsexpr))
+   pass-thru-state++-jsexpr
+
+   no-red-state-jsexpr))
 
 (module+ picts
   (provide
@@ -794,6 +796,9 @@
                  (set-add players (player name port x y)))])))
   (state grid players))
 
+;; ---------------------------------------------------------------------------------------------------
+;; bad intermediate state specs
+
 (define bad-intermediate-spec
   (intermediate-list-from-spec
    ((34 "red" #:on port-red) #f (34 #:rotate 90 "blue" #:on port-blue))
@@ -834,6 +839,9 @@
   (check-true (every-player-faces-an-open-square       (intermediate-aux bad-intermediate-spec-3)))
   (check-false (every-player-can-leave-going-backwards (intermediate-aux bad-intermediate-spec-3))
                "the white player can't leave"))
+
+;; ---------------------------------------------------------------------------------------------------
+;; good intermediate state specs
 
 (define good-intermediate-spec
   (intermediate-list-from-spec
@@ -893,9 +901,11 @@
   (define F (compose (curry equal? pn) player-name))
   (for/first ((element (in-set players)) #:when (F element)) element))
 
+;; ---------------------------------------------------------------------------------------------------
+;; good state transitions
+
 (define tile-to-add-to-grid-3-index 33)
 (define state3-action `(,player-red (,tile-to-add-to-grid-3-index 90)))
-
 (define state3++
   (state-from #:grid0 grid3
               #:set0 (set-remove (state-players state3) red-player)
@@ -929,11 +939,17 @@
                 good-intermediate-state+++
                 "red fwd 3"))
 
+;; ---------------------------------------------------------------------------------------------------
+;; infinite loops
+
 (define state3+infinite-index 34)
 (define state3+infinite (tile-index->tile state3+infinite-index))
 
 (module+ test 
   (check-true (infinite? (add-tile state3 player-red state3+infinite)) "red player goes infinite"))
+
+;; ---------------------------------------------------------------------------------------------------
+;; two avatars collide on the same tile and same port 
 
 (define collision-state
   (state-from (#f                                [34 "red" #:on (index->port 4)])
@@ -952,6 +968,9 @@
 (module+ test
   (check-equal? (add-tile/a collision-state collision-action) (collided collision-state++)))
 
+;; ---------------------------------------------------------------------------------------------------
+;; two avatars reach the same tile but not the same port
+
 (define simultaneous-state
   (state-from (#f                                [34 "red" #:on (index->port 4)])
               ([34 "white" #:on (index->port 3)] )))
@@ -966,6 +985,9 @@
 (module+ test
   (check-equal? (add-tile/a simultaneous-state collision-action) simultaneous-state++))
 
+;; ---------------------------------------------------------------------------------------------------
+;; two avatars pass thru each other during the addition of a tile
+
 (define pass-thru-state simultaneous-state)
 (define pass-thru-action [list "red" [list 7 0]])
 (define pass-thru-state++
@@ -977,6 +999,10 @@
 
 (module+ test
   (check-equal? (add-tile/a pass-thru-state pass-thru-action) pass-thru-state++))
+
+(define no-red-state
+  (state-from (#f                                [34 "blue" #:on (index->port 4)])
+              ([34 "white" #:on (index->port 3)] )))
   
 ;                                                                                                    
 ;                                                                                                    
@@ -1251,6 +1277,8 @@
 
   (define pass-thru-state-jsexpr (state->jsexpr pass-thru-state))
   (define pass-thru-state++-jsexpr (state->jsexpr pass-thru-state++))
+
+  (define no-red-state-jsexpr (state->jsexpr no-red-state))
 
   ;; -------------------------------------------------------------------------------------------------
   (check-equal? (jsexpr->state (state->jsexpr state3)) state3)
