@@ -149,11 +149,17 @@
 (define (at-least-one-player-left intermediates0)
   (ormap (λ (spec) (> (length spec) 3)) intermediates0))
 
+#;{Intermediate* -> Boolean}
+(define (no-duplicate-player intermediates0)
+  (define players (map second (filter (λ (spec) (> (length spec) 3)) intermediates0)))
+  (= (length players) (set-count (apply set players))))
+
 (define intermediate*/c
   (make-list-of-places-ctc
    either-or
    (and/c
     at-least-one-player-left
+    no-duplicate-player
     occupied-periphery-or-2-neighbors
     distinct-x-y-or-player-on-same-tile-different-port)))
 ;                                                                                      
@@ -197,15 +203,12 @@
   (= (length locations) (set-count (apply set locations))))
 
 (define initial-player-on-tile*/c
-  (make-list-of-places-ctc player-on-tile/c (and/c no-neighbors? distinct-x-y)))
-
-(define spot/c (list/c port? index? index?))
-
-#; { State -> [Spot -> Boolean] }
-(define ((dont-use-taken-spot/c s) spot)
-  (match-define (list port x y) spot)
-  (match-define (state grid players) s)
-  (equal? (matrix-ref grid x y) BLANK))
+  (make-list-of-places-ctc
+   player-on-tile/c
+   (and/c
+    no-duplicate-player
+    no-neighbors?
+    distinct-x-y)))
 
 ;                                                   
 ;                                                   
@@ -263,6 +266,14 @@
   (and (players-are-on-distinct-places s)
        (all-tiles-are-at-periphery s)
        (every-player-faces-an-open-square s)))
+
+(define spot/c (list/c port? index? index?))
+
+#; { State -> [Spot -> Boolean] }
+(define ((dont-use-taken-spot/c s) spot)
+  (match-define (list port x y) spot)
+  (match-define (state grid players) s)
+  (equal? (matrix-ref grid x y) BLANK))
 
 ;; for tests of contracts, see below data examples 
 
@@ -528,10 +539,14 @@
 
 (define state3 (state grid3 3players))
 
+(define bad-inits-for-state-with-duplicate-players
+  (cons `[, tile-00 ,player-red ,port-red 4 0] inits-for-state-with-3-players))
+
 (module+ test ;; some contract testing 
   (check-equal? (survivors state3) (set-map 3players player-name) "survivors")
   (check-true (player-on-tile/c (first inits-for-state-with-3-players)))
   (check-true (initial-player-on-tile*/c inits-for-state-with-3-players))
+  (check-false (initial-player-on-tile*/c bad-inits-for-state-with-duplicate-players))
   (check-true (set-member? (survivors state3) player-red))
   (check-true (intermediate*/c inits-for-state-with-3-players)
               "an initial configuration of tiles is also intermediate"))
@@ -794,8 +809,15 @@
    (33)
    (33 (33 #:rotate 180 "white" #:on port-white))))
 
+(define bad-intermediate-spec-4
+  (intermediate-list-from-spec
+   ((34 "red" #:on port-red) #f (34 #:rotate 90 "red" #:on port-blue))
+   (33)
+   (33 (33 #:rotate 180 "red" #:on port-white))))
+
 (module+ test ;; intermediate grids, states, and contracts 
   (check-false (intermediate*/c bad-intermediate-spec) "an isolated tile that nobody could place")
+  (check-false (intermediate*/c bad-intermediate-spec-4) "red shows up many times")
 
   (check-true (andmap tile/c contiguity-for-3-platers) "tiles are tiles")
   (check-true (player-on-any-tile/c (first bad-intermediate-spec-2)) "1 p")
@@ -1134,6 +1156,7 @@
 
 ; (module+ picts (show-state good-intermediate-state++))
 
+#;
 (module+ picts ;; demonstrate collision 
   (show-state collision-state #:name "pre-collision")
   (show-state collision-state++ #:name "collision")
