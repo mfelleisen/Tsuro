@@ -6,6 +6,8 @@ This directory implements a distributed Tsuro game
 
 [ ] can intermediate describe islands of tiles without an avatar on them?
 
+[ ] can initials/intermediate come with more than one tile for same player?
+
 [x] tiles, rendering tiles 
 
 [x] unique tile configs 

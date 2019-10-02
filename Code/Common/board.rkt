@@ -383,8 +383,17 @@
    ;; actions on states 
    state3-action
    state3-action-infinite
-   state++-jsexpr
-   ))
+   state3++-jsexpr
+   
+   collision-state-jsexpr
+   collision-action
+   
+   simultaneous-state-jsexpr
+   simultaneous-state++-jsexpr
+
+   pass-thru-state-jsexpr
+   pass-thru-action
+   pass-thru-state++-jsexpr))
 
 (module+ picts
   (provide
@@ -865,7 +874,7 @@
 (define tile-to-add-to-grid-3-index 33)
 (define state3-action `(,player-red (,tile-to-add-to-grid-3-index 90)))
 
-(define state+
+(define state3++
   (state-from #:grid0 grid3
               #:set0 (set-remove (state-players state3) red-player)
               (#f (tile-to-add-to-grid-3-index #:rotate 90))))
@@ -886,7 +895,7 @@
 
 (module+ test ;; add-tile
   (check-equal? (find-player 3players "red") red-player)
-  (check-equal? (add-tile/a state3 state3-action) state+ "drive red player off")
+  (check-equal? (add-tile/a state3 state3-action) state3++ "drive red player off")
   
   (check-equal? (add-tile/a good-intermediate-state (first good-state-actions))
                 good-intermediate-state+
@@ -905,35 +914,48 @@
   (check-true (infinite? (add-tile state3 player-red state3+infinite)) "red player goes infinite"))
 
 (define collision-state
-  (state-from (#f                                [34 "blue" #:on (index->port 4)])
+  (state-from (#f                                [34 "red" #:on (index->port 4)])
               ([34 "white" #:on (index->port 2)] )))
 
-(define collision-tile (tile-index->tile 4))
+(define collision-tile-index 4)
+(define collision-action (list "red" [list collision-tile-index 0]))
 
 (define collision-state++
   (let* ([s (state-from (#f 34)
-                        (34 [4 "blue" #:on (index->port 2)]))]
+                        (34 [4 "red" #:on (index->port 2)]))]
          [p (state-players s)]
          [p (set-add p (player "white" (index->port 2) 1 1))])
     (state (state-grid s) p)))
 
 (module+ test
-  (check-equal? (add-tile collision-state "blue" collision-tile) (collided collision-state++)))
+  (check-equal? (add-tile/a collision-state collision-action) (collided collision-state++)))
 
 (define simultaneous-state
-  (state-from (#f                                [34 "blue" #:on (index->port 4)])
+  (state-from (#f                                [34 "red" #:on (index->port 4)])
               ([34 "white" #:on (index->port 3)] )))
 
 (define simultaneous-state++
   (let* ([s (state-from (#f 34)
-                        (34 [4 "blue" #:on (index->port 2)]))]
+                        (34 [4 "red" #:on (index->port 2)]))]
          [p (state-players s)]
          [p (set-add p (player "white" (index->port 5) 1 1))])
     (state (state-grid s) p)))
     
 (module+ test
-  (check-equal? (add-tile simultaneous-state "blue" collision-tile) simultaneous-state++))
+  (check-equal? (add-tile/a simultaneous-state collision-action) simultaneous-state++))
 
+(define pass-thru-state simultaneous-state)
+(define pass-thru-action [list "red" [list 7 0]])
+(define pass-thru-state++
+  (let* ([s (state-from (#f   34)
+                        ([34] [7  "red" #:on (index->port 4)]))]
+         [p (state-players s)]
+         [p (set-add p (player "white" (index->port 3) 1 1))])
+    (state (state-grid s) p)))
+
+(module+ test
+  (check-equal? (add-tile/a pass-thru-state pass-thru-action) pass-thru-state++))
+  
 ;                                                                                                    
 ;                                                                                                    
 ;                           ;                               ;;;                                      
@@ -1019,8 +1041,8 @@
     [(seen? place seen) (inf (player name port-out x y))]
     [else (list port-out x y (set-add seen place))]))
 
-(define grid+  (state-grid state+))
-(define sq-00+  (matrix-ref grid+ 0 0))
+(define grid3++ (state-grid state3++))
+(define sq-00+  (matrix-ref grid3++ 0 0))
 (define (red i) (player "red" (index->port i) 1 0))
 (define red-out (out (red 1)))
 
@@ -1030,8 +1052,8 @@
               [(33 #:rotate 180 "white" #:on port-white)]))
 
 (module+ test ;; move player
-  (check-equal? (move-player-one-square grid+ sq-00+ port-red "red" (set)) red-out "move red 1 step")
-  (check-equal? (move-one-player grid+ red-player) red-out "move red player out")
+  (check-equal? (move-player-one-square grid3++ sq-00+ port-red "red" (set)) red-out "move red 1")
+  (check-equal? (move-one-player grid3++ red-player) red-out "move red player out")
   
   (match-define (state grid-good-move _)
     (state-from [(34 "red" #:on port-red) 33 (34 #:rotate 90 "blue" #:on port-blue)]
@@ -1113,11 +1135,11 @@
 ; (module+ picts (show-state good-intermediate-state++))
 
 (module+ picts ;; demonstrate collision 
-  (define cs (add-tile collision-state "blue" collision-tile))
   (show-state collision-state #:name "pre-collision")
-  (show-state (collided-state cs) #:name "collision")
+  (show-state collision-state++ #:name "collision")
 
-  (show-state simultaneous-state++ #:name "simul"))
+  (show-state simultaneous-state #:name "pre-simultaneous")
+  (show-state simultaneous-state++ #:name "simultaneous"))
 
 ; (module+ picts (show-state state3))
 ; (module+ picts (show-state state+ #:name "expected red off"))
@@ -1143,7 +1165,6 @@
 ;      ;                       
 ;      ;                       
 ;    ;;
-
 
 (module+ json
 
@@ -1197,11 +1218,16 @@
   (define state3-action-infinite (list player-red (tile->jsexpr state3+infinite)))
   (check-true (match state3-action-infinite [(action-pat pn ti) #t]))
 
-  (define state++-jsexpr (state->jsexpr state+))
-
+  (define state3++-jsexpr (state->jsexpr state3++))
+  (define collision-state-jsexpr (state->jsexpr collision-state))
+  (define simultaneous-state-jsexpr (state->jsexpr simultaneous-state))
+  ;; + collision-action
   (define simultaneous-state++-jsexpr (state->jsexpr simultaneous-state++))
 
   (check-true (distinct-x-y-or-player-on-same-tile-different-port simultaneous-state++-jsexpr))
+
+  (define pass-thru-state-jsexpr (state->jsexpr pass-thru-state))
+  (define pass-thru-state++-jsexpr (state->jsexpr pass-thru-state++))
 
   ;; -------------------------------------------------------------------------------------------------
   (check-equal? (jsexpr->state (state->jsexpr state3)) state3)
