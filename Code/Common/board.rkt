@@ -308,6 +308,9 @@
    ;; all live players in this state 
    (-> state? (listof color?))]
 
+  [find-avatar
+   (-> color? state? (or/c #f [list/c [list/c tile-index? degree?] color? index? index?]))]
+
   [find-first-free-spot
    ;; search in clock-wise fashion starting from (0,0), a first square w/o neighbors at the periphery
    ;; search in clock-wise fashion from the left port on the NORTH side that faces inward 
@@ -407,6 +410,7 @@
 ;                 ;                                                                    
 ;                 ;                                                                    
 
+(require (submod Tsuro/Code/Common/tiles json))
 (require (except-in Tsuro/Code/Common/grid SIZE looking-at square-tile))
 (require (except-in Tsuro/Code/Common/tiles tile?))
 (require (except-in Tsuro/Code/Common/port port?))
@@ -462,13 +466,25 @@
 (define (survivors s)
   (map player-name (set->list (state-players s))))
 
+(define (find-avatar name s)
+  (define place (memf (λ (p) (equal? (player-name p) name)) (set->list (state-players s))))
+  (and place
+       (let ()
+         (match-define (player name port x y) (first place))
+         (define tile (square-tile (matrix-ref (state-grid s) x y)))
+         `[,(tile->jsexpr tile) ,name ,x ,y])))
+
 (module+ test
   (define (player-set other) (set (player "red" (index->port 0) 1 1) other))
   (define true-player  (player-set (player "blue" (index->port 2) 2 2)))
   (define false-player (player-set (player "blue" (index->port 0) 1 1)))
 
   (check-true (players-are-on-distinct-places (state '() true-player)))
-  (check-false (players-are-on-distinct-places (state '() false-player))))
+  (check-false (players-are-on-distinct-places (state '() false-player)))
+
+  (define grid (add-new-square-update-neighbors the-empty-grid  (tile-index->tile 34) 2 2))
+  (check-equal? (find-avatar "blue" (state grid true-player)) `[[34 0] "blue" 2 2])
+  (check-false  (find-avatar "green" (state grid false-player))))
 
 
 ;                                                                                             
@@ -695,7 +711,7 @@
     ;; -- spot has no occupied neighbors, so port faces empty spot
     ;; ERGO it is an initial state 
 
-    (define grid+1    (matrix-set grid x y tile))
+    (define grid+1    (add-new-square-update-neighbors grid tile x y))
     (define players+1 (set-add players (player name port x y)))
     (state grid+1 players+1)))
 
