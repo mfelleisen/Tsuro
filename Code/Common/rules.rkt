@@ -1,19 +1,27 @@
 #lang racket
 
+;; a Tsuro rule checker 
+
 (require Tsuro/Code/Common/actions)
 (require (only-in Tsuro/Code/Common/board state?))
 (require (only-in Tsuro/Code/Common/tokens color?))
 
-(define result/c (or/c state?))
+(define (ok s) (or/c #false s))
 
 (provide
  (contract-out
-  [legal-initial   (-> state? color? init-action/c result/c)]
-  [legal-take-turn (-> state? color? turn-action/c result/c)]))
+  [legal-initial
+   (-> initial-state? color? tile-index? tile-index? tile-index? init-action/c (ok initial-state?))]
+  [legal-take-turn
+   (-> state? color? tile-index? tile-index? turn-action/c (ok state?))]))
 
 ;; ---------------------------------------------------------------------------------------------------
 (require (except-in Tsuro/Code/Common/board state?))
 (require Tsuro/Code/Common/tiles)
+
+(module+ test
+  (require (submod Tsuro/Code/Common/board test))
+  (require rackunit))
 
 ;; ---------------------------------------------------------------------------------------------------
 ;; A player gets handed a board representation and responds with an action.
@@ -25,26 +33,52 @@
 ;; -- does not neighbor an already placed tile in a cardinal direction
 ;; -- the player faces an empty square on the board.
 
-
-(define (legal-initial board player ia)
+(define (legal-initial state0 player given-ti1 given-ti2 given-ti3 ia)
   (match-define (list (list ti d) p x y) ia)
-  ;; ???? needs new board action 
-  #false)
+  (define tidx (first ia))
+  (define spot (rest ia))
+  (cond
+    [(not (or (equal? ti given-ti1) (equal? ti given-ti2))) #false]
+    [(not (degree? d)) #false]
+    [(and (not (set-member? (survivors state0) player)) ((dont-use-taken-spot/c state0) spot))
+     (define tile (tile-index->tile tidx))
+     (define state+1 (place-first-tile state0 player tile spot))
+     (and (initial-state? state+1) state+1)]
+    [else #false]))
 
 ;; ---------------------------------------------------------------------------------------------------
 ;; A  turn-action/c merely specifies a tile index and a rotation.
 ;; It is legal if placing the tile does not lead to
-;; -- the suicide of the player's avatar 
+;; -- the suicide of the player's avatar unless all options demand it 
 ;; -- the infinite looping of any avatar, including the player's
-;; -- the collision of two (or more) player avatars on the same spot.
 
-(define (legal-take-turn state player ta)
+(define (legal-take-turn state player given-ti1 given-ti2 ta)
   (match-define (list ti d) ta)
-  (define tile (rotate-tile (tile-index->tile ti) d))
-  (define state+1 (add-tile state player tile))
-  (and (not (infinite? state+1)) (not (collided? state+1)) (not (suicide? state+1 player)) state+1))
+  (cond
+    [(not (or (equal? ti given-ti1) (equal? ti given-ti2))) #false]
+    [(not (degree? d)) #false]
+    [else 
+     (define tile (rotate-tile (tile-index->tile ti) #:degree d))
+     (define state+1 (add-tile state player tile))
+     (if (and (suicide? state+1 player)
+              (all-suicide? state player given-ti1 given-ti2))
+         state+1
+         (and (not (infinite? state+1))
+              (not (suicide? state+1 player))
+              state+1))]))
 
 #; {State Player -> Boolean}
 ;; is player a dead in state? 
 (define (suicide? state player)
   (boolean? (member player (survivors state))))
+
+#;{State Player TileIndex TileIndex -> Boolean}
+(define (all-suicide? state player ti1 ti2)
+  (for/and ((t (append (all-tiles ti1) (all-tiles ti2))))
+    (define state+1 (add-tile state player t))
+    (suicide? state+1)))
+
+(module+ test
+  (match-define [list player [list tile-index degrees]] (first good-state-actions))
+  (define action1 [list tile-index degrees])
+  (check-true (state? (legal-take-turn good-intermediate-state player tile-index 0 action1))))
