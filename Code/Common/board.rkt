@@ -322,7 +322,7 @@
   [find-avatar
    (-> color? state? (or/c #f [list/c [list/c tile-index? degree?] color? index? index?]))]
 
-  [find-first-free-spot
+  [find-free-spots
    ;; find all legal initial positions starting from (0,0) in clockwise direction
    ;; with free ports also specified in clockwise fashion starting from top left 
    (-> state? (listof spot/c))]
@@ -408,14 +408,39 @@
 
    no-red-state-jsexpr))
 
+(module+ test
+  (provide
+   ;; States as JSexpr 
+   state3
+   good-intermediate-state
+   good-state-actions
+   good-intermediate-state++
+
+   ;; Intermediates as JSexpr
+   bad-intermediate-spec
+   bad-intermediate-spec-2
+
+   ;; actions on states 
+   state3-action
+   state3-action-infinite
+   state3++
+   
+   collision-state
+   collision-action
+   
+   simultaneous-state
+   simultaneous-state++
+
+   pass-thru-state
+   pass-thru-action
+   pass-thru-state++
+
+   no-red-state))
+
 (module+ picts
   (provide
    state->pict
    show-state))
-
-(module+ test
-  (provide 
-   checks-initialization-sequence))
 
 ;                                                                                      
 ;       ;                                  ;                                           
@@ -641,6 +666,7 @@
          (values (add-new-square-update-neighbors grid tile x y) (set-add players new-player))])))
   (state grid players))
 
+;; ---------------------------------------------------------------------------------------------------
 (module+ test ;; testing the DSL
   (check-equal? (intermediate-list-from-spec
                  ((34 "red" #:on port-red) #f (34 #:rotate 90 "blue" #:on port-blue))
@@ -697,18 +723,28 @@
   (check-exn exn:fail:contract? (λ () (initialize `((,tile-00 "x" 2 0 0)))) "port, not index")
   (check-equal? (initialize inits-for-state-with-3-players) state3))
 
-;; ---------------------------------------------------------------------------------------------------
-;; TODO: find all free spots
-;; -- fix testing function 
-;; -- change name here and in strategy
+;                                                                        
+;      ;;                                                                
+;     ;                                                       ;          
+;     ;                                                       ;          
+;   ;;;;;   ;;;;   ;;;    ;;;           ;;;   ;;;;    ;;;   ;;;;;   ;;;  
+;     ;     ;;  ; ;;  ;  ;;  ;         ;   ;  ;; ;;  ;; ;;    ;    ;   ; 
+;     ;     ;     ;   ;; ;   ;;        ;      ;   ;  ;   ;    ;    ;     
+;     ;     ;     ;;;;;; ;;;;;;         ;;;   ;   ;  ;   ;    ;     ;;;  
+;     ;     ;     ;      ;                 ;  ;   ;  ;   ;    ;        ; 
+;     ;     ;     ;      ;             ;   ;  ;; ;;  ;; ;;    ;    ;   ; 
+;     ;     ;      ;;;;   ;;;;          ;;;   ;;;;    ;;;     ;;;   ;;;  
+;                                             ;                          
+;                                             ;                          
+;                                             ;                          
 
-(define (find-first-free-spot s0)
+(define (find-free-spots s0)
   (match-define (state grid players) s0)
   (apply append
          (for/list ((loc (clock-wise)))
            (if (free-for-init grid loc)
-	       (map (λ (p) (cons p loc)) (pick-port loc))
-	       '()))))
+               (map (λ (p) (cons p loc)) (pick-port loc))
+               '()))))
 
 #; {-> [Listof Location]}
 (define (clock-wise)
@@ -724,27 +760,23 @@
   (for/list ((p (in-list PORTS)) #:when (apply port-facing-inward? p loc)) p))
 
 (module+ test
-  
-  (define (checks-initialization-sequence #:actual actual #:expected expected spot0 player-placements)
-    (define-values (_1 _2)
-      (for/fold ([init '()][spot spot0]) ([pp player-placements])
-        (match-define [list color port x y] pp)
-        (define state (initialize init))
-        (check-equal? (actual color port x y spot init state)
-                      (expected color port x y spot init state)
-                      color)
-        (values (cons (list* tile-00 color spot) init) (list port x y))))
-    (void))
-  
+
   (define two (index->port 2))
-  (define strategy 0)
-  (checks-initialization-sequence
-   #:actual 
-   (λ (color port x y spot init state) (find-first-free-spot state))
-   #:expected
-   (λ (color port x y spot init state) (list spot))
-   `(,port-red 0 0)
-   `[("red" ,two 2 0) ("black" ,two 4 0) ("blue" ,two 6 0) ("white" ,two 8 0) ("green" 0 9 1)]))
+  (define (fff x y) (curry filter (λ (z) (equal? (list x y) (rest z)))))
+  
+  (check-equal? ((fff 0 0) (find-free-spots (initialize '())))
+                `[[,(index->port 2) 0 0]
+                  [,(index->port 3) 0 0]
+                  [,(index->port 4) 0 0]
+                  [,(index->port 5) 0 0]])
+
+  (check-equal? ((fff 2 0) (find-free-spots (initialize `[(,tile-00 "black" ,two 0 0)])))
+                `[[,(index->port 2) 2 0]
+                  [,(index->port 3) 2 0]
+                  [,(index->port 4) 2 0]
+                  [,(index->port 5) 2 0]
+                  [,(index->port 6) 2 0]
+                  [,(index->port 7) 2 0]]))
 
 
 ;                                                                               
@@ -786,14 +818,9 @@
     (state grid+1 players+1)))
 
 (module+ test
-  (checks-initialization-sequence
-   #:actual 
-   (λ (color port x y spot init state) (initial-state? (place-first-tile state color tile-00 spot)))
-   #:expected 
-   (λ (color port x y spot init state) #true)
-   `(,port-red 0 0)
-   `[("red" ,two 2 0) ("black" ,two 4 0) ("blue" ,two 6 0) ("white" ,two 8 0)]))
 
+  (check-equal? (place-first-tile (initialize '()) "black"  tile-00`[,(index->port 2) 0 0])
+                (initialize `[(,tile-00 "black" ,two 0 0)])))
 
 ;                                                                                      
 ;                                                        ;                             
@@ -978,10 +1005,11 @@
 ;; infinite loops
 
 (define state3+infinite-index 34)
+(define state3-action-infinite (list player-red (tile->jsexpr state3+infinite)))
 (define state3+infinite (tile-index->tile state3+infinite-index))
 
 (module+ test 
-  (check-true (infinite? (add-tile state3 player-red state3+infinite)) "red player goes infinite"))
+  (check-true (infinite? (add-tile/a state3 state3+infinite)) "red player goes infinite"))
 
 ;; ---------------------------------------------------------------------------------------------------
 ;; two avatars collide on the same tile and same port 
@@ -1299,7 +1327,6 @@
     (_ pn ti) #'`(,(? color? pn) ,(tile-pat ti)))
   
   (check-true (match state3-action [(action-pat pn ti) #t]))
-  (define state3-action-infinite (list player-red (tile->jsexpr state3+infinite)))
   (check-true (match state3-action-infinite [(action-pat pn ti) #t]))
 
   (define state3++-jsexpr (state->jsexpr state3++))
