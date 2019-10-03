@@ -205,8 +205,8 @@
     [(WEST)  (values (- x 1) y)]))
 
 (define (free-for-init grid loc)
-  (for/and ((n (cons loc (apply neighbor-locations loc))))
-    (not (equal? (apply matrix-ref grid n) BLANK))))
+  (for/and ((n (cons loc (neighbor-locations loc))))
+    (equal? (apply matrix-ref grid n) BLANK)))
 
 (define (all-neighbors-blank grid loc)
   (for/and ((n (neighbor-locations loc)))
