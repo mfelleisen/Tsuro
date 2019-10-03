@@ -296,6 +296,7 @@
  ;; type State
  ;; all players are on ports that face empty squares on the grid 
  state?
+ initial-state?
 
  ;; type Player
  #; [name #;color? port #;port? x #;index? y #;index?]
@@ -723,31 +724,31 @@
   (check-exn exn:fail:contract? (λ () (initialize `((,tile-00 "x" 2 0 0)))) "port, not index")
   (check-equal? (initialize inits-for-state-with-3-players) state3))
 
-;                                                                        
-;      ;;                                                                
-;     ;                                                       ;          
-;     ;                                                       ;          
-;   ;;;;;   ;;;;   ;;;    ;;;           ;;;   ;;;;    ;;;   ;;;;;   ;;;  
-;     ;     ;;  ; ;;  ;  ;;  ;         ;   ;  ;; ;;  ;; ;;    ;    ;   ; 
-;     ;     ;     ;   ;; ;   ;;        ;      ;   ;  ;   ;    ;    ;     
-;     ;     ;     ;;;;;; ;;;;;;         ;;;   ;   ;  ;   ;    ;     ;;;  
-;     ;     ;     ;      ;                 ;  ;   ;  ;   ;    ;        ; 
-;     ;     ;     ;      ;             ;   ;  ;; ;;  ;; ;;    ;    ;   ; 
-;     ;     ;      ;;;;   ;;;;          ;;;   ;;;;    ;;;     ;;;   ;;;  
-;                                             ;                          
-;                                             ;                          
-;                                             ;                          
+;                                                                               
+;      ;;                                 ;;                                    
+;     ;                                  ;       ;                   ;          
+;     ;                                  ;                           ;          
+;   ;;;;;   ;;;;   ;;;    ;;;          ;;;;;   ;;;    ;;;;   ;;;   ;;;;;   ;;;  
+;     ;     ;;  ; ;;  ;  ;;  ;           ;       ;    ;;  ; ;   ;    ;    ;   ; 
+;     ;     ;     ;   ;; ;   ;;          ;       ;    ;     ;        ;    ;     
+;     ;     ;     ;;;;;; ;;;;;;          ;       ;    ;      ;;;     ;     ;;;  
+;     ;     ;     ;      ;               ;       ;    ;         ;    ;        ; 
+;     ;     ;     ;      ;               ;       ;    ;     ;   ;    ;    ;   ; 
+;     ;     ;      ;;;;   ;;;;           ;     ;;;;;  ;      ;;;     ;;;   ;;;  
+;                                                                               
+;                                                                               
+;                                                                               
 
 (define (find-free-spots s0)
   (match-define (state grid players) s0)
-  (apply append
-         (for/list ((loc (clock-wise)))
-           (if (free-for-init grid loc)
-               (map (λ (p) (cons p loc)) (pick-port loc))
-               '()))))
+  (reverse 
+   (for/fold ([rresult '()]) ((loc clock-wise))
+     (if (free-for-init grid loc)
+         (append (reverse (map (λ (p) (cons p loc)) (pick-port loc))) rresult)
+         rresult))))
 
 #; {-> [Listof Location]}
-(define (clock-wise)
+(define clock-wise ;; starting at (0,0) [exclusive]
   (append (for/list ([i (in-range 9)]) (list (+ i 1) 0))
           (for/list ([j (in-range 9)]) (list 9 (+ j 1)))
           (reverse (for/list ([i (in-range 9)]) (list i 9)))
