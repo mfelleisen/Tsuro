@@ -297,6 +297,7 @@
  ;; all players are on ports that face empty squares on the grid 
  state?
  initial-state?
+ dont-use-taken-spot/c
 
  ;; type Player
  #; [name #;color? port #;port? x #;index? y #;index?]
@@ -412,7 +413,10 @@
 (module+ test
   (provide
    state3
-   inits-for-state-with-3-players))
+   inits-for-state-with-3-players
+
+   good-intermediate-state
+   good-state-actions))
 
 (module+ picts
   (provide
@@ -755,21 +759,20 @@
                   [,(index->port 6) 2 0]
                   [,(index->port 7) 2 0]]))
 
-
-;                                                                               
-;                                                ;;                             
-;          ;;;                                  ;       ;                   ;   
-;            ;                                  ;                           ;   
-;   ;;;;     ;    ;;;;    ;;;    ;;;          ;;;;;   ;;;    ;;;;   ;;;   ;;;;; 
-;   ;; ;;    ;        ;  ;;  ;  ;;  ;           ;       ;    ;;  ; ;   ;    ;   
-;   ;   ;    ;        ;  ;      ;   ;;          ;       ;    ;     ;        ;   
-;   ;   ;    ;     ;;;;  ;      ;;;;;;          ;       ;    ;      ;;;     ;   
-;   ;   ;    ;    ;   ;  ;      ;               ;       ;    ;         ;    ;   
-;   ;; ;;    ;    ;   ;  ;;     ;               ;       ;    ;     ;   ;    ;   
-;   ;;;;      ;;   ;;;;   ;;;;   ;;;;           ;     ;;;;;  ;      ;;;     ;;; 
-;   ;                                                                           
-;   ;                                                                           
-;   ;                                                                           
+;                                                                                                    
+;              ;      ;            ;;                                                                
+;              ;      ;           ;       ;                   ;             ;       ;   ;;;          
+;              ;      ;           ;                           ;             ;             ;          
+;   ;;;;    ;;;;   ;;;;         ;;;;;   ;;;    ;;;;   ;;;   ;;;;;         ;;;;;   ;;;     ;     ;;;  
+;       ;  ;; ;;  ;; ;;           ;       ;    ;;  ; ;   ;    ;             ;       ;     ;    ;;  ; 
+;       ;  ;   ;  ;   ;           ;       ;    ;     ;        ;             ;       ;     ;    ;   ;;
+;    ;;;;  ;   ;  ;   ;           ;       ;    ;      ;;;     ;             ;       ;     ;    ;;;;;;
+;   ;   ;  ;   ;  ;   ;           ;       ;    ;         ;    ;             ;       ;     ;    ;     
+;   ;   ;  ;; ;;  ;; ;;           ;       ;    ;     ;   ;    ;             ;       ;     ;    ;     
+;    ;;;;   ;;;;   ;;;;           ;     ;;;;;  ;      ;;;     ;;;           ;;;   ;;;;;    ;;   ;;;; 
+;                                                                                                    
+;                                                                                                    
+;                                                                                                    
 
 (struct bad-spot [state spot] #:transparent)
 
@@ -950,6 +953,7 @@
               #:set0 (set-remove (state-players state3) red-player)
               (#f (tile-to-add-to-grid-3-index #:rotate 90))))
 
+(define good-state-tiles '(11 12 34))
 (define good-state-actions `[(,player-red (11 0)) (,player-red (12 0)) (,player-red (34 0))])
 (define good-intermediate-state+
   (state-from (34 (11 "red" #:on #\E) (34 #:rotate 90 "blue" #:on port-blue))
