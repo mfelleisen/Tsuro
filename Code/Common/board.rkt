@@ -323,9 +323,9 @@
    (-> color? state? (or/c #f [list/c [list/c tile-index? degree?] color? index? index?]))]
 
   [find-first-free-spot
-   ;; search in clock-wise fashion starting from (0,0), a first square w/o neighbors at the periphery
-   ;; search in clock-wise fashion from the left port on the NORTH side that faces inward 
-   (-> state? (-> location/c location/c) (-> location/c port?) spot/c)]
+   ;; find all legal initial positions starting from (0,0) in clockwise direction
+   ;; with free ports also specified in clockwise fashion starting from top left 
+   (-> state? (listof spot/c))]
 
   [place-first-tile
    (->i ([s (and/c state? initial-state?)]
@@ -698,10 +698,54 @@
   (check-equal? (initialize inits-for-state-with-3-players) state3))
 
 ;; ---------------------------------------------------------------------------------------------------
-(define (find-first-free-spot s0 clock-wise pick-port)
+;; TODO: find all free spots
+;; -- fix testing function 
+;; -- change name here and in strategy
+
+(define (find-first-free-spot s0)
   (match-define (state grid players) s0)
-  (let loop ([loc (list 0 0)])
-    (if (free-for-init grid loc) (cons (pick-port loc) loc) (loop (clock-wise loc)))))
+  (apply append
+         (for/list ((loc (clock-wise)))
+           (if (free-for-init grid loc)
+	       (map (λ (p) (cons p loc)) (pick-port loc))
+	       '()))))
+
+#; {-> [Listof Location]}
+(define (clock-wise)
+  (append (for/list ([i (in-range 9)]) (list (+ i 1) 0))
+          (for/list ([j (in-range 9)]) (list 9 (+ j 1)))
+          (reverse (for/list ([i (in-range 9)]) (list i 9)))
+          (reverse (for/list ([j (in-range 9)]) (list 0 j)))))
+
+#; {Location -> [Listof Port]}
+;; ASSUME no neighboring tile 
+(define (pick-port loc)
+  (define n (neighbor-locations loc))
+  (for/list ((p (in-list PORTS)) #:when (apply port-facing-inward? p loc)) p))
+
+(module+ test
+  
+  (define (checks-initialization-sequence #:actual actual #:expected expected spot0 player-placements)
+    (define-values (_1 _2)
+      (for/fold ([init '()][spot spot0]) ([pp player-placements])
+        (match-define [list color port x y] pp)
+        (define state (initialize init))
+        (check-equal? (actual color port x y spot init state)
+                      (expected color port x y spot init state)
+                      color)
+        (values (cons (list* tile-00 color spot) init) (list port x y))))
+    (void))
+  
+  (define two (index->port 2))
+  (define strategy 0)
+  (checks-initialization-sequence
+   #:actual 
+   (λ (color port x y spot init state) (find-first-free-spot state))
+   #:expected
+   (λ (color port x y spot init state) (list spot))
+   `(,port-red 0 0)
+   `[("red" ,two 2 0) ("black" ,two 4 0) ("blue" ,two 6 0) ("white" ,two 8 0) ("green" 0 9 1)]))
+
 
 ;                                                                               
 ;                                                ;;                             
@@ -742,22 +786,13 @@
     (state grid+1 players+1)))
 
 (module+ test
-  (define (checks-initialization-sequence actual expected spot0 player-placements)
-    (define-values (_1 _2)
-      (for/fold ([init '()][spot spot0]) ([pp player-placements])
-        (match-define [list color port x y] pp)
-        (define state (initialize init))
-        (check-equal? (actual color port x y spot init state)
-                      (expected color port x y spot init state)
-                      color)
-        (values (cons (list* tile-00 color spot) init) (list port x y))))
-    (void))
-
-  (define two (index->port 2))
   (checks-initialization-sequence
+   #:actual 
    (λ (color port x y spot init state) (initial-state? (place-first-tile state color tile-00 spot)))
+   #:expected 
    (λ (color port x y spot init state) #true)
-   `(,port-red 0 0) `[("red" ,two 2 0) ("black" ,two 4 0) ("blue" ,two 6 0) ("white" ,two 8 0)]))
+   `(,port-red 0 0)
+   `[("red" ,two 2 0) ("black" ,two 4 0) ("blue" ,two 6 0) ("white" ,two 8 0)]))
 
 
 ;                                                                                      

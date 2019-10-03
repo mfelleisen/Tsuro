@@ -24,6 +24,11 @@
    - discovered while adding a feature to state->pict for showing multiple players on one tile
    - this also affected the JSON representation of intermediate boards, and its contracts
 
+6. in Common/grid 
+   - free-for-init had negated its logic (not equal to BLANK instead of equal to BLANK)
+   - I have no clue how test cases ever passed 
+   - discovered while creating the right function for initial place finder 
+   - not a type problem 
 
 ### Design Bugs 
 
