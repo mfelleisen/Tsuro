@@ -1005,11 +1005,10 @@
 ;; infinite loops
 
 (define state3+infinite-index 34)
-(define state3-action-infinite (list player-red (tile->jsexpr state3+infinite)))
-(define state3+infinite (tile-index->tile state3+infinite-index))
+(define state3-action-infinite (list player-red (list state3+infinite-index 0)))
 
 (module+ test 
-  (check-true (infinite? (add-tile/a state3 state3+infinite)) "red player goes infinite"))
+  (check-true (infinite? (add-tile/a state3 state3-action-infinite)) "red player goes infinite"))
 
 ;; ---------------------------------------------------------------------------------------------------
 ;; two avatars collide on the same tile and same port 
