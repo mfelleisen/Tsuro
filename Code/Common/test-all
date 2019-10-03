@@ -1,6 +1,6 @@
 #!/bin/sh 
 
-raco make *rkt 
+raco make *.rkt 
 
-time raco test matrix.rkt grid.rkt port-alphabetic.rkt tiles.rkt board.rkt 
+time raco test tokens.rkt port*.rkt matrix.rkt grid.rkt tiles.rkt board.rkt player-interface.rkt rules.rkt
 time raco test -s json tiles.rkt board.rkt 
