@@ -19,61 +19,30 @@
 
 ;; ---------------------------------------------------------------------------------------------------
 (define strategy/c
-  (class/c 
-   (initial
-    (->m initial-player-on-tile*/c tile-index? tile-index? tile-index? init-action/c))
-   [take-turn
-    (->m intermediate*/c tile-index? tile-index? turn-action/c)]))
+  (class/c
+   ;; the initial step does not need to know which player the initial placement is chosen for 
+   (initial   (->m initial-state? tile-index? tile-index? tile-index? init-action/c))
+   ;; the take-tuen must know; it can find out who else is playing via survivors (if needed)
+   [take-turn (->m color? state? tile-index? tile-index? turn-action/c)]))
 
 (define first-strategy%
   (class object%
 
-    ;; find first free spot starting from (0,0) where a tile can be placed at the periphery
-    ;; then find the first free port facing an empty tile 
-    (define/public (initial tiles-placed-so-far tile1 tile2 tile3)
-      (define board (initialize tiles-placed-so-far))
-      (define spot  (find-first-free-spot board clock-wise pick-port))
+    ;; use first free spot starting from (0,0) [exclusive] where a tile can be placed at the periphery
+    ;; use first free port facing an empty tile; search clockwise in both cases 
+    (define/public (initial board tile1 tile2 tile3)
+      (define spot (first (find-free-spots board)))
       (cons (list tile3 0) spot))
 
     ;; use the first tile, don't rotate 
-    (define/public (take-turn tiles-placed-so-far tile1 tile2)
+    (define/public (take-turn me board tile1 tile2)
       (list tile1 0))
 
     (super-new)))
 
-#; {Location -> Location}
-(define (clock-wise loc)
-  (define-values (x y) (apply values loc))
-  (cond
-    [(and (< (+ x 1) SIZE) (= y 0))          (list (+ x 1) 0)]
-    [(and (= (+ x 1) SIZE) (< (+ y 1) SIZE)) (list x (+ y 1))]
-    [(and (> x 0) (= (+ y 1) SIZE))          (list (- x 1) y)]
-    [(and (= x 0) (>  y 0))                  (list x (- y 1))]
-    [else (error 'find-first-free-spot "out of free periphery positions")]))
-
-(define (counter-clock-wise loc)
-  (define-values (x y) (apply values loc))
-  (cond
-    [(and (= x 0) (< (+ y 1) SIZE))          (list x (+ y 1))]
-    [(and (< (+ x 1) SIZE) (= (+ y 1) SIZE)) (list (+ x 1) y)]
-    [(and (= (+ x 1) SIZE) (> y 0))          (list x (- y 1))]
-    [(and (> x 0) (= y 0))                   (list (- x 1) y)]
-    [else (error 'find-first-free-spot "out of free periphery positions")]))
-
-#; {Location -> Port}
-;; ASSUME no neighboring tile 
-(define (pick-port loc)
-  (define n (neighbor-locations loc))
-  (for/first ((p (in-list PORTS)) #:when (apply port-facing-inward? p loc)) p))
-
 (module+ test
-  (define port-red (index->port 2))
-  (define two (index->port 2))
   (define strategy (new first-strategy%))
-  (checks-initialization-sequence
-   (λ (color port x y spot init state) (send strategy initial init 1 2 3))
-   (λ (color port x y spot init state) (cons `(3 0) spot))
-   `(,port-red 0 0)
-   `[("red" ,two 2 0) ("black" ,two 4 0) ("blue" ,two 6 0) ("white" ,two 8 0) ("green" 0 9 1)])
-
-  (check-equal? (send (new first-strategy%) take-turn '[] 1 2) (list 1 0)))
+  (define me "red")
+  
+  (check-equal? (send strategy initial (initialize '()) 1 2 3) `[[3 0] ,(index->port 2) 1 0])
+  (check-equal? (send strategy take-turn me state3 1 2) (list 1 0)))

@@ -411,32 +411,8 @@
 
 (module+ test
   (provide
-   ;; States as JSexpr 
    state3
-   good-intermediate-state
-   good-state-actions
-   good-intermediate-state++
-
-   ;; Intermediates as JSexpr
-   bad-intermediate-spec
-   bad-intermediate-spec-2
-
-   ;; actions on states 
-   state3-action
-   state3-action-infinite
-   state3++
-   
-   collision-state
-   collision-action
-   
-   simultaneous-state
-   simultaneous-state++
-
-   pass-thru-state
-   pass-thru-action
-   pass-thru-state++
-
-   no-red-state))
+   inits-for-state-with-3-players))
 
 (module+ picts
   (provide
