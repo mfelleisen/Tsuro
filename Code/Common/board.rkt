@@ -413,8 +413,9 @@
 (module+ test
   (provide
    state3
+   state3-action
    inits-for-state-with-3-players
-
+   
    good-intermediate-state
    good-state-actions))
 
