@@ -1,3 +1,5 @@
+;; TDDO: resolve player alive: rules.rkt might be wrong; push to referee with dependent contracts? 
+
 #lang racket
 
 ;; a Tsuro rule checker 
@@ -106,7 +108,7 @@
     (define tile-2-index (or t2 tile-index))
     (check-equal? (legal-take-turn state player tile-1-index tile-2-index action2) expected msg))
 
-  (check-turn good-intermediate-state state3-action #false "why is state3-action illegal?")
+  (check-turn good-intermediate-state state3-action #false "plain suicide?")
   (check-turn state-suicide state3-action-infinite state-suicide++ "forced suicide")
   (check-turn state3 state3-action-infinite #false "infinite loop")
   (check-turn good-intermediate-state #:t1 0 #:t2 0 '["red" [1 0]] #false "not a given tile")  
