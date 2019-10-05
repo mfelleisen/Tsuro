@@ -412,9 +412,12 @@
 
 (module+ test
   (provide
+   state-suicide
    state3
    state3-action
    inits-for-state-with-3-players
+   state3-action-infinite
+   state-suicide++
    
    good-intermediate-state
    good-state-actions))
@@ -984,13 +987,22 @@
                 "red fwd 3"))
 
 ;; ---------------------------------------------------------------------------------------------------
-;; infinite loops
+;; infinite loops, plus more driving red off the board 
 
 (define state3+infinite-index 34)
-(define state3-action-infinite (list player-red (list state3+infinite-index 0)))
+(define (state3-action-infinite* d) (list player-red (list state3+infinite-index d)))
+(define state3-action-infinite (state3-action-infinite* 0))
+
+(define state-suicide (state-from [(21 "red" #:on port-blue)]))
+(define state-suicide++ (state-from (21) (34)))
 
 (module+ test 
-  (check-true (infinite? (add-tile/a state3 state3-action-infinite)) "red player goes infinite"))
+  (check-true (infinite? (add-tile/a state3 state3-action-infinite)) "red player goes infinite")
+  
+  (check-equal? (add-tile/a state-suicide (state3-action-infinite* 270)) state-suicide++ "270")
+  (check-equal? (add-tile/a state-suicide (state3-action-infinite* 180)) state-suicide++ "180")
+  (check-equal? (add-tile/a state-suicide (state3-action-infinite* 90)) state-suicide++ "90")
+  (check-equal? (add-tile/a state-suicide (state3-action-infinite* 00)) state-suicide++ "0"))
 
 ;; ---------------------------------------------------------------------------------------------------
 ;; two avatars collide on the same tile and same port 
@@ -1234,7 +1246,7 @@
   (show-state simultaneous-state #:name "pre-simultaneous")
   (show-state simultaneous-state++ #:name "simultaneous"))
 
-; (module+ picts (show-state state3))
+(module+ picts (show-state state3))
 ; (module+ picts (show-state state+ #:name "expected red off"))
 ; (module+ picts (show-state (add-tile/a state3 state3-action) #:name "red off"))
 

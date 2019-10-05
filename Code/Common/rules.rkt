@@ -19,6 +19,7 @@
 (require (except-in Tsuro/Code/Common/board state?))
 (require Tsuro/Code/Common/tiles)
 (require Tsuro/Code/Common/port)
+(require SwDev/Debugging/spy)
 
 (module+ test
   (require (submod ".."))
@@ -81,14 +82,21 @@
 
   ; (check-false (legal-initial state3 "red" 0 0 0 `[[0 666] ,(index->port 0) 0 0]) "i: not degree")
   (check-false (legal-initial state3 "red" 0 0 0 `[[1 0] ,(index->port 0) 0 0]) "i: not a given")
-
+  
   (let ()
     (match-define [list player [list tile-index degrees]] state3-action)
     (define action2 (second state3-action))
     (check-false (legal-take-turn good-intermediate-state player tile-index tile-index action2)))
 
+  (let ()
+    (match-define [list plyr [list tile-index degrees]] state3-action-infinite)
+    (define action2 (second state3-action-infinite))
+    (check-true (suicide? (add-tile state-suicide plyr (tile-index->tile tile-index)) plyr) "suicide")
+    (check-equal? (legal-take-turn state-suicide plyr tile-index tile-index action2) state-suicide++))
+
   ; (check-false (legal-take-turn good-intermediate-state "red" 0 0 `[0 666]) "not degree")
   (check-false (legal-take-turn good-intermediate-state "red" 0 0 `[1 0]) "not a given tile")
+  
 
   (match-define [list player [list tile-index degrees]] (first good-state-actions))
   (define action1 [list tile-index degrees])
