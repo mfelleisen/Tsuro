@@ -418,9 +418,16 @@
    inits-for-state-with-3-players
    state3-action-infinite
    state-suicide++
+
+   state3+green-spot
+   state3+green-ti
+   state3+green
    
    good-intermediate-state
-   good-state-actions))
+   good-state-actions
+   good-intermediate-state+
+   good-intermediate-state++
+   good-intermediate-state+++))
 
 (module+ picts
   (provide
@@ -804,7 +811,20 @@
 (module+ test
 
   (check-equal? (place-first-tile (initialize '()) "black"  tile-00`[,(index->port 2) 0 0])
-                (initialize `[(,tile-00 "black" ,two 0 0)])))
+                (initialize `[(,tile-00 "black" ,two 0 0)]))
+
+  (define state3+green-ti 17)
+  (define state3+green-tile (tile-index->tile state3+green-ti))
+  (define state3+green-spot `[,(index->port 3) 4 0])
+  (define state3+green 
+    (let ()
+      (match-define [list port x y] state3+green-spot)
+      (define g (add-new-square-update-neighbors (state-grid state3) state3+green-tile x y))
+      (define p (set-add (state-players state3) (apply player "green" state3+green-spot)))
+      (state g p)))
+  
+  (check-equal? (place-first-tile state3 "green" state3+green-tile state3+green-spot) state3+green))
+                
 
 ;                                                                                      
 ;                                                        ;                             

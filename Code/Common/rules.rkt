@@ -24,6 +24,7 @@
 (module+ test
   (require (submod ".."))
   (require (submod Tsuro/Code/Common/board test))
+  (require (submod Tsuro/Code/Common/board picts))
   (require rackunit))
 
 ;; ---------------------------------------------------------------------------------------------------
@@ -38,14 +39,15 @@
 
 (define (legal-initial state0 player given-ti1 given-ti2 given-ti3 ia)
   (match-define (list (list ti d) p x y) ia)
-  (define tidx (first ia))
+  
   (define spot (rest ia))
   (cond
     [(not (or (equal? ti given-ti1) (equal? ti given-ti2))) #false]
-    [(and (not (set-member? (survivors state0) player)) ((dont-use-taken-spot/c state0) spot))
-     (define tile (tile-index->tile tidx))
+    [(set-member? (survivors state0) player) #false]
+    [((dont-use-taken-spot/c state0) spot)
+     (define tile (rotate-tile (tile-index->tile ti) #:degree d))
      (define state+1 (place-first-tile state0 player tile spot))
-     (and (initial-state? state+1) state+1)]
+     (if (bad-spot? state+1) #false (and (initial-state? state+1) state+1))]
     [else #false]))
 
 ;; ---------------------------------------------------------------------------------------------------
@@ -61,11 +63,11 @@
     [else 
      (define tile (rotate-tile (tile-index->tile ti) #:degree d))
      (define state+1 (add-tile state player tile))
-     (if (and (suicide? state+1 player) (all-suicide? state player given-ti1 given-ti2))
-         state+1
-         (and (not (infinite? state+1))
-              (not (suicide? state+1 player))
-              state+1))]))
+     (cond
+       [(infinite? state+1) #false]
+       [(suicide? state+1 player)
+        (if (all-suicide? state player given-ti1 given-ti2) state+1 #false)]
+       [else state+1])]))
 
 #; {State Player -> Boolean}
 ;; is player a dead in state? 
@@ -80,24 +82,36 @@
 
 (module+ test
 
-  ; (check-false (legal-initial state3 "red" 0 0 0 `[[0 666] ,(index->port 0) 0 0]) "i: not degree")
-  (check-false (legal-initial state3 "red" 0 0 0 `[[1 0] ,(index->port 0) 0 0]) "i: not a given")
+  ;; -------------------------------------------------------------------------------------------------
+  ;; check the initial placement rule 
+
+  (define (check-initial player #:ti (ti1 0) init (msg "") (expected #f))
+    (check-equal? (legal-initial state3 player ti1 0 0 init) expected msg))
   
-  (let ()
-    (match-define [list player [list tile-index degrees]] state3-action)
-    (define action2 (second state3-action))
-    (check-false (legal-take-turn good-intermediate-state player tile-index tile-index action2)))
+  (check-initial "green" #:ti 0 `[[1 0] ,(index->port 0) 0 0] "not a given tile")
+  (check-initial "red" #:ti 0 `[[0 0] ,(index->port 0) 0 0] "already played")
+  (check-initial "green" #:ti state3+green-ti `[[,state3+green-ti 0] ,(index->port 0) 4 0] "bad port")
+  (check-initial "green" `[[0 0] ,(index->port 0) 0 0] "taken spot")
 
-  (let ()
-    (match-define [list plyr [list tile-index degrees]] state3-action-infinite)
-    (define action2 (second state3-action-infinite))
-    (check-true (suicide? (add-tile state-suicide plyr (tile-index->tile tile-index)) plyr) "suicide")
-    (check-equal? (legal-take-turn state-suicide plyr tile-index tile-index action2) state-suicide++))
+  (define state3-initial `[[,state3+green-ti 0] ,@state3+green-spot])
+  (check-initial "green" #:ti state3+green-ti state3-initial "o" state3+green)
 
-  ; (check-false (legal-take-turn good-intermediate-state "red" 0 0 `[0 666]) "not degree")
-  (check-false (legal-take-turn good-intermediate-state "red" 0 0 `[1 0]) "not a given tile")
+  ;; -------------------------------------------------------------------------------------------------
+  ;; check the turn rule 
+
+  (define (check-turn state action expected msg #:t1 (t1 #f) #:t2 (t2 #f))
+    (match-define [list player [list tile-index _]] action)
+    (define action2 (second action))
+    (define tile-1-index (or t1 tile-index))
+    (define tile-2-index (or t2 tile-index))
+    (check-equal? (legal-take-turn state player tile-1-index tile-2-index action2) expected msg))
+
+  (check-turn good-intermediate-state state3-action #false "why is state3-action illegal?")
+  (check-turn state-suicide state3-action-infinite state-suicide++ "forced suicide")
+  (check-turn state3 state3-action-infinite #false "infinite loop")
+  (check-turn good-intermediate-state #:t1 0 #:t2 0 '["red" [1 0]] #false "not a given tile")  
   
-
-  (match-define [list player [list tile-index degrees]] (first good-state-actions))
-  (define action1 [list tile-index degrees])
-  (check-true (state? (legal-take-turn good-intermediate-state player tile-index 0 action1))))
+  (match-define [list a1 a2 a3] good-state-actions)
+  (check-turn good-intermediate-state #:t2 0 a1 good-intermediate-state+ "+")
+  (check-turn good-intermediate-state+ #:t2 0 a2 good-intermediate-state++ "++")
+  (check-turn good-intermediate-state++ #:t2 0 a3 good-intermediate-state+++ "+++"))
