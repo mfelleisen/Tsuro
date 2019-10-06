@@ -324,6 +324,9 @@
   [find-avatar
    (-> color? state? (or/c #f [list/c [list/c tile-index? degree?] color? index? index?]))]
 
+  [minus-player
+   (->i ([s state?][c (s) (and/c color? (curry set-member? (survivors s)))]) (r state?))]
+
   [find-free-spots
    ;; find all legal initial positions starting from (0,0) in clockwise direction
    ;; with free ports also specified in clockwise fashion starting from top left 
@@ -340,7 +343,9 @@
                              #; initial-state?))])])
 
  infinite?
+ infinite-state
  collided?
+ collided-state
 
  (contract-out
   [intermediate
@@ -417,12 +422,17 @@
    state3-action
    inits-for-state-with-3-players
    state3-action-infinite
+   state3-infinite
    state-suicide++
 
    state3+green-spot
    state3+green-ti
    state3+green
-   
+
+   collision-state
+   collision-action
+   collision-state++
+
    good-intermediate-state
    good-state-actions
    good-intermediate-state+
@@ -513,17 +523,26 @@
          (define tile (square-tile (matrix-ref (state-grid s) x y)))
          `[,(tile->jsexpr tile) ,name ,x ,y])))
 
+(define (minus-player s name)
+  (match-define (state grid players) s)
+  (define p (set-member players (λ (p) (equal? (player-name p) name))))
+  (state grid (set-subtract players p)))
+
 (module+ test
-  (define (player-set other) (set (player "red" (index->port 0) 1 1) other))
+  (define (player-set other)
+    (define red-set (player "red" (index->port 0) 1 1))
+    (if other (set red-set other) (set red-set)))
   (define true-player  (player-set (player "blue" (index->port 2) 2 2)))
   (define false-player (player-set (player "blue" (index->port 0) 1 1)))
-
+  
   (check-true (players-are-on-distinct-places (state '() true-player)))
   (check-false (players-are-on-distinct-places (state '() false-player)))
 
   (define grid (add-new-square-update-neighbors the-empty-grid  (tile-index->tile 34) 2 2))
   (check-equal? (find-avatar "blue" (state grid true-player)) `[[34 0] "blue" 2 2])
-  (check-false  (find-avatar "green" (state grid false-player))))
+  (check-false  (find-avatar "green" (state grid false-player)))
+
+  (check-equal? (minus-player (state grid true-player) "blue") (state grid (player-set #f))))
 
 
 ;                                                                                             
@@ -1018,11 +1037,14 @@
 
 (module+ test 
   (check-true (infinite? (add-tile/a state3 state3-action-infinite)) "red player goes infinite")
-  
+  (define state3-infinite (add-tile/a state3 state3-action-infinite))
+
   (check-equal? (add-tile/a state-suicide (state3-action-infinite* 270)) state-suicide++ "270")
   (check-equal? (add-tile/a state-suicide (state3-action-infinite* 180)) state-suicide++ "180")
   (check-equal? (add-tile/a state-suicide (state3-action-infinite* 90)) state-suicide++ "90")
   (check-equal? (add-tile/a state-suicide (state3-action-infinite* 00)) state-suicide++ "0"))
+
+
 
 ;; ---------------------------------------------------------------------------------------------------
 ;; two avatars collide on the same tile and same port 
@@ -1266,7 +1288,7 @@
   (show-state simultaneous-state #:name "pre-simultaneous")
   (show-state simultaneous-state++ #:name "simultaneous"))
 
-(module+ picts (show-state state3))
+; (module+ picts (show-state state3))
 ; (module+ picts (show-state state+ #:name "expected red off"))
 ; (module+ picts (show-state (add-tile/a state3 state3-action) #:name "red off"))
 

@@ -1,8 +1,7 @@
-;; TDDO: resolve player alive: rules.rkt might be wrong; push to referee with dependent contracts? 
-
 #lang racket
 
-;; a Tsuro rule checker 
+;; a Tsuro rule checker: it checks whether the requested player action is legal
+;; and, if so, computes the new state 
 
 (require Tsuro/Code/Common/actions)
 (require (only-in Tsuro/Code/Common/board state?))
@@ -13,9 +12,20 @@
 (provide
  (contract-out
   [legal-initial
-   (-> initial-state? color? tile-index? tile-index? tile-index? init-action/c (ok initial-state?))]
+   (->i ([s initial-state?]
+         [c (s) (and/c color? (compose not (curry set-member? (survivors s))))]
+         [t1 tile-index?]
+         [t2 tile-index?]
+         [t3 tile-index?]
+         [ia init-action/c])
+        (r (ok initial-state?)))]
   [legal-take-turn
-   (-> state? color? tile-index? tile-index? turn-action/c (ok state?))]))
+   (->i ([s state?]
+         [c (s) (and/c color? (curry set-member? (survivors s)))]
+         [t1 tile-index?]
+         [t2 tile-index?]
+         [ta turn-action/c])
+         (r (ok state?)))]))
 
 ;; ---------------------------------------------------------------------------------------------------
 (require (except-in Tsuro/Code/Common/board state?))
@@ -45,7 +55,6 @@
   (define spot (rest ia))
   (cond
     [(not (or (equal? ti given-ti1) (equal? ti given-ti2))) #false]
-    [(set-member? (survivors state0) player) #false]
     [((dont-use-taken-spot/c state0) spot)
      (define tile (rotate-tile (tile-index->tile ti) #:degree d))
      (define state+1 (place-first-tile state0 player tile spot))
@@ -66,7 +75,9 @@
      (define tile (rotate-tile (tile-index->tile ti) #:degree d))
      (define state+1 (add-tile state player tile))
      (cond
-       [(infinite? state+1) #false]
+       [(collided? state+1) (collided-state state+1)]
+       [(infinite? state+1)
+        (if (all-infinite-suicide? state player given-ti1 given-ti2) (minus-player state player) #f)]
        [(suicide? state+1 player)
         (if (all-suicide? state player given-ti1 given-ti2) state+1 #false)]
        [else state+1])]))
@@ -76,11 +87,17 @@
 (define (suicide? state player)
   (boolean? (member player (survivors state))))
 
-#;{State Player TileIndex TileIndex -> Boolean}
+#; {State Player TileIndex TileIndex -> Boolean}
 (define (all-suicide? state player ti1 ti2)
   (for/and ((t (append (all-tiles ti1) (all-tiles ti2))))
     (define state+1 (add-tile state player t))
     (suicide? state+1 player)))
+
+#; {State Player TileIndex TileIndex -> Boolean}
+(define (all-infinite-suicide? state player ti1 ti2)
+  (for/and ((t (append (all-tiles ti1) (all-tiles ti2))))
+    (define state+1 (add-tile state player t))
+    (infinite? state+1)))
 
 (module+ test
 
@@ -91,7 +108,7 @@
     (check-equal? (legal-initial state3 player ti1 0 0 init) expected msg))
   
   (check-initial "green" #:ti 0 `[[1 0] ,(index->port 0) 0 0] "not a given tile")
-  (check-initial "red" #:ti 0 `[[0 0] ,(index->port 0) 0 0] "already played")
+  ; (check-initial "red" #:ti 0 `[[0 0] ,(index->port 0) 0 0] "already played")
   (check-initial "green" #:ti state3+green-ti `[[,state3+green-ti 0] ,(index->port 0) 4 0] "bad port")
   (check-initial "green" `[[0 0] ,(index->port 0) 0 0] "taken spot")
 
@@ -110,8 +127,12 @@
 
   (check-turn good-intermediate-state state3-action #false "plain suicide?")
   (check-turn state-suicide state3-action-infinite state-suicide++ "forced suicide")
-  (check-turn state3 state3-action-infinite #false "infinite loop")
-  (check-turn good-intermediate-state #:t1 0 #:t2 0 '["red" [1 0]] #false "not a given tile")  
+
+  (check-turn state3 state3-action-infinite #:t1 3 #false "plain infinite loop")
+  (check-turn state3 state3-action-infinite (minus-player state3 "red") "force infinite-loop suicide")
+  (check-turn good-intermediate-state #:t1 0 #:t2 0 '["red" [1 0]] #false "not a given tile")
+
+  (check-turn collision-state collision-action collision-state++ "collision")
   
   (match-define [list a1 a2 a3] good-state-actions)
   (check-turn good-intermediate-state #:t2 0 a1 good-intermediate-state+ "+")
