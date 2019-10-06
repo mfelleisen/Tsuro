@@ -83,8 +83,10 @@
 
 (module+ picts
   (require Tsuro/Code/Common/tokens)
-
-  (define ((empty-if-blank sq) on-sq) (or (not (equal? sq BLANK)) (empty? on-sq)))
+  
+  (define (empty-if-blank sq)
+    (define n (format "no avatars, if blannk ~a" sq))
+    (flat-named-contract n (λ (on-sq) (or (not (equal? sq BLANK)) (empty? on-sq)))))
 
   (provide
 
