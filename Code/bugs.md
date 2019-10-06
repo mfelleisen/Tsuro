@@ -30,6 +30,10 @@
    - discovered while creating the right function for initial place finder 
    - not a type problem 
 
+7. in Common/board 
+   - it turns out that players can show up on the same port and tile
+   - so allow intermediates to come with this too 
+
 ### Design Bugs 
 
 1. equality for tiles was flawed 

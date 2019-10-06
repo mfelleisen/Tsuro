@@ -20,12 +20,11 @@ This directory implements a distributed Tsuro game
 [x] batch test harness for board 
   - get all players thrown out? 
   
-[ ] legal move: suicide, circular paths, no more than one token per port
+[X] legal move: suicide, circular paths, no more than one token per port
 
-[ ] the player 
-  - is placing a tile in some orientation a "good thing" 
+[X] the player 
 
-[ ] strategy 
+[X] strategy 
 
 [ ] the referee 
 

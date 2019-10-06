@@ -121,30 +121,6 @@
   (define r (reverse x))
   (list (second r) (first r)))
 
-#; {Intermediate* -> Boolean}
-(define (distinct-x-y-or-player-on-same-tile-different-port intermediates0)
-  (let loop ([intermediates intermediates0]
-             #; [Listof [List [List Index Index] [List Tile Port]]]
-             [seen '()])
-    (cond
-      [(empty? intermediates) #true]
-      [else 
-       (match (first intermediates)
-         [(list tile player port x y)
-          (define place (list x y))
-          (match (assoc place seen)
-            [(? boolean?)
-             (loop (rest intermediates) (cons (list place (list tile port)) seen))]
-            [(list _ 'plain)
-             #f]
-            [(list _ (list t p))
-             (and (equal? tile t) (not (equal? port p))
-                  (loop (rest intermediates) (cons (list place (list tile port)) seen)))])]
-         [(list tile x y)
-          (define place (list x y))
-          (and (not (assoc place seen))
-               (loop (rest intermediates) (cons (list place 'plain) seen)))])])))
-
 #;{Intermediate* -> Boolean}
 (define (at-least-one-player-left intermediates0)
   (ormap (λ (spec) (> (length spec) 3)) intermediates0))
@@ -160,8 +136,7 @@
    (and/c
     at-least-one-player-left
     no-duplicate-player
-    occupied-periphery-or-2-neighbors
-    distinct-x-y-or-player-on-same-tile-different-port)))
+    occupied-periphery-or-2-neighbors)))
 ;                                                                                      
 ;                                                                                      
 ;                    ;             ;     ;       ;          ;;;       ;                
@@ -413,7 +388,10 @@
    pass-thru-action
    pass-thru-state++-jsexpr
 
-   no-red-state-jsexpr))
+   no-red-state-jsexpr
+   state-infinite-and-collide-jsexpr
+   state-red-leaves-collision-jsexpr
+   state-red-collide-action ))
 
 (module+ test
   (provide
@@ -1044,8 +1022,6 @@
   (check-equal? (add-tile/a state-suicide (state3-action-infinite* 90)) state-suicide++ "90")
   (check-equal? (add-tile/a state-suicide (state3-action-infinite* 00)) state-suicide++ "0"))
 
-
-
 ;; ---------------------------------------------------------------------------------------------------
 ;; two avatars collide on the same tile and same port 
 
@@ -1063,7 +1039,28 @@
          [p (set-add p (player "white" (index->port 2) 1 1))])
     (state (state-grid s) p)))
 
+(define state-infinite-and-collide
+  (state-from
+   (#f                                [34 "blue" #:on (index->port 4)] #f 34)
+   ([34 "green" #:on (index->port 2)] #f                               (2 "red" #:on (index->port 7))
+                                      (11 #:rotate 270))
+   (2                                 [33 "black" #:on (index->port 4)])))
+
+(define state-red-leaves-collision
+  (state-from
+   (#f                                [34 "blue" #:on (index->port 4)] #f 34)
+   ([34 "green" #:on (index->port 2)] #f                               (2 "red" #:on (index->port 7))
+                                      12)
+   (2                                 [12 "black" #:on (index->port 4)] )))
+
+(define state-red-collide-action (list "red" (list 13 90)))
+
 (module+ test
+  (check-true (every-player-faces-an-open-square state-red-leaves-collision) "red leaves faces")
+  (check-true (every-player-can-leave-going-backwards state-red-leaves-collision) "red leaves back")
+
+  (check-true (collided? (add-tile/a state-red-leaves-collision state-red-collide-action)))
+  (check-true (infinite? (add-tile/a state-infinite-and-collide collision-action)))
   (check-equal? (add-tile/a collision-state collision-action) (collided collision-state++)))
 
 ;; ---------------------------------------------------------------------------------------------------
@@ -1276,17 +1273,26 @@
 
     (send frame show v)))
 
-(module+ picts (show-state good-intermediate-state+ #:visible #f))
-
-; (module+ picts (show-state good-intermediate-state++))
+#;
+(module+ picts
+  (show-state good-intermediate-state+)
+  (show-state good-intermediate-state++))
 
 #;
 (module+ picts ;; demonstrate collision 
   (show-state collision-state #:name "pre-collision")
-  (show-state collision-state++ #:name "collision")
+  (show-state collision-state++ #:name "collision"))
 
+#;
+(module+ picts ;; demonstrate simultaneous tile 
   (show-state simultaneous-state #:name "pre-simultaneous")
   (show-state simultaneous-state++ #:name "simultaneous"))
+
+(module+ picts
+  (show-state state-infinite-and-collide #:name "everything happens")
+  (show-state state-red-leaves-collision #:name "state-red-leaves-collision")
+  (show-state (collided-state (add-tile/a state-red-leaves-collision (list "red" (list 13 90))))
+              #:name "red left"))
 
 ; (module+ picts (show-state state3))
 ; (module+ picts (show-state state+ #:name "expected red off"))
@@ -1369,13 +1375,13 @@
   (define simultaneous-state-jsexpr (state->jsexpr simultaneous-state))
   ;; + collision-action
   (define simultaneous-state++-jsexpr (state->jsexpr simultaneous-state++))
-
-  (check-true (distinct-x-y-or-player-on-same-tile-different-port simultaneous-state++-jsexpr))
-
   (define pass-thru-state-jsexpr (state->jsexpr pass-thru-state))
   (define pass-thru-state++-jsexpr (state->jsexpr pass-thru-state++))
 
   (define no-red-state-jsexpr (state->jsexpr no-red-state))
+  
+  (define state-infinite-and-collide-jsexpr (state->jsexpr state-infinite-and-collide))
+  (define state-red-leaves-collision-jsexpr (state->jsexpr state-red-leaves-collision))
 
   ;; -------------------------------------------------------------------------------------------------
   (check-equal? (jsexpr->state (state->jsexpr state3)) state3)
