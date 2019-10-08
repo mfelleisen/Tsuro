@@ -1247,9 +1247,9 @@
   (define HEIGHT (+ INSET (* 10 TILE-SIZE) INSET))
 
   #; {State (Instanceof DC<%>) -> Pict}
-  (define (state->pict b dc)
+  (define (state->pict b)
     (match-define (state squares players) b)
-    (define grid-as-pict
+    (define state-as-pict
       (let loop ([l (matrix->rectangle squares)][y 0])
         (cond
           [(empty? l) (blank)]
@@ -1259,7 +1259,7 @@
              (for/list ((square (in-list row)) (x (in-naturals)))
                (square->pict square (is-player-on players x y))))
            (vl-append (apply hc-append picts) (loop (rest l) (+ y 1)))])))
-    (draw-pict grid-as-pict dc INSET INSET))
+    state-as-pict)
   
   #; {State -> Void}
   (define (show-state s #:visible (v #t) #:name (name "hello"))
@@ -1268,7 +1268,7 @@
     (define canvas
       (new canvas%
            [parent frame]
-           [paint-callback (λ (e dc) (state->pict s dc))]))
+           [paint-callback (λ (e dc) (draw-pict (state->pict s) dc INSET INSET))]))
     (send canvas on-paint)
 
     (send frame show v)))
@@ -1288,6 +1288,7 @@
   (show-state simultaneous-state #:name "pre-simultaneous")
   (show-state simultaneous-state++ #:name "simultaneous"))
 
+#;
 (module+ picts
   (show-state state-infinite-and-collide #:name "everything happens")
   (show-state state-red-leaves-collision #:name "state-red-leaves-collision")
