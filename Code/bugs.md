@@ -34,6 +34,13 @@
    - it turns out that players can show up on the same port and tile
    - so allow intermediates to come with this too 
 
+8. in Common/board 
+   - the find-avatar function should have, but did not, return the board 
+
+   conceptual bug: everything but the port is guaranteed to be a JSexpr 
+   this breaks "religious abstraction"
+
+
 ### Design Bugs 
 
 1. equality for tiles was flawed 

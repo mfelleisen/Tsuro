@@ -297,7 +297,7 @@
    (-> state? (listof color?))]
 
   [find-avatar
-   (-> color? state? (or/c #f [list/c [list/c tile-index? degree?] color? index? index?]))]
+   (-> color? state? (or/c #f [list/c [list/c tile-index? degree?] color? port? index? index?]))]
 
   [minus-player
    (->i ([s state?][c (s) (and/c color? (curry set-member? (survivors s)))]) (r state?))]
@@ -483,7 +483,7 @@
 ;; data representation of the game state: the grid, the players  
 
 ;; the game state itself 
-;; ------------------------------------------------------------------
+;; --------------------------------------
 #; {State   = (state grid Player*)}
 #; {Player* = [Setof Player]}
 #; {Player  = (player PlayerName p x y)}
@@ -501,7 +501,7 @@
        (let ()
          (match-define (player name port x y) (first place))
          (define tile (square-tile (matrix-ref (state-grid s) x y)))
-         `[,(tile->jsexpr tile) ,name ,x ,y])))
+         `[,(tile->jsexpr tile) ,name , port ,x ,y])))
 
 (define (minus-player s name)
   (match-define (state grid players) s)
@@ -512,14 +512,14 @@
   (define (player-set other)
     (define red-set (player "red" (index->port 0) 1 1))
     (if other (set red-set other) (set red-set)))
-  (define true-player  (player-set (player "blue" (index->port 2) 2 2)))
+  (define true-player  (player-set (player "blue" port-blue 2 2)))
   (define false-player (player-set (player "blue" (index->port 0) 1 1)))
   
   (check-true (players-are-on-distinct-places (state '() true-player)))
   (check-false (players-are-on-distinct-places (state '() false-player)))
 
-  (define grid (add-new-square-update-neighbors the-empty-grid  (tile-index->tile 34) 2 2))
-  (check-equal? (find-avatar "blue" (state grid true-player)) `[[34 0] "blue" 2 2])
+  (define grid (add-new-square-update-neighbors the-empty-grid (tile-index->tile 34) 2 2))
+  (check-equal? (find-avatar "blue" (state grid true-player)) `[[34 0] "blue" ,port-blue 2 2])
   (check-false  (find-avatar "green" (state grid false-player)))
 
   (check-equal? (minus-player (state grid true-player) "blue") (state grid (player-set #f))))
