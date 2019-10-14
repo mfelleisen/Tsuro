@@ -1,4 +1,4 @@
-#lang racket/gui
+#lang racket
 
 ;; a data representation for game States, plus basic functions for manipulating them
 
@@ -418,6 +418,8 @@
    good-intermediate-state+++))
 
 (module+ picts
+  (require racket/gui)
+  
   (provide
    state->pict
    show-state))
