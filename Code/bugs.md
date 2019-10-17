@@ -40,6 +40,8 @@
    conceptual bug: everything but the port is guaranteed to be a JSexpr 
    this breaks "religious abstraction"
 
+9. in Common/grid
+  - at-periphery was off-by-one on indicies of positive periphery
 
 ### Design Bugs 
 

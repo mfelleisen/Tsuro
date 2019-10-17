@@ -919,10 +919,40 @@
               (33)
               ((33 #:rotate 180 "white" #:on port-white))))
 
+(define good-intermediate-spec-pos-periph
+  (intermediate-list-from-spec
+   ((34 "red" #:on port-red))
+   ()
+   ()
+   ()
+   ()
+   ()
+   ()
+   ()
+   ()
+   ((31 "white" #:on (index->port 2)) #f (34 "blue" #:on (index->port 0)))))
+
+(define good-intermediate-state-pos-periph
+  (state-from
+   ((34 "red" #:on port-red))
+   ()
+   ()
+   ()
+   ()
+   ()
+   ()
+   ()
+   ()
+   ((31 "white" #:on (index->port 2)) #f (34 "blue" #:on (index->port 0)))))
+
 (module+ test ;; testing intermediate's results
   (check-true (every-player-faces-an-open-square      (intermediate-aux good-intermediate-spec)))
   (check-true (every-player-can-leave-going-backwards (intermediate-aux good-intermediate-spec)))
-  (check-equal? (intermediate good-intermediate-spec) good-intermediate-state))
+  (check-equal? (intermediate good-intermediate-spec) good-intermediate-state)
+
+  (check-true (every-player-faces-an-open-square      (intermediate-aux good-intermediate-spec-pos-periph)))
+  (check-true (every-player-can-leave-going-backwards (intermediate-aux good-intermediate-spec-pos-periph)))
+  (check-equal? (intermediate good-intermediate-spec-pos-periph) good-intermediate-state-pos-periph))
 
 ;                                                                        
 ;              ;      ;                                                  

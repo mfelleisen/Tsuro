@@ -192,7 +192,7 @@
   (member x (list WALL OPEN)))
 
 (define (at-periphery? x y)
-  (or (= x 0) (= x SIZE) (= y 0) (= y SIZE)))
+  (or (= x 0) (= x (- SIZE 1)) (= y 0) (= y (- SIZE 1))))
 
 (define (neighbor-locations loc)
   (match-define (list x y) loc)
