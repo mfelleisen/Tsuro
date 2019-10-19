@@ -342,7 +342,9 @@
                              #; "and also satisfies, to help enforce rules"
                              #; players-are-on-distinct-places
                              #; every-player-faces-an-open-square
-                             #; every-player-can-leave-going-backwards))])]))
+                             #; every-player-can-leave-going-backwards))])]
+ 
+  [final? (-> state? boolean?)]))
 
 (module+ json
   (provide
@@ -713,6 +715,26 @@
 (module+ test ;; initialize 
   (check-exn exn:fail:contract? (λ () (initialize `((,tile-00 "x" 2 0 0)))) "port, not index")
   (check-equal? (initialize inits-for-state-with-3-players) state3))
+
+;                                                          
+;      ;;                                                  
+;     ;       ;                 ;;;       ;                
+;     ;                           ;                        
+;   ;;;;;   ;;;   ; ;;   ;;;;     ;     ;;;   ;;;;;   ;;;  
+;     ;       ;   ;;  ;      ;    ;       ;       ;  ;;  ; 
+;     ;       ;   ;   ;      ;    ;       ;      ;   ;   ;;
+;     ;       ;   ;   ;   ;;;;    ;       ;     ;    ;;;;;;
+;     ;       ;   ;   ;  ;   ;    ;       ;    ;     ;     
+;     ;       ;   ;   ;  ;   ;    ;       ;   ;      ;     
+;     ;     ;;;;; ;   ;   ;;;;     ;;   ;;;;; ;;;;;   ;;;; 
+;                                                          
+;                                                          
+;                                                          
+
+;; a state is final if there are no survivors left or one 
+(define (final? state)
+  (define s (survivors state))
+  (or (empty? s) (empty? (rest s))))
 
 ;                                                                               
 ;      ;;                                 ;;                                    
