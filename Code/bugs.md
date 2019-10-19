@@ -41,7 +41,10 @@
    this breaks "religious abstraction"
 
 9. in Common/grid
-  - at-periphery was off-by-one on indicies of positive periphery
+   - at-periphery was off-by-one on indicies of positive periphery
+
+10. in Common/rules 
+    - forgot the third tile as a possibility for initial placements    
 
 ### Design Bugs 
 

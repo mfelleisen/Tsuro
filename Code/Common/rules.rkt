@@ -54,7 +54,7 @@
   
   (define spot (rest ia))
   (cond
-    [(not (or (equal? ti given-ti1) (equal? ti given-ti2))) #false]
+    [(not (or (equal? ti given-ti1) (equal? ti given-ti2) (equal? ti given-ti3))) #false]
     [((dont-use-taken-spot/c state0) spot)
      (define tile (rotate-tile (tile-index->tile ti) #:degree d))
      (define state+1 (place-first-tile state0 player tile spot))
