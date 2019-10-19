@@ -1,6 +1,8 @@
 #lang racket
 
 (provide
+ TOKEN-COLORS
+
  ;; all tokens come in a distinct color
  color?)
 
