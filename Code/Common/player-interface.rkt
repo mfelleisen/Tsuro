@@ -11,6 +11,10 @@
  admin-player%/c
  referee-player%/c
 
+ admin-player/c
+ referee-player/c
+ player/c
+
  (all-from-out Tsuro/Code/Common/actions)
  (all-from-out Tsuro/Code/Common/board)
  (all-from-out Tsuro/Code/Common/tiles)
@@ -37,6 +41,10 @@
    [end-of-tournament (->m [listof string?] any)]))
 
 (define player%/c (and/c referee-player%/c admin-player%/c))
+
+(define admin-player/c   (instanceof/c admin-player%/c))
+(define referee-player/c (instanceof/c referee-player%/c))
+(define player/c         (instanceof/c player%/c))
 
 ;; protocol:
 ;; -- playing-as is called first and once per game
