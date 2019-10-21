@@ -1,0 +1,16 @@
+#!/bin/bash 
+
+echo "gc-ing" 
+
+rm -rf *~ */*~ ; rm -rf errors.txt 
+
+echo "testing" 
+
+raco make */*.rkt
+raco test Common/*.rkt Players/*.rkt Admin/*.rkt 2> errors.txt
+ 
+if grep --quiet "non-zero exit" errors.txt; then 
+   cat errors.txt 
+else 
+   tail -1 errors.txt
+fi
