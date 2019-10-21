@@ -46,6 +46,9 @@
 10. in Common/rules 
     - forgot the third tile as a possibility for initial placements    
 
+11. in Common/board 
+    - design bug: the infinite state must list all "looping players" not just one
+
 ### Design Bugs 
 
 1. equality for tiles was flawed 

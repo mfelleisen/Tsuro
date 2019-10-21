@@ -95,7 +95,8 @@
                   (1) distinct locs
                   (2) every location is
                   -- either occupied,
-                  -- at the periphery, 
+                  -- at the periphery,
+                  WRONG: 10/21
                   -- or has two neighbors}
 #; {Intermediate  = (U TilePlacement
                        PlayerOnTile w/o perhiphery constraint)}
@@ -893,7 +894,7 @@
 (define bad-intermediate-spec
   (intermediate-list-from-spec
    ((34 "red" #:on port-red) #f (34 #:rotate 90 "blue" #:on port-blue))
-   (33 33)
+   (33                          33)
    ((33 #:rotate 180 "white" #:on port-white))))
 
 (define contiguity-for-3-platers `((,(tile-index->tile 33) 0 1) (,(tile-index->tile 33) 1 0)))
@@ -1023,7 +1024,7 @@
   (define-values  (moved out* inf*) (move-players nu-grid players x-new y-new))
   (define col*    (players-are-on-distinct-places (state '_ moved)))
   (cond
-    [(cons? inf*) (infinite (state nu-grid moved) (first inf*))]
+    [(cons? inf*) (infinite (state nu-grid moved) inf*)]
     [(not col*)   (collided (state nu-grid moved))]
     [else (state nu-grid moved)]))
 
@@ -1129,6 +1130,15 @@
                                       12)
    (2                                 [12 "black" #:on (index->port 4)] )))
 
+(define red-player+++   (player "red" (index->port 4) 1 1))
+(define white-player+++ (player "white" (index->port 4) 1 1))
+(define collision-state+++
+  (let* ([s (state-from (#f 34)
+                        (34 [4 "red" #:on (index->port 4)] 34))]
+         [p (state-players s)]
+         [p (set-add p white-player+++)])
+    (state (state-grid s) p)))
+
 (define state-red-collide-action (list "red" (list 13 90)))
 
 (module+ test
@@ -1137,7 +1147,9 @@
 
   (check-true (collided? (add-tile/a state-red-leaves-collision state-red-collide-action)))
   (check-true (infinite? (add-tile/a state-infinite-and-collide collision-action)))
-  (check-equal? (add-tile/a collision-state collision-action) (collided collision-state++)))
+  (check-equal? (add-tile/a collision-state collision-action) (collided collision-state++))
+  (check-equal? (infinite-player (add-tile/a collision-state+++ (state3-action-infinite* 00)))
+                `(,red-player+++ ,white-player+++)))
 
 ;; ---------------------------------------------------------------------------------------------------
 ;; two avatars reach the same tile but not the same port
@@ -1206,7 +1218,7 @@
          (define p-moved (move-one-player grid p))
          (cond
            [(out? p-moved) (values moved (cons p-moved out) inf)]
-           [(inf? p-moved) (values moved out (cons p-moved inf))]
+           [(inf? p-moved) (values moved out (cons (inf-player p-moved) inf))]
            [else (values (set-add moved p-moved) out inf)])]
         [else (values (set-add moved p) out inf)])))
   (values moved out inf))
@@ -1351,14 +1363,17 @@
 
 #;
 (module+ picts
+  (show-state (intermediate bad-intermediate-spec) #:name "formerly bad intermediate"))
+
+#;
+(module+ picts
   (show-state good-intermediate-state+)
   (show-state good-intermediate-state++))
 
+#;
 (module+ picts ;; demonstrate collision 
   (show-state collision-state #:name "pre-collision")
-  (show-state collision-state++ #:name "collision")
-
-  (show-state (collided-state (add-tile collision-state++ "red" (jsexpr->tile (list 34 0))))))
+  (show-state collision-state++ #:name "collision"))
 
 #;
 (module+ picts ;; demonstrate simultaneous tile 
