@@ -343,6 +343,8 @@
                              #; players-are-on-distinct-places
                              #; every-player-faces-an-open-square
                              #; every-player-can-leave-going-backwards))])]
+
+  [state->intermediate* {-> state? intermediate*/c}]
  
   [final? (-> state? boolean?)]))
 
@@ -403,6 +405,8 @@
    inits-for-state-with-3-players
    state3-action-infinite
    state3-infinite
+
+   state-suicide-index
    state-suicide++
 
    state3+green-spot
@@ -863,14 +867,14 @@
 ;                                                                                      
 
 (define (intermediate l-intermediate)
-  (define s (intermediate-aux l-intermediate))
+  (define s (intermediate+ l-intermediate))
   (and (every-player-faces-an-open-square s)
        (every-player-can-leave-going-backwards s)
        s))
 
 #; {Intermediate* -> State}
 ;; produces the state as specified without checking whether it is valid 
-(define (intermediate-aux l-intermediate)
+(define (intermediate+ l-intermediate)
   (define grid0 the-empty-grid)
   (define-values (grid players)
     (for/fold ((grid grid0) (players (set))) ([p l-intermediate])
@@ -918,13 +922,13 @@
   (check-true ((or/c tile/c player-on-any-tile/c) (first bad-intermediate-spec-2)) "reversed or")
   
   (check-true (intermediate*/c bad-intermediate-spec-2) "it's okay as input but creates a bad state")
-  (check-false (every-player-faces-an-open-square       (intermediate-aux bad-intermediate-spec-2))
+  (check-false (every-player-faces-an-open-square       (intermediate+ bad-intermediate-spec-2))
                "avatar is interior because of contiguity")
-  (check-true (every-player-can-leave-going-backwards   (intermediate-aux bad-intermediate-spec-2))
+  (check-true (every-player-can-leave-going-backwards   (intermediate+ bad-intermediate-spec-2))
               "but it is on an initial square")
 
-  (check-true (every-player-faces-an-open-square       (intermediate-aux bad-intermediate-spec-3)))
-  (check-false (every-player-can-leave-going-backwards (intermediate-aux bad-intermediate-spec-3))
+  (check-true (every-player-faces-an-open-square       (intermediate+ bad-intermediate-spec-3)))
+  (check-false (every-player-can-leave-going-backwards (intermediate+ bad-intermediate-spec-3))
                "the white player can't leave"))
 
 ;; ---------------------------------------------------------------------------------------------------
@@ -941,7 +945,7 @@
               (33)
               ((33 #:rotate 180 "white" #:on port-white))))
 
-(define good-intermediate-spec-pos-periph
+(define good-intermediate-pos-periph
   (intermediate-list-from-spec
    ((34 "red" #:on port-red))
    ()
@@ -968,13 +972,30 @@
    ((31 "white" #:on (index->port 2)) #f (34 "blue" #:on (index->port 0)))))
 
 (module+ test ;; testing intermediate's results
-  (check-true (every-player-faces-an-open-square      (intermediate-aux good-intermediate-spec)))
-  (check-true (every-player-can-leave-going-backwards (intermediate-aux good-intermediate-spec)))
+  (check-true (every-player-faces-an-open-square      (intermediate+ good-intermediate-spec)))
+  (check-true (every-player-can-leave-going-backwards (intermediate+ good-intermediate-spec)))
   (check-equal? (intermediate good-intermediate-spec) good-intermediate-state)
 
-  (check-true (every-player-faces-an-open-square      (intermediate-aux good-intermediate-spec-pos-periph)))
-  (check-true (every-player-can-leave-going-backwards (intermediate-aux good-intermediate-spec-pos-periph)))
-  (check-equal? (intermediate good-intermediate-spec-pos-periph) good-intermediate-state-pos-periph))
+  (check-true (every-player-faces-an-open-square      (intermediate+ good-intermediate-pos-periph)))
+  (check-true (every-player-can-leave-going-backwards (intermediate+ good-intermediate-pos-periph)))
+  (check-equal? (intermediate good-intermediate-pos-periph) good-intermediate-state-pos-periph))
+
+;; ---------------------------------------------------------------------------------------------------
+#;{State [#:->jsexpr (Port -> Any)] -> Intermediate*}
+(define (state->intermediate* s #:->jsexpr [->jsexpr (list values values)])
+  (match-define [list tile->jsexpr port->jsexpr] ->jsexpr)
+  #; {Player* -> [Square Index Index -> [Listof JSexpr]]}
+  ;; does not belong into square.rkt because that one doesn't know about (x,y)
+  (define ((square->jsexpr players) sq x y)
+    (define tj (tile->jsexpr (square-tile sq)))
+    (define players-on-x-y (is-player-on players x y))
+    (match players-on-x-y
+      ['() (list (list tj x y))]
+      [(list (list names ports) ...)
+       ;; all pprts are distinct
+       (for/list ((name names) (port ports))
+         (list tj name (port->jsexpr port) x y))]))
+  (apply append (matrix-where (state-grid s) (λ (sq x y) sq) (square->jsexpr (state-players s)))))
 
 ;                                                                        
 ;              ;      ;                                                  
@@ -1065,6 +1086,7 @@
 (define state3-action-infinite (state3-action-infinite* 0))
 
 (define state-suicide (state-from [(21 "red" #:on port-blue)]))
+(define state-suicide-index state3+infinite-index)
 (define state-suicide++ (state-from (21) (34)))
 
 (module+ test 
@@ -1332,10 +1354,11 @@
   (show-state good-intermediate-state+)
   (show-state good-intermediate-state++))
 
-#;
 (module+ picts ;; demonstrate collision 
   (show-state collision-state #:name "pre-collision")
-  (show-state collision-state++ #:name "collision"))
+  (show-state collision-state++ #:name "collision")
+
+  (show-state (collided-state (add-tile collision-state++ "red" (jsexpr->tile (list 34 0))))))
 
 #;
 (module+ picts ;; demonstrate simultaneous tile 
@@ -1378,21 +1401,8 @@
 
   ;; -------------------------------------------------------------------------------------------------
   (define (state->jsexpr s)
-    (define players (state-players s))
-    (apply append (matrix-where (state-grid s) (λ (sq x y) sq) (square->jsexpr players))))
-
-  #; {Player* -> [Square Index Index -> [Listof JSexpr]]}
-  ;; does not belong into square.rkt because that one doesn't know about (x,y)
-  (define ((square->jsexpr players) sq x y)
-    (define tj (tile->jsexpr (square-tile sq)))
-    (define players-on-x-y (is-player-on players x y))
-    (match players-on-x-y
-      ['() (list (list tj x y))]
-      [(list (list names ports) ...)
-       ;; all pprts are distinct
-       (for/list ((name names) (port ports))
-         (list tj name (port->jsexpr port) x y))]))
-
+    (state->intermediate* s #:->jsexpr (list tile->jsexpr port->jsexpr)))
+  
   (define (intermediate*->jsexpr intermediates)
     (for/list ((i intermediates))
       (define ti (tile->jsexpr (first i)))
