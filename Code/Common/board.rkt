@@ -318,8 +318,7 @@
                              #; "and also satisfies, to help enforce rules"
                              #; initial-state?))])])
 
- infinite?
- infinite-state
+ (struct-out infinite)
  collided?
  collided-state
 
@@ -1019,15 +1018,15 @@
 (struct infinite [state player] #:transparent)
 (struct collided [state] #:transparent)
 
-(define (add-tile state0 player-name tile)
+(define (add-tile state0 avatar tile)
   (match-define   (state grid players) state0)
-  (match-define   (player _ port x y) (find-player players player-name))
+  (match-define   (player _ port x y) (find-player players avatar))
   (define-values  (x-new y-new) (looking-at port x y))
   (define nu-grid (add-new-square-update-neighbors grid tile x-new y-new))
   (define-values  (moved out* inf*) (move-players nu-grid players x-new y-new))
   (define col*    (players-are-on-distinct-places (state '_ moved)))
   (cond
-    [(cons? inf*) (infinite (state nu-grid moved) inf*)]
+    [(cons? inf*) (infinite (state nu-grid moved) (map player-name inf*))]
     [(not col*)   (collided (state nu-grid moved))]
     [else (state nu-grid moved)]))
 
@@ -1146,7 +1145,7 @@
   (let* ([s (state-from (#f 34)
                         (34  4 34)
                         (#f 34))])
-    (infinite (state (state-grid s) (set)) `(,red-player+++ ,white-player+++))))
+    (infinite (state (state-grid s) (set)) (map player-name `(,red-player+++ ,white-player+++)))))
 
 (define state-red-collide-action (list "red" (list 13 90)))
 

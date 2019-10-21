@@ -77,7 +77,9 @@
      (cond
        [(collided? state+1) (collided-state state+1)]
        [(infinite? state+1)
-        (and (all-infinite-suicide? state player given-ti1 given-ti2) (infinite-state state+1))]
+        (and (all-infinite-suicide? state player given-ti1 given-ti2)
+             (for/fold ((state state)) ([avatar (infinite-player state+1)])
+               (minus-player state avatar)))]
        [(suicide? state+1 player)
         (if (all-suicide? state player given-ti1 given-ti2) state+1 #false)]
        [else state+1])]))
@@ -116,8 +118,7 @@
   (check-initial "green" #:ti state3+green-ti state3-initial "o" state3+green)
 
   ;; -------------------------------------------------------------------------------------------------
-  ;; check the turn rule 
-
+  ;; check the turn rule
   (define (check-turn state action expected msg #:t1 (t1 #f) #:t2 (t2 #f))
     (match-define [list player [list tile-index _]] action)
     (define action2 (second action))
