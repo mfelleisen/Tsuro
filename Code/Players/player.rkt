@@ -42,7 +42,7 @@
 
     #; (-> intermediate*/c tile-index? tile-index? turn-action/c)
     [define/public (take-turn tiles-placed-so-far tile1 tile2)
-      (define board (initialize tiles-placed-so-far))
+      (define board (intermediate tiles-placed-so-far))
       ;; optional: update _others_ because some may no longer be with us 
       (send strategy take-turn me board tile1 tile2)]
 
