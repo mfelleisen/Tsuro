@@ -10,90 +10,141 @@
   (referee (->* [(and/c [listof player/c] (λ (l) (<= MIN-PLAYERS (length l) MAX-PLAYERS)))]
                 (list/c [listof player*] player*)))))
 
-;; ---------------------------------------------------------------------------------------------------
+;                                                                                      
+;       ;                                  ;                                           
+;       ;                                  ;                          ;                
+;       ;                                  ;                                           
+;    ;;;;   ;;;   ;;;;    ;;;   ; ;;    ;;;;   ;;;   ; ;;    ;;;    ;;;    ;;;    ;;;  
+;   ;; ;;  ;;  ;  ;; ;;  ;;  ;  ;;  ;  ;; ;;  ;;  ;  ;;  ;  ;;  ;     ;   ;;  ;  ;   ; 
+;   ;   ;  ;   ;; ;   ;  ;   ;; ;   ;  ;   ;  ;   ;; ;   ;  ;         ;   ;   ;; ;     
+;   ;   ;  ;;;;;; ;   ;  ;;;;;; ;   ;  ;   ;  ;;;;;; ;   ;  ;         ;   ;;;;;;  ;;;  
+;   ;   ;  ;      ;   ;  ;      ;   ;  ;   ;  ;      ;   ;  ;         ;   ;          ; 
+;   ;; ;;  ;      ;; ;;  ;      ;   ;  ;; ;;  ;      ;   ;  ;;        ;   ;      ;   ; 
+;    ;;;;   ;;;;  ;;;;    ;;;;  ;   ;   ;;;;   ;;;;  ;   ;   ;;;;   ;;;;;  ;;;;   ;;;  
+;                 ;                                                                    
+;                 ;                                                                    
+;                 ;                                                                    
+
 (require Tsuro/Code/Common/player-interface)
 (require Tsuro/Code/Common/rules)
 (require (submod Tsuro/Code/Common/tiles json))
 (require (submod Tsuro/Code/Common/board json))
 (require Tsuro/Code/Common/port)
+(require Tsuro/Code/Common/tokens)
 
 (require "../Lib/xsend.rkt")
 
 (require SwDev/Debugging/spy)
+(require (submod Tsuro/Code/Common/board picts))
 
 (module+ test
+  (require (submod ".."))
   (require Tsuro/Code/Players/player)
   (require Tsuro/Code/Players/strategies)
   (require (submod Tsuro/Code/Common/board test))
-  (require rackunit))
+  (require rackunit)
 
-;; ---------------------------------------------------------------------------------------------------
+  (require (for-syntax racket/syntax))
+  (require (for-syntax syntax/parse)))
+
+;                                                   
+;                    ;;                             
+;                   ;                               
+;                   ;                               
+;    ;;;;   ;;;   ;;;;;   ;;;    ;;;;   ;;;    ;;;  
+;    ;;  ; ;;  ;    ;    ;;  ;   ;;  ; ;;  ;  ;;  ; 
+;    ;     ;   ;;   ;    ;   ;;  ;     ;   ;; ;   ;;
+;    ;     ;;;;;;   ;    ;;;;;;  ;     ;;;;;; ;;;;;;
+;    ;     ;        ;    ;       ;     ;      ;     
+;    ;     ;        ;    ;       ;     ;      ;     
+;    ;      ;;;;    ;     ;;;;   ;      ;;;;   ;;;; 
+;                                                   
+;                                                   
+;                                                   
+
 (define TILES (range TILES#))
 
 #; {type Rankings = [Listof [Listof Player]]}
 
-(struct internal [external color] #:transparent)
-#; {type Internal = (internal Player Color)}
+(struct internal [external avatar] #:transparent)
+#; {type Internal = (internal Player Avatar)}
 
 (define (referee external*)
   (define internal* (assign-avatars external*))
   (define cheaters0 (inform-about-self-and-others internal*))
   (match-define (list state0 cheaters remaining) (initial-placements (remove* cheaters0 internal*)))
-  ;; there are always enough tiles left so remaining doesn't need to be refilled 
-  (play-rounds state0 remaining (remove* cheaters internal*)))
-  
-(module+ test
-  ;; testing remove* 
-  (define playrs (list (internal 'dummy "red") (internal 'dummy "white") (internal 'dummy "green")))
-  (check-equal? (remove* (list (third playrs) (first playrs)) playrs) (list (second playrs))))
+  ;; there are always enough tiles left so remaining doesn't need to be refilled
+  (play-game state0 remaining (remove* cheaters internal*)))
 
-  
 ;; ---------------------------------------------------------------------------------------------------
 #; {[Listof Player] -> [Listof Internal]}
 (define (assign-avatars external*)
-  (for/list ((e external*) (c TOKEN-COLORS))
+  (for/list ((e external*) (c AVATAR-COLORS))
     (internal e c)))
 
 (module+ test
-  (check-equal? (assign-avatars '(1 2 3))
-                (list
-                 (internal 1 (first TOKEN-COLORS))
-                 (internal 2 (second TOKEN-COLORS))
-                 (internal 3 (third TOKEN-COLORS)))))
+  (check-equal? (assign-avatars '(0 1 2)) (map internal (range 3) (take AVATAR-COLORS 3))))
 
 ;; ---------------------------------------------------------------------------------------------------
 #; {[Listof Internal] -> [Listof Internal]}
 (define (inform-about-self-and-others internal*)
-  (define all-colors (map internal-color internal*))
+  (define all-avatars (map internal-avatar internal*))
   (for/fold ((cheaters '())) ((i internal*))
-    (match-define (internal external color) i)
-    (define void-failed (xsend external playing-as color))
+    (match-define (internal external avatar) i)
+    (define void-failed (xsend external playing-as avatar))
     (cond
       [(failed? void-failed) (cons i cheaters)]
-      [else (define void-failed (xsend external playing-with (remove color all-colors)))
+      [else (define void-failed (xsend external playing-with (remove avatar all-avatars)))
             (if (failed? void-failed) (cons i cheaters) cheaters)])))
 
 (module+ test
-  (define strategy       (new first-strategy%))
-  (define red-external   (new player% [strategy strategy]))
-  (define red-internal   (internal red-external "red"))
-  (define white-external (new player% [strategy strategy]))
-  (define white-internal (internal white-external "white"))
-  (define playah%        (class player% (super-new [strategy strategy]))))
+  (define strategy (new first-strategy%))
+  
+  (define-syntax (define-external/internal stx)
+    (syntax-parse stx
+      [(_ avatar:id name #;{:str or :id} (~optional (~seq #:with %) #:defaults ([% #'player%])))
+       (with-syntax ([name-external (make-name stx "external" #'avatar #'name)]
+                     [name-internal (make-name stx "internal" #'avatar #'name)])
+         #'(define-values (name-external name-internal)
+             (let* ([player (new % [strategy strategy])])
+               (values player (internal player (~a 'avatar))))))]))
+
+  (define-for-syntax (make-name stx tag avatar name)
+    (define a (symbol->string (syntax-e avatar)))
+    (define n (format "~a" (syntax-e name)))
+    (if (string=? n "") (format-id stx "~a-~a" a tag) (format-id stx "~a-~a-~a" a n tag)))
+
+  (define-external/internal green "")
+  (define-external/internal red   "")
+  (define-external/internal blue  "")
+  (define-external/internal black "")
+  (define-external/internal white ""))
 
 (module+ test 
-  (define bad-playing-as% (class playah% (super-new) (define/override (playing-as c) (raise 0))))
-  (define bad-playing-with% (class playah% (super-new) (define/override (playing-with c) (raise 1))))
-  
-  (define inform0
-    (list
-     (internal (new bad-playing-as%) "white")
-     red-internal 
-     (internal (new bad-playing-with%) "green")))
+  (define bad-playing-as% (class player% (super-new) (define/override (playing-as c) (raise 0))))
+  (define bad-playing-with% (class player% (super-new) (define/override (playing-with c) (raise 1))))
 
+  (define-external/internal white as #:with bad-playing-as%)
+  (define-external/internal white with #:with bad-playing-with%)
+  
+  (define inform0 (list white-as-internal red-internal white-with-internal))
   (check-equal? (inform-about-self-and-others inform0) (list (third inform0) (first inform0))))
 
-;; ---------------------------------------------------------------------------------------------------
+;                                                   
+;                                                   
+;      ;             ;     ;       ;          ;;;   
+;                          ;                    ;   
+;    ;;;   ; ;;    ;;;   ;;;;;   ;;;   ;;;;     ;   
+;      ;   ;;  ;     ;     ;       ;       ;    ;   
+;      ;   ;   ;     ;     ;       ;       ;    ;   
+;      ;   ;   ;     ;     ;       ;    ;;;;    ;   
+;      ;   ;   ;     ;     ;       ;   ;   ;    ;   
+;      ;   ;   ;     ;     ;       ;   ;   ;    ;   
+;    ;;;;; ;   ;   ;;;;;   ;;;   ;;;;;  ;;;;     ;; 
+;                                                   
+;                                                   
+;                                                   
+
 (define INIT# 3)
 
 #; {[Listof Internal] -> (list State [Listof Internal] [Listof TileIndex])}
@@ -103,98 +154,184 @@
   (define state0  (initialize places0))
   (define-values (_ state cheaters remaining)
     (for/fold ([initials places0][state state0][cheats '()][remaining TILES]) ([i internal*])
-      (match-define (internal external color) i)
-      (match-define [list (list tile1 tile2 tile3) remaining+1] (split-tiles remaining INIT#))
+      (match-define (internal external avatar) i)
+      (match-define [list (list tile1 tile2 tile3) tiles+1] (split-tiles remaining INIT#))
       (define choice-failed (xsend external initial initials tile1 tile2 tile3))
       (cond
-        [(failed? choice-failed) (values initials state (cons i cheats) remaining+1)]
-        [(legal-initial (initialize initials) color tile1 tile2 tile3 choice-failed)
+        [(failed? choice-failed) (values initials state (cons i cheats) tiles+1)]
+        [(legal-initial (initialize initials) avatar tile1 tile2 tile3 choice-failed)
          =>
-         (λ (next) (values (cons (->initials color choice-failed) initials) next cheats remaining+1))]
-        [else (values initials state (cons i cheats) remaining+1)])))
+         (λ (next) (values (cons (->initials avatar choice-failed) initials) next cheats tiles+1))]
+        [else (values initials state (cons i cheats) tiles+1)])))
   (list state cheaters remaining))
 
-#; {Color InitialAction -> Initial}
-(define (->initials color ia)
+#; {Avatar InitialAction -> Initial}
+(define (->initials avatar ia)
   (match-define (list ti port x y) ia)
-  (list (jsexpr->tile ti) color port x y))
+  (list (jsexpr->tile ti) avatar port x y))
 
 (module+ test
-  (define bad-init-time% (class playah% (super-new) (define/override (initial . x) (let L () (L)))))
+  (define bad-init-time% (class player% (super-new) (define/override (initial . x) (let L () (L)))))
   (define bad-init-choice%
-    (class playah%
+    (class player%
       (super-new)
       ;; this method relies on the specific strategy of using the last given tile
       (define/override (initial is ti1 ti2 ti3)
         (list [list (modulo (+ ti3 1) TILES#) 0] (index->port 3) 0 0))))
 
-  (define initial0
-    (list red-internal
-          (internal (new bad-init-time%) "green")
-          (internal (new bad-init-choice%) "white")))
+  (define-external/internal white init-time #:with bad-init-time%)
+  (define-external/internal white choice #:with bad-init-choice%)
+
+  (define initial0 (list red-internal white-init-time-internal white-choice-internal))
   (define good-init (send/apply red-external initial '[] (take TILES 3)))
   (check-equal? (initial-placements initial0)
-                (list (initialize (list (->initials (internal-color red-internal) good-init)))
+                (list (initialize (list (->initials (internal-avatar red-internal) good-init)))
                       (reverse (rest initial0))
                       (drop TILES 9))))
 
-;; ---------------------------------------------------------------------------------------------------
+;                              
+;                              
+;                              
+;                              
+;    ;;;;  ;;;;  ;;;;;;   ;;;  
+;   ;;  ;      ; ;  ;  ; ;;  ; 
+;   ;   ;      ; ;  ;  ; ;   ;;
+;   ;   ;   ;;;; ;  ;  ; ;;;;;;
+;   ;   ;  ;   ; ;  ;  ; ;     
+;   ;; ;;  ;   ; ;  ;  ; ;     
+;    ;;;;   ;;;; ;  ;  ;  ;;;; 
+;       ;                      
+;    ;  ;                      
+;     ;;                       
+
 (define TURN# 2)
 
 #; {State [Listof TileIndex] [Listof Internal] -> (list Rankings [Listof Player])}
-(define (play-rounds-old state0 tiles internal*)
+(define (play-game state0 tiles0 internal*)
+  (let play ([state state0][tiles tiles0][rankings '[]][cheats '[]])
+    (cond
+      [(final? state)
+       (define s (survivors state))
+       (list (add-rank (map (find-external internal*) s) rankings) cheats)]
+      [else
+       (match-define [list state+1 tiles+1 ranked cheats+1] (play-one-round state tiles internal*))
+       (play state+1 tiles+1 (add-rank ranked rankings) (append cheats+1 cheats))])))
 
-  ;; *****************************************************************************
-  ;; this fails to distinguish between ONE round and a COMPLETE GAME
-  ;; *****************************************************************************
+#; {[Listof Player] Rankings -> Rankings}
+(define (add-rank ranked rankings)
+  (if (empty? ranked) rankings (cons ranked rankings)))
 
-  (define finder (find-external internal*))
-  (define-values (_ rankings cheats _2)
-    (let/ec final 
-      (for/fold ([state state0] [rankings '[]] [cheats '()] [remaining tiles]) ([i internal*])
-        (match-define (internal external color) i)
-        (match-define (list (list tile1 tile2) remaining+1) (split-tiles remaining TURN#))
-        (define choice-failed (xsend external take-turn (state->intermediate* state) tile1 tile2))
-        (cond
-          [(failed? choice-failed) (values state rankings (cons (finder color) cheats) remaining+1)]
-          [(legal-take-turn state color tile1 tile2 choice-failed)
-           =>
-           (λ (next)
-             (define others (add-to rankings finder state next))
-             (cond
-               [(final? next)
-                (define firsts (map finder (survivors next)))
-                (final next (if (empty? firsts) others (cons firsts others)) cheats remaining+1)]
-               [else (values next others cheats remaining+1)]))]
-          [else (values state rankings (cons (finder color) cheats) remaining+1)]))))
-  (list rankings cheats))
+(module+ test #; play-game
+  (define bad-turn-time% (class player% (super-new) (define/override (take-turn . x) (let L () (L)))))
+  (define-external/internal red turn-time #:with bad-turn-time%)
+  (define-external/internal blue turn-time #:with bad-turn-time%)
+
+  (define forced-suicide-tiles (list state-suicide-index state-suicide-index))
+  (define 2-rounds-suicide (append forced-suicide-tiles forced-suicide-tiles))
+
+  (check-equal? (play-game collision-state++ 2-rounds-suicide (list red-internal white-internal))
+                (list (list (map internal-external (list white-internal red-internal))) '[])
+                "play one game forced infinite loop of two players")
+
+  (define blue-time-spot (list (index->port 2) 0 8))
+  (define blue-tile      (tile-index->tile 0))
+  (define blue-collision (place-first-tile collision-state "blue" blue-tile blue-time-spot))
+  (define blue-+-players `(,blue-turn-time-internal ,red-internal ,white-internal))
+  (check-equal? (play-game blue-collision 2-rounds-suicide blue-+-players)
+                (list (list (map internal-external (list white-internal red-internal)))
+                      `[,blue-turn-time-external])
+                "play one game forced infinite loop of two players"))
+
+;                                     
+;                                   ; 
+;                                   ; 
+;                                   ; 
+;    ;;;;   ;;;   ;   ;  ; ;;    ;;;; 
+;    ;;  ; ;; ;;  ;   ;  ;;  ;  ;; ;; 
+;    ;     ;   ;  ;   ;  ;   ;  ;   ; 
+;    ;     ;   ;  ;   ;  ;   ;  ;   ; 
+;    ;     ;   ;  ;   ;  ;   ;  ;   ; 
+;    ;     ;; ;;  ;   ;  ;   ;  ;; ;; 
+;    ;      ;;;    ;;;;  ;   ;   ;;;; 
+;                                     
+;                                     
+;                                     
 
 #; {State [Listof TileIndex] [Listof Internal] ->
           (list State [Listf TileIndex] [Listof Player] [Listof Player])}
-
-(define (play-rounds state0 tiles internal*)
+(define (play-one-round state0 tiles0 internal*)
   (define finder (find-external internal*))
-  (define-values (state-N ranked-in-this-round cheats remaining)
-    (let/ec stop-round 
-      (for/fold ([state state0] [rankings '[]] [cheats '()] [remaining tiles]) ([i internal*])
-        (match-define (internal external color) i)
-        (match-define (list (list tile1 tile2) remaining+1) (split-tiles remaining TURN#))
+  (define-values (state-N tiles-N ranked cheats)
+    (for/fold ([state state0][tiles tiles0][ranked '[]][cheats '()]) ([i internal*])
+      (play-one-turn i state tiles ranked cheats finder)))
+  (list state-N tiles-N ranked cheats))
 
-        ;; don't play unless avatar is alive 
+(module+ test #; play-one-round 
+  (define active3 (list red-turn-time-internal))
+  (check-equal? (play-one-round state-suicide TILES active3)
+                (list (minus-player state-suicide "red")
+                      (cddr TILES)
+                      '[]
+                      `[,red-turn-time-external])
+                "turn diverges")
 
+  (define chosen-suicide-tiles (cons state-suicide-index TILES))
+  (check-equal? (play-one-round state-suicide chosen-suicide-tiles (list red-internal))
+                (list (minus-player state-suicide "red")
+                      (cddr chosen-suicide-tiles)
+                      '[]
+                      `[,red-external])
+                "chosen suicide of last player")
+  
+  (define rankings `[[,red-external]])
+  (define cheats   '[])
+  (check-equal? (play-one-round state-suicide forced-suicide-tiles (list red-internal))
+                (list state-suicide++ TILES `[,red-external] '[])
+                "forced suicide of last player")
+  
+  ;; this test case shows that the "at periphery or 2 neightbors" condition on intermediates
+  ;; is too strong; but it is not clear what to replace it with because sometimes it's okay
+  (check-equal? (play-one-round collision-state+++ 2-rounds-suicide `(,red-internal ,white-internal))
+                (list (minus-player (minus-player collision-state+++ "red") "white")
+                      (cddr 2-rounds-suicide)
+                      (map internal-external (list white-internal red-internal))
+                      '[])
+                "one turn infinite loop of two players (1)"))
 
-        (define choice-failed (xsend external take-turn (state->intermediate* state) tile1 tile2))
-        (cond
-          [(failed? choice-failed) (values state rankings (cons (finder color) cheats) remaining+1)]
-          [(legal-take-turn state color tile1 tile2 choice-failed)
-           =>
-           (λ (next)
-             (define others (add-to rankings finder state next))
-             ((if (empty? (survivors next)) stop-round values) next others cheats remaining+1))]
-          [else (values state rankings (cons (finder color) cheats) remaining+1)]))))
-  (list state-N remaining ranked-in-this-round cheats))
+;                              
+;                              
+;     ;                        
+;     ;                        
+;   ;;;;;  ;   ;   ;;;;  ; ;;  
+;     ;    ;   ;   ;;  ; ;;  ; 
+;     ;    ;   ;   ;     ;   ; 
+;     ;    ;   ;   ;     ;   ; 
+;     ;    ;   ;   ;     ;   ; 
+;     ;    ;   ;   ;     ;   ; 
+;     ;;;   ;;;;   ;     ;   ; 
+;                              
+;                              
+;                              
 
-#; {Rankings [Color -> Player] State State -> Rankings}
+#; {Internal State [Listof TileIndex] Rankings [Listof Player] [Avatar -> Player] ->
+             (values State [Listf TileIndex] [Listof Player] [Listof Player])}
+(define (play-one-turn i state tiles ranked cheats finder)
+  (match-define (internal external avatar) i)
+  (cond
+    [(boolean? (member avatar (survivors state))) (values state tiles ranked cheats)]
+    [else 
+     (match-define (list (list tile1 tile2) tiles+1) (split-tiles tiles TURN#))
+     (define choice-failed (xsend external take-turn (state->intermediate* state) tile1 tile2))
+     (cond
+       [(failed? choice-failed)
+        (values (minus-player state avatar) tiles+1 ranked (cons (finder avatar) cheats))]
+       [(legal-take-turn state avatar tile1 tile2 choice-failed)
+        => (λ (next) (values next tiles+1 (add-to ranked finder state next) cheats))]
+       [else
+        (values (minus-player state avatar) tiles+1 ranked (cons (finder avatar) cheats))])]))
+
+;; ---------------------------------------------------------------------------------------------------
+#; {Rankings [Avatar -> Player] State State -> Rankings}
 (define (add-to rankings finder state-n state-n+1)
   (define survivors-n (apply set (survivors state-n)))
   (define survivors-1 (apply set (survivors state-n+1)))
@@ -202,73 +339,45 @@
     [(set=? survivors-1 survivors-n) rankings]
     [else (append (map finder (set->list (set-subtract survivors-n survivors-1))) rankings)]))
 
-#; {[Listof Internal] -> [ Color -> Player ]}
-(define [(find-external internal*) color]
-  (internal-external (first (memf (λ (i) (equal? (internal-color i) color)) internal*))))
+#; {[Listof Internal] -> [ Avatar -> Player ]}
+(define [(find-external internal*) avatar]
+  (internal-external (first (memf (λ (i) (equal? (internal-avatar i) avatar)) internal*))))
 
-
-(module+ test
-  (define active0 (find-external '[]))
-  (check-equal? (add-to '[] active0  good-intermediate-state good-intermediate-state++) '[])
-
-  (define active1 (list red-internal))
-  (define finder1 (find-external active1))
+(module+ test #; find-external 
+  (define finder0 (find-external '[]))
+  (check-equal? (add-to '[] finder0  good-intermediate-state good-intermediate-state++) '[])
+  
+  (define finder1 (find-external (list red-internal)))
   (check-equal? (add-to '[] finder1 state-suicide state-suicide++) (list red-external))
 
-  (define active2 `(,red-internal ,(internal (new playah%) "white") ,(internal (new playah%) "blue")))
+  (define active2 `(,red-internal ,white-internal ,blue-internal))
   (define finder2 (find-external active2))
   (check-equal? (add-to '[] finder2 good-intermediate-state+ state-suicide)
                 (map internal-external (rest active2))))
 
 (module+ test
-  (define bad-turn-time% (class playah% (super-new) (define/override (take-turn . x) (let L () (L)))))
-  (define bad-turn-time (new bad-turn-time%))
-  (define active3 (list (internal bad-turn-time "red")))
-  (check-equal? (play-rounds state-suicide TILES active3)
-                (list state-suicide (cddr TILES) '[] `[,bad-turn-time])
-                "turn diverges")
+  (log-error "refereeing 3")
+  (referee (list red-external white-external green-external))
+  (log-error "refereeing 4")
+  (referee (list red-external white-external green-external blue-external))
+  (log-error "refereeing 5")
+  (referee (list red-external white-external green-external blue-external black-external)))
 
-  (define chosen-suicide-tiles (cons state-suicide-index TILES))
-  (check-equal? (play-rounds state-suicide chosen-suicide-tiles active1)
-                (list state-suicide (cddr chosen-suicide-tiles) '[]  `[,red-external])
-                "chosen suicide of last player")
+;                                                                        
+;                                                                        
+;                                                                        
+;                                                                        
+;    ;;;    ;;;  ;;;;;; ;;;;;;   ;;;   ; ;;          ;;;;   ;   ;  ;   ; 
+;   ;;  ;  ;; ;; ;  ;  ;;  ;  ; ;; ;;  ;;  ;             ;  ;   ;   ; ;  
+;   ;      ;   ; ;  ;  ;;  ;  ; ;   ;  ;   ;             ;  ;   ;   ;;;  
+;   ;      ;   ; ;  ;  ;;  ;  ; ;   ;  ;   ;          ;;;;  ;   ;    ;   
+;   ;      ;   ; ;  ;  ;;  ;  ; ;   ;  ;   ;         ;   ;  ;   ;   ;;;  
+;   ;;     ;; ;; ;  ;  ;;  ;  ; ;; ;;  ;   ;         ;   ;  ;   ;   ; ;  
+;    ;;;;   ;;;  ;  ;  ;;  ;  ;  ;;;   ;   ;          ;;;;   ;;;;  ;   ; 
+;                                                                        
+;                                                                        
+;                                                                        
 
-  (define forced-suicide-tiles (list state-suicide-index state-suicide-index))
-  (define rankings `[[,red-external]])
-  (define cheats   '[])
-  (check-equal? (play-rounds state-suicide forced-suicide-tiles active1)
-                (list state-suicide++ TILES `[,red-external] '[])
-                "forced suicide of last player")
-
-  (define two-rounds-suicide (append forced-suicide-tiles forced-suicide-tiles))
-  (define active4 (list red-internal white-internal))
-  ; (define state4  (add-tile collision-state "red" state-suicide-index))
-  
-  (require (submod Tsuro/Code/Common/board picts))
-  (show-state (first (play-rounds collision-state two-rounds-suicide active4)) #:name "2 infinite")
-
-  ;; ******************************************************************
-  ;; not placing the tile when an avatar goes into an infinite loop
-  ;; means that intermediate states no longer satisfy the "periphery"
-  ;; condition ~~ I do wonder whether this is also the case with the
-  ;; failed tests from last week
-
-  ;; RETHINK the not place the tile
-  
-  ;; ******************************************************************
-
-
-  #;
-  (check-equal? (play-rounds collision-state++ two-rounds-suicide active4)
-                (list (minus-player (minus-player collision-state++ "red") "white")
-                      (append (cddr two-rounds-suicide) TILES)
-                      (map internal-external active4)
-                      '[])
-                "one turn infinite loop of two players")
-  )
-  
-
-;; ---------------------------------------------------------------------------------------------------
 #; {[Listof TileIndex] N -> (List [Listof TileIndex] [Listof TileIndex])}
 ;; the second list has at least n elements 
 (define (split-tiles r n)
