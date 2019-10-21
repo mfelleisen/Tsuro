@@ -77,7 +77,7 @@
      (cond
        [(collided? state+1) (collided-state state+1)]
        [(infinite? state+1)
-        (if (all-infinite-suicide? state player given-ti1 given-ti2) (minus-player state player) #f)]
+        (and (all-infinite-suicide? state player given-ti1 given-ti2) (infinite-state state+1))]
        [(suicide? state+1 player)
         (if (all-suicide? state player given-ti1 given-ti2) state+1 #false)]
        [else state+1])]))
