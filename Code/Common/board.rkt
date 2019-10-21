@@ -417,6 +417,9 @@
    collision-state
    collision-action
    collision-state++
+   collision-state+++
+   state3-action-infinite ;; again 
+   collision-state++++
 
    good-intermediate-state
    good-state-actions
@@ -1139,6 +1142,12 @@
          [p (set-add p white-player+++)])
     (state (state-grid s) p)))
 
+(define collision-state++++
+  (let* ([s (state-from (#f 34)
+                        (34  4 34)
+                        (#f 34))])
+    (infinite (state (state-grid s) (set)) `(,red-player+++ ,white-player+++))))
+
 (define state-red-collide-action (list "red" (list 13 90)))
 
 (module+ test
@@ -1148,8 +1157,7 @@
   (check-true (collided? (add-tile/a state-red-leaves-collision state-red-collide-action)))
   (check-true (infinite? (add-tile/a state-infinite-and-collide collision-action)))
   (check-equal? (add-tile/a collision-state collision-action) (collided collision-state++))
-  (check-equal? (infinite-player (add-tile/a collision-state+++ (state3-action-infinite* 00)))
-                `(,red-player+++ ,white-player+++)))
+  (check-equal? (add-tile/a collision-state+++ state3-action-infinite) collision-state++++))
 
 ;; ---------------------------------------------------------------------------------------------------
 ;; two avatars reach the same tile but not the same port
