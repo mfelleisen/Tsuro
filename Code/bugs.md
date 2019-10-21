@@ -49,6 +49,10 @@
 11. in Common/board 
     - design bug: the infinite state must list all "looping players" not just one
 
+12. in Common/board 
+    - the "at periphery or 2 neightbors" condition on intermediates is too strong
+    - BUT I do not yet know what condition to replace it with 
+
 ### Design Bugs 
 
 1. equality for tiles was flawed 

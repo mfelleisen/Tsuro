@@ -111,7 +111,7 @@
          #:let locations (map place-of tile-spec)
          #:let all-but (remove x-y locations)
          #:let neigbors# (for/sum ((n (neighbor-locations x-y)) #:when (member n all-but)) 1)
-         (> neigbors# 1))))
+         (>= neigbors# 1))))
 
 (define tile/c (list/c tile? index? index?))
 (define player-on-any-tile/c (make-placement/c facing-inward))
