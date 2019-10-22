@@ -6,6 +6,8 @@
 (define MAX-PLAYERS 5)
 
 (provide
+ MIN-PLAYERS
+ MAX-PLAYERS
  (contract-out
   (referee (->* [(and/c [listof player/c] (λ (l) (<= MIN-PLAYERS (length l) MAX-PLAYERS)))]
                 (list/c [listof player*] player*)))))
