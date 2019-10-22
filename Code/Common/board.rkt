@@ -899,6 +899,12 @@
    (33                          33)
    ((33 #:rotate 180 "white" #:on port-white))))
 
+(define bad-intermediate-state
+  (state-from
+   ((34 "red" #:on port-red) #f (34 #:rotate 90 "blue" #:on port-blue))
+   (33                          33)
+   ((33 #:rotate 180 "white" #:on port-white))))
+
 (define contiguity-for-3-platers `((,(tile-index->tile 33) 0 1) (,(tile-index->tile 33) 1 0)))
 (define bad-intermediate-spec-2 (append inits-for-state-with-3-players contiguity-for-3-platers))
 
@@ -915,7 +921,6 @@
    (33 (33 #:rotate 180 "red" #:on port-white))))
 
 (module+ test ;; intermediate grids, states, and contracts 
-  (check-false (intermediate*/c bad-intermediate-spec) "an isolated tile that nobody could place")
   (check-false (intermediate*/c bad-intermediate-spec-4) "red shows up many times")
 
   (check-true (andmap tile/c contiguity-for-3-platers) "tiles are tiles")
@@ -1158,6 +1163,19 @@
   (check-equal? (add-tile/a collision-state collision-action) (collided collision-state++))
   (check-equal? (add-tile/a collision-state+++ state3-action-infinite) collision-state++++))
 
+(module+ test ;; these two tests demonstrate that "on periphery or occupied or neighboring 2" is wrong
+  (define collision-intermediate
+    (let* ([p (index->port 4)]
+           [s (intermediate-list-from-spec
+               (#f 34)
+               (34 [4 "red" #:on p] 34))]
+           [t `[,(tile-index->tile 4) "white" ,p 1 1]])
+      ; t tile?] [n color?] [p port?] [x index?] [y index?]
+      (cons t s)))
+  
+  (check-false (intermediate*/c bad-intermediate-spec)  "an isolated tile that nobody could place")
+  (check-true  (intermediate*/c collision-intermediate) "an isolated tile that red placed"))
+
 ;; ---------------------------------------------------------------------------------------------------
 ;; two avatars reach the same tile but not the same port
 
@@ -1394,6 +1412,7 @@
   (show-state (collided-state (add-tile/a state-red-leaves-collision (list "red" (list 13 90))))
               #:name "red left"))
 
+
 ; (module+ picts (show-state state3))
 ; (module+ picts (show-state state+ #:name "expected red off"))
 ; (module+ picts (show-state (add-tile/a state3 state3-action) #:name "red off"))
@@ -1479,8 +1498,12 @@
   (define good-intermediate-state-jsexpr (state->jsexpr good-intermediate-state))
   (define good-intermediate-state++-jsexpr (state->jsexpr good-intermediate-state+++))
   
-  (check-false (jsexpr->state (intermediate*->jsexpr bad-intermediate-spec)))
   (check-false (jsexpr->state (intermediate*->jsexpr bad-intermediate-spec-2)))
 
   (define bad-intermediate-spec-jsexpr (intermediate*->jsexpr bad-intermediate-spec))
   (define bad-intermediate-spec-2-jsexpr (intermediate*->jsexpr bad-intermediate-spec-2)))
+
+
+(module+ picts
+  (show-state  collision-state+++ #:name "+++")
+  (show-state bad-intermediate-state #:name "bad"))
