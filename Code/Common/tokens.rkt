@@ -4,8 +4,8 @@
  AVATAR-COLORS
 
  ;; all tokens come in a distinct color
- color?)
+ avatar?)
 
 ;; -----------------------------------------------------------------------------
 (define AVATAR-COLORS '("white" "black" "red" "green" "blue")) ;; colors only
-(define (color? x) (cons? (member x AVATAR-COLORS)))
+(define (avatar? x) (cons? (member x AVATAR-COLORS)))

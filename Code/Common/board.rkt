@@ -65,7 +65,7 @@
 (define (make-placement/c label+good?)
   (match-define (list label good?) label+good?)
   [list/dc
-   [t tile?] [n color?] [p port?] [x index?] [y index?]
+   [t tile?] [n avatar?] [p port?] [x index?] [y index?]
    #:post label (p x y)
    (and (good? x y)
         (port-facing-inward? p x y))])
@@ -275,8 +275,7 @@
  initial-state?
  dont-use-taken-spot/c
 
- ;; type Player
- #; [name #;color? port #;port? x #;index? y #;index?]
+ #; {type Player = [name #;color? port #;port? x #;index? y #;index?]}
  (struct-out player)
 
  player-on-tile/c
@@ -295,13 +294,13 @@
   
   [survivors
    ;; all live players in this state 
-   (-> state? (listof color?))]
+   (-> state? (listof avatar?))]
 
   [find-avatar
-   (-> color? state? (or/c #f [list/c [list/c tile-index? degree?] color? port? index? index?]))]
+   (-> avatar? state? (or/c #f [list/c [list/c tile-index? degree?] avatar? port? index? index?]))]
 
   [minus-player
-   (->i ([s state?][c (s) (and/c color? (curry set-member? (survivors s)))]) (r state?))]
+   (->i ([s state?][c (s) (and/c avatar? (curry set-member? (survivors s)))]) (r state?))]
 
   [find-free-spots
    ;; find all legal initial positions starting from (0,0) in clockwise direction
@@ -310,7 +309,7 @@
 
   [place-first-tile
    (->i ([s (and/c state? initial-state?)]
-         [name (s) (and/c color? (compose not (curry set-member? (survivors s))))]
+         [name (s) (and/c avatar? (compose not (curry set-member? (survivors s))))]
          [t tile?]
          [p (s) (and/c spot/c (dont-use-taken-spot/c s))])
         [result (or/c bad-spot?
@@ -335,7 +334,7 @@
   
   [add-tile
    ;; place a tile on the empty square that the player neighbors in this state
-   (->i ([s state?][name (s) (and/c color? (curry set-member? (survivors s)))][t tile?])
+   (->i ([s state?][name (s) (and/c avatar? (curry set-member? (survivors s)))][t tile?])
         [result (or/c infinite?
                       collided?
                       (and/c state?
@@ -619,7 +618,7 @@
              #:with square #'#f)
     (pattern
      (index (~optional (~seq #:rotate r:degree) #:defaults ([r #'0])) (~optional (~seq n #:on p)))
-     #:declare n     (expr/c #'color?)
+     #:declare n     (expr/c #'avatar?)
      #:declare p     (expr/c #'port?)
      #:declare index (expr/c #'(</c TILES#))
      #:with tile   #'(rotate-tile (tile-index->tile index.c) #:degree r)
@@ -1038,7 +1037,7 @@
     [(not col*)   (collided (state nu-grid moved))]
     [else (state nu-grid moved)]))
 
-#; {type Action = [List Color [List TileIndex Degree]]}
+#; {type Action = [List Avatar [List TileIndex Degree]]}
 
 #; {State Action -> State}
 (define (add-tile/a state action)
@@ -1167,6 +1166,7 @@
   (check-equal? (add-tile/a collision-state+++ state3-action-infinite) collision-state++++))
 
 (module+ test ;; these two tests demonstrate that "on periphery or occupied or neighboring 2" is wrong
+  ;; see for images of these two at the end of the module 
   (define collision-intermediate
     (let* ([p (index->port 4)]
            [s (intermediate-list-from
@@ -1337,7 +1337,7 @@
 ;   ;                     ;                                              
 ;   ;                    ;;                                              
 
-#; {Player* Natural Natural -> [Listof [List Color Port]]}
+#; {Player* Natural Natural -> [Listof [List Avatar Port]]}
 (define (is-player-on players x y)
   (define p (set-member players (λ (p) (match-define (player _ _ x0 y0) p) (and (= x x0) (= y y0)))))
   (for/list ((p-on-x-y (in-set p))) (list (player-name p-on-x-y) (player-port p-on-x-y))))
@@ -1456,7 +1456,7 @@
 
   ;; -------------------------------------------------------------------------------------------------
   (def/mp init-pat
-    (_ t n p x y) #'`(,(tile-pat t) ,(? color? n) ,(port-pat p) ,(? index? x) ,(? index? y)))
+    (_ t n p x y) #'`(,(tile-pat t) ,(? avatar? n) ,(port-pat p) ,(? index? x) ,(? index? y)))
   (def/mp intermediate-pat
     (_ ti-d x y) #'`(,(tile-pat ti-d) ,(? index? x) ,(? index? y)))
   (def/mp state-pat
@@ -1474,7 +1474,7 @@
       [else #f]))
   
   (def/mp action-pat
-    (_ pn ti) #'`(,(? color? pn) ,(tile-pat ti)))
+    (_ pn ti) #'`(,(? avatar? pn) ,(tile-pat ti)))
   
   (check-true (match state3-action [(action-pat pn ti) #t]))
   (check-true (match state3-action-infinite [(action-pat pn ti) #t]))

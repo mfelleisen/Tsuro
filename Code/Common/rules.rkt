@@ -5,7 +5,7 @@
 
 (require Tsuro/Code/Common/actions)
 (require (only-in Tsuro/Code/Common/board state?))
-(require (only-in Tsuro/Code/Common/tokens color?))
+(require (only-in Tsuro/Code/Common/tokens avatar?))
 
 (define (ok s) (or/c #false s))
 
@@ -13,7 +13,7 @@
  (contract-out
   [legal-initial
    (->i ([s initial-state?]
-         [c (s) (and/c color? (compose not (curry set-member? (survivors s))))]
+         [c (s) (and/c avatar? (compose not (curry set-member? (survivors s))))]
          [t1 tile-index?]
          [t2 tile-index?]
          [t3 tile-index?]
@@ -21,7 +21,7 @@
         (r (ok initial-state?)))]
   [legal-take-turn
    (->i ([s state?]
-         [c (s) (and/c color? (curry set-member? (survivors s)))]
+         [c (s) (and/c avatar? (curry set-member? (survivors s)))]
          [t1 tile-index?]
          [t2 tile-index?]
          [ta turn-action/c])

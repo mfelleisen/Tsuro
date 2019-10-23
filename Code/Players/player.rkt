@@ -46,7 +46,7 @@
       ;; optional: update _others_ because some may no longer be with us 
       (send strategy take-turn me board tile1 tile2)]
 
-    #; (-> [listof color?] any)
+    #; (-> [listof Avatar] any)
     [define/public (end-of-game order-of-exist)
       (void)]
 

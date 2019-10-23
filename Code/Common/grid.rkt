@@ -96,7 +96,7 @@
     [square->pict
      ;; if square is BLANK, p must be '()
      (->i ([sq (or/c BLANK square?)]
-           [on-sq (sq) (and/c (listof (list/c color? port?)) (empty-if-blank sq))])
+           [on-sq (sq) (and/c (listof (list/c avatar? port?)) (empty-if-blank sq))])
           [r pict?])])))
 
 ;                                                                                      
@@ -428,12 +428,12 @@
 (module+ picts   
   (define PLAYER-SIZE (quotient TILE-SIZE 5))
   
-  #; {Square [Listof [List Color Port]] -> Pict}
+  #; {Square [Listof [List Avatar Port]] -> Pict}
   ;; if square is BLANK, p must be '()
   (define (square->pict square p)
     (if (equal? BLANK square) BLANK-TILE (tile+players->pict  (square-tile square) p)))
 
-  #; {Tile [Listof [List Color Port]] -> Pict}
+  #; {Tile [Listof [List Avatar Port]] -> Pict}
   (define (tile+players->pict tile p)
     (match-define (list (list colors ports) ...) p)
     (define-values (pict _)

@@ -30,11 +30,11 @@
  
 (define referee-player%/c
   (class/c
-   [playing-as   (->m color? any)]
-   [playing-with (->m [listof color?] any)]
+   [playing-as   (->m avatar? any)]
+   [playing-with (->m [listof avatar?] any)]
    (initial      (->m initial-player-on-tile*/c tile-index? tile-index? tile-index? init-action/c))
    [take-turn    (->m intermediate*/c tile-index? tile-index? turn-action/c)]
-   [end-of-game  (->m [listof color?] any)]))
+   [end-of-game  (->m [listof avatar?] any)]))
 
 (define admin-player%/c
   (class/c
