@@ -597,15 +597,18 @@
 ;; SYNTAX
 
 #; (state-from #:grid0 grid0 #:players0 [p ...] S ...)
+;; creates a state from a matrix of tile and avatar specs 
   
-#; (init-list-from-tiles (S ...) ...)
+#; (intermediate-list-from (S ...) ...)
 #; (S =  #f
       || I
       || (I PlayerName #:on Port)
       || (I #:rotate (0,90,180,270))
       || (I #:rotate (0,90,180,270) PlayerName #:on Port))
 #; {I = 0 .. TILES#}
-;; creates a list of tile placements from which initialze and intermediate create a grid 
+;; creates a list of tile placements from a matrix of tile and avatar specs
+
+;; NOTE this syntax is too restrictive. It should use contracts to check the constraints not patterns.
   
 ;; ---------------------------------------------------------------------------------------------------
 (begin-for-syntax
@@ -633,7 +636,7 @@
              #:declare yi (expr/c #'index?)
              #:with (tile x y) #'( (rotate-tile (tile-index->tile ti.c) #:degree r) xi.c yi.c)]))
 
-(define-syntax (intermediate-list-from-spec stx)
+(define-syntax (intermediate-list-from stx)
   (syntax-parse stx
     [(_ (t:index/or-index-w-player ...) ...)
      #'(init-list-from-tiles/proc (list (list t.square ...) ...))]))
@@ -668,7 +671,7 @@
 
 ;; ---------------------------------------------------------------------------------------------------
 (module+ test ;; testing the DSL
-  (check-equal? (intermediate-list-from-spec
+  (check-equal? (intermediate-list-from
                  ((34 "red" #:on port-red) #f (34 #:rotate 90 "blue" #:on port-blue))
                  (#f)
                  ((33 "white" #:on port-white)))
@@ -894,7 +897,7 @@
 ;; bad intermediate state specs
 
 (define bad-intermediate-spec
-  (intermediate-list-from-spec
+  (intermediate-list-from
    ((34 "red" #:on port-red) #f (34 #:rotate 90 "blue" #:on port-blue))
    (33                          33)
    ((33 #:rotate 180 "white" #:on port-white))))
@@ -909,13 +912,13 @@
 (define bad-intermediate-spec-2 (append inits-for-state-with-3-players contiguity-for-3-platers))
 
 (define bad-intermediate-spec-3
-  (intermediate-list-from-spec
+  (intermediate-list-from
    ((34 "red" #:on port-red) #f (34 #:rotate 90 "blue" #:on port-blue))
    (33)
    (33 (33 #:rotate 180 "white" #:on port-white))))
 
 (define bad-intermediate-spec-4
-  (intermediate-list-from-spec
+  (intermediate-list-from
    ((34 "red" #:on port-red) #f (34 #:rotate 90 "red" #:on port-blue))
    (33)
    (33 (33 #:rotate 180 "red" #:on port-white))))
@@ -943,7 +946,7 @@
 ;; good intermediate state specs
 
 (define good-intermediate-spec
-  (intermediate-list-from-spec
+  (intermediate-list-from
    ((34 "red" #:on port-red) #f (34 #:rotate 90 "blue" #:on port-blue))
    (33)
    ((33 #:rotate 180 "white" #:on port-white))))
@@ -954,7 +957,7 @@
               ((33 #:rotate 180 "white" #:on port-white))))
 
 (define good-intermediate-pos-periph
-  (intermediate-list-from-spec
+  (intermediate-list-from
    ((34 "red" #:on port-red))
    ()
    ()
@@ -1166,7 +1169,7 @@
 (module+ test ;; these two tests demonstrate that "on periphery or occupied or neighboring 2" is wrong
   (define collision-intermediate
     (let* ([p (index->port 4)]
-           [s (intermediate-list-from-spec
+           [s (intermediate-list-from
                (#f 34)
                (34 [4 "red" #:on p] 34))]
            [t `[,(tile-index->tile 4) "white" ,p 1 1]])
