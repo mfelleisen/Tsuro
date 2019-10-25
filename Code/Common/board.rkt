@@ -1506,7 +1506,7 @@
   (define bad-intermediate-spec-jsexpr (intermediate*->jsexpr bad-intermediate-spec))
   (define bad-intermediate-spec-2-jsexpr (intermediate*->jsexpr bad-intermediate-spec-2)))
 
-
+#;
 (module+ picts
   (show-state  collision-state+++ #:name "+++")
   (show-state bad-intermediate-state #:name "bad"))
