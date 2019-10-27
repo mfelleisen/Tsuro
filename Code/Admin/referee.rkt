@@ -1,16 +1,17 @@
-#lang racket 
+#lang racket
 
-(define player* (listof referee-player/c))
+;; a referee that plays a single game with players given in the order of their "age"
+;; and produces a ranking (list of players placed at same position) and a list of cheats
 
-(define MIN-PLAYERS 3)
-(define MAX-PLAYERS 5)
+(require Tsuro/Code/Admin/basics)
+(require (only-in Tsuro/Code/Common/player-interface referee-player/c))
+(define referee-player/c*  (listof referee-player/c))
+(define ranked/c [listof referee-player/c*])
 
 (provide
- MIN-PLAYERS
- MAX-PLAYERS
  (contract-out
-  (referee (->* [(and/c [listof player/c] (λ (l) (<= MIN-PLAYERS (length l) MAX-PLAYERS)))]
-                (list/c [listof player*] player*)))))
+  (referee
+   (-> (and/c [listof referee-player/c] distinct? enough?) (list/c ranked/c referee-player/c*)))))
 
 ;                                                                                      
 ;       ;                                  ;                                           
@@ -27,23 +28,20 @@
 ;                 ;                                                                    
 ;                 ;                                                                    
 
-(require Tsuro/Code/Common/player-interface)
+(require (except-in Tsuro/Code/Common/player-interface referee-player/c))
 (require Tsuro/Code/Common/rules)
-(require (submod Tsuro/Code/Common/tiles json))
-(require (submod Tsuro/Code/Common/board json))
-(require Tsuro/Code/Common/port)
 (require Tsuro/Code/Common/tokens)
 
-(require "../Lib/xsend.rkt")
+(require Tsuro/Code/Lib/xsend)
 
-(require SwDev/Debugging/spy)
-(require (submod Tsuro/Code/Common/board picts))
+(require SwDev/Debugging/spy (submod Tsuro/Code/Common/board picts))
 
 (module+ test
   (require (submod ".."))
   (require Tsuro/Code/Players/player)
   (require Tsuro/Code/Players/strategies)
   (require (submod Tsuro/Code/Common/board test))
+  (require Tsuro/Code/Common/port)
   (require rackunit)
 
   (require (for-syntax racket/syntax))
@@ -156,21 +154,28 @@
   (define state0  (initialize places0))
   (define-values (_ state cheaters remaining)
     (for/fold ([initials places0][state state0][cheats '()][remaining TILES]) ([i internal*])
-      (match-define (internal external avatar) i)
-      (match-define [list (list tile1 tile2 tile3) tiles+1] (split-tiles remaining INIT#))
-      (define choice-failed (xsend external initial initials tile1 tile2 tile3))
-      (cond
-        [(failed? choice-failed) (values initials state (cons i cheats) tiles+1)]
-        [(legal-initial (initialize initials) avatar tile1 tile2 tile3 choice-failed)
-         =>
-         (λ (next) (values (cons (->initials avatar choice-failed) initials) next cheats tiles+1))]
-        [else (values initials state (cons i cheats) tiles+1)])))
+      (assign-avatar-and-inform-of-others i initials state cheats remaining)))
   (list state cheaters remaining))
+
+#; {Internal [Listof Initial] State [Listof Player] [Listof TileIndex]
+             ->
+             (values [Listof Initial] State [Listof Player] [Listof TileIndex])}
+(define (assign-avatar-and-inform-of-others i initials state cheats remaining)
+  (match-define (internal external avatar) i)
+  (match-define [list (list tile1 tile2 tile3) tiles+1] (split-tiles remaining INIT#))
+  (define choice-failed (xsend external initial initials tile1 tile2 tile3))
+  (cond
+    [(failed? choice-failed) (values initials state (cons i cheats) tiles+1)]
+    [(legal-initial (initialize initials) avatar tile1 tile2 tile3 choice-failed)
+     =>
+     (λ (next) (values (cons (->initials avatar choice-failed) initials) next cheats tiles+1))]
+    [else (values initials state (cons i cheats) tiles+1)]))
 
 #; {Avatar InitialAction -> Initial}
 (define (->initials avatar ia)
-  (match-define (list ti port x y) ia)
-  (list (jsexpr->tile ti) avatar port x y))
+  (match-define (list (list ti d) port x y) ia)
+  (define tile (rotate-tile (tile-index->tile ti) #:degree d))
+  (list tile avatar port x y))
 
 (module+ test
   (define bad-init-time% (class player% (super-new) (define/override (initial . x) (let L () (L)))))
