@@ -34,11 +34,12 @@
    [playing-with (->m [listof avatar?] any)]
    (initial      (->m initial-player-on-tile*/c tile-index? tile-index? tile-index? init-action/c))
    [take-turn    (->m intermediate*/c tile-index? tile-index? turn-action/c)]
+   #;
    [end-of-game  (->m [listof avatar?] any)]))
 
 (define admin-player%/c
   (class/c
-   [end-of-tournament (->m [listof string?] any)]))
+   [end-of-tournament (->m boolean? any)]))
 
 (define player%/c (and/c referee-player%/c admin-player%/c))
 
