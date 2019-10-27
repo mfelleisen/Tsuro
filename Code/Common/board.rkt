@@ -2,9 +2,6 @@
 
 ;; a data representation for game States, plus basic functions for manipulating them
 
-;; TDOO:
-;; -- can init and intermediate tiles accept rotated tiles? 
-
 ;                                                                 
 ;                                                                 
 ;                          ;                           ;          
@@ -622,7 +619,7 @@
      #:declare p     (expr/c #'port?)
      #:declare index (expr/c #'(</c TILES#))
      #:with tile   #'(rotate-tile (tile-index->tile index.c) #:degree r)
-     #:with square #'`(~? (,tile ,n.c ,p) (,tile)))
+     #:with square #'`(~? (,tile ,n.c ,p.c) (,tile)))
     (pattern index
              #:declare index (expr/c #'(</c TILES#))
              #:with tile   #'(tile-index->tile index.c)
@@ -1088,6 +1085,8 @@
                 good-intermediate-state+++
                 "red fwd 3"))
 
+
+
 ;; ---------------------------------------------------------------------------------------------------
 ;; infinite loops, plus more driving red off the board 
 
@@ -1361,18 +1360,18 @@
   (define INSET  (+ 20 TILE-SIZE))
   (define WIDTH  (+ INSET (* 10 TILE-SIZE) INSET))
   (define HEIGHT (+ INSET (* 10 TILE-SIZE) INSET))
-
+  
   #; {State (Instanceof DC<%>) -> Pict}
-  (define (state->pict b)
+  (define (state->pict b #:y-max (y-max 9) #:x-max (x-max #f)) ;; x-max and y-max for NSF only 
     (match-define (state squares players) b)
     (define state-as-pict
       (let loop ([l (matrix->rectangle squares)][y 0])
         (cond
-          [(empty? l) (blank)]
+          [(or (empty? l) (>= y y-max)) (blank)]
           [else
            (define row (first l))
            (define picts
-             (for/list ((square (in-list row)) (x (in-naturals)))
+             (for/list ((square (in-list row)) (x (or x-max (in-naturals))))
                (square->pict square (is-player-on players x y))))
            (vl-append (apply hc-append picts) (loop (rest l) (+ y 1)))])))
     state-as-pict)
@@ -1395,7 +1394,7 @@
 
 #;
 (module+ picts
-  (show-state good-intermediate-state+)
+  (show-state good-intermediate-state)
   (show-state good-intermediate-state++))
 
 #;
@@ -1510,3 +1509,36 @@
 (module+ picts
   (show-state  collision-state+++ #:name "+++")
   (show-state bad-intermediate-state #:name "bad"))
+
+(module+ nsf
+
+  (provide
+   #; {PositiveReal -> Pict}
+   one act two)
+
+  (require (submod ".." picts))
+  (require (submod Tsuro/Code/Common/tiles picts))
+  (define red-avatar "red")
+  (define black-avatar "black")
+  (define green-avatar "green")
+
+  (define red-port (index->port 2))
+  (define green-port (index->port 1))
+  (define green-port++ (index->port 2))
+  (define black-port (index->port 6))
+  
+  (define state-0
+    (state-from ((10 red-avatar #:on red-port) #false (12 #:rotate 90 black-avatar #:on black-port))
+                [#false]
+                ((33 #:rotate 90 green-avatar #:on green-port))))
+
+  (define state-1
+    (state-from ((10 red-avatar #:on red-port) #false (12 #:rotate 90 black-avatar #:on black-port))
+                [[12 #:rotate 90 green-avatar #:on green-port++]]
+                ((33 #:rotate 90))))
+
+  ; (show-state state-0 #:name "0")
+  ; (show-state state-1 #:name "1")
+  (define (one (s .5)) (scale (state->pict state-0 #:y-max 4 #:x-max 4) s))
+  (define (act (s .5)) (scale (tile->pict (rotate-tile (tile-index->tile 12) #:degree 90)) s))
+  (define (two (s .5)) (scale (state->pict state-1 #:y-max 4 #:x-max 4) s)))
