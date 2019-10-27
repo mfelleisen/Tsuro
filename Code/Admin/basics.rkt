@@ -1,5 +1,7 @@
 #lang racket
 
+;; concepts common to the tournament administrator and referee 
+
 (provide
  enough?
  distinct?
