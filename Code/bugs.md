@@ -53,6 +53,11 @@
     - the "at periphery or 2 neightbors" condition on intermediates is too strong
     - BUT I do not yet know what condition to replace it with 
 
+13. in Common/rules 
+			-----------------------------------------------------------------------------
+    - the all-suicide function did not check whether the result of (add-tile ..) was a state, 
+      as opposed to infinite or collided (which just aren't suicidal)
+
 ### Design Bugs 
 
 1. equality for tiles was flawed 

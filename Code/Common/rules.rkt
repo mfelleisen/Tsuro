@@ -93,7 +93,8 @@
 (define (all-suicide? state player ti1 ti2)
   (for/and ((t (append (all-tiles ti1) (all-tiles ti2))))
     (define state+1 (add-tile state player t))
-    (suicide? state+1 player)))
+    ;; neither (infinite? state+1) nor (collided? state+1) yield suicide 
+    (and (state? state+1) (suicide? state+1 player))))
 
 #; {State Player TileIndex TileIndex -> Boolean}
 (define (all-infinite-suicide? state player ti1 ti2)
