@@ -121,9 +121,6 @@
   (define-external/internal white ""))
 
 (module+ test 
-  (define bad-playing-as% (class player% (super-new) (define/override (playing-as c) (raise 0))))
-  (define bad-playing-with% (class player% (super-new) (define/override (playing-with c) (raise 1))))
-
   (define-external/internal white as #:with bad-playing-as%)
   (define-external/internal white with #:with bad-playing-with%)
   
@@ -178,14 +175,6 @@
   (list tile avatar port x y))
 
 (module+ test
-  (define bad-init-time% (class player% (super-new) (define/override (initial . x) (let L () (L)))))
-  (define bad-init-choice%
-    (class player%
-      (super-new)
-      ;; this method relies on the specific strategy of using the last given tile
-      (define/override (initial is ti1 ti2 ti3)
-        (list [list (modulo (+ ti3 1) TILES#) 0] (index->port 3) 0 0))))
-
   (define-external/internal white init-time #:with bad-init-time%)
   (define-external/internal white choice #:with bad-init-choice%)
 
@@ -229,7 +218,6 @@
   (if (empty? ranked) rankings (cons ranked rankings)))
 
 (module+ test #; play-game
-  (define bad-turn-time% (class player% (super-new) (define/override (take-turn . x) (let L () (L)))))
   (define-external/internal red turn-time #:with bad-turn-time%)
   (define-external/internal blue turn-time #:with bad-turn-time%)
 
