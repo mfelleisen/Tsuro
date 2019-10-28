@@ -106,7 +106,7 @@
        (with-syntax ([name-external (make-name stx "external" #'avatar #'name)]
                      [name-internal (make-name stx "internal" #'avatar #'name)])
          #'(define-values (name-external name-internal)
-             (let* ([player (new % [strategy strategy])])
+             (let* ([player (if (eq? player% %) (new % [strategy strategy]) [new %])])
                (values player (internal player (~a 'avatar))))))]))
 
   (define-for-syntax (make-name stx tag avatar name)

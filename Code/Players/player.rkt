@@ -124,7 +124,7 @@
 (define-syntax-rule (define/override-m % m)
   (define %
     (class player%
-      (super-new)
+      (super-new [strategy (new first-strategy%)])
       m)))
 
 (define-syntax-rule (define/time % m) (define/override-m % (define/override (m . x) (let L () (L)))))

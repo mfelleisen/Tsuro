@@ -28,6 +28,8 @@
 ;                 ;                                                                    
 
 (require Tsuro/Code/Admin/referee)
+(require Tsuro/Code/Players/player)
+(require Tsuro/Code/Players/strategies)
 (require Tsuro/Code/Lib/xsend)
 
 (module+ test
@@ -97,6 +99,19 @@
        [(failed? void-failed) final-winners]
        [is-winner (cons p final-winners)]
        [else final-winners]))))
+
+(module+ test
+  (define strategy (new first-strategy%))
+  (define winner  (new player% [strategy strategy]))
+  (define bad-win (new bad-end-of-tournament%))
+  (define loser   (new player% [strategy strategy]))
+  (define cheater (new bad-turn-time%))
+
+  (define all (list winner bad-win loser cheater))
+  
+  (check-equal? (inform-all-non-cheaters (list winner bad-win) all (list cheater)) (list winner)))
+
+
 
 ;                       
 ;                       
@@ -189,8 +204,6 @@
 ;                                                                        
 
 (module+ test
-  (define strategy (new first-strategy%))
-  
   (define-syntax (define-player stx)
     (syntax-parse stx
       [(_ avatar:id name #;{:str or :id} (~optional (~seq #:with %) #:defaults ([% #'player%])))
