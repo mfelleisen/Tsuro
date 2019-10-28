@@ -7,7 +7,7 @@
 #; {Nat -> Boolean : Index}
 (define (index? z) (< -1 z SIZE))
 
-(define grid? object?)
+(define grid? any/c #;object?)
 (define location/c (list/c index? index?))
 
 ;                                                   

@@ -1,20 +1,52 @@
 #lang racket
 
+(define N natural-number/c)
+(define matrix? any/c)
+(define (good-x m) (and/c N (</c (length m))))
+(define (good-y m) (and/c N (</c (length (first m)))))
+
 (provide
- build-matrix
- matrix-set
- matrix-ref
- matrix->rectangle
- matrix-andmap
- matrix-where)
+ (contract-out
+  [build-matrix (-> N N (-> N N any) matrix?)]
+  [matrix-set   (->i ([m matrix?] [x (m) (good-x m)] [y (m) (good-y m)] [new any/c]) (r matrix?))]
+  [matrix-ref   (->i ([m matrix?] [x (m) (good-x m)] [y (m) (good-y m)]) (r any/c))]
+  [matrix->rectangle (-> matrix? (listof list?))]
+  [matrix-andmap (-> matrix? (-> any/c N N any) boolean?)]
+  [matrix-where  (-> matrix? (-> any/c N N any) (-> any/c N N any) (listof any/c))]))
 
-(require (only-in htdp/matrix build-matrix matrix->rectangle))
-(require (prefix-in htdp: (only-in htdp/matrix matrix-set matrix-ref)))
-(module+ test (require rackunit))
+;; ---------------------------------------------------------------------------------------------------
+(module+ test
+  (require (submod ".."))
+  (require (prefix-in H: (only-in htdp/matrix matrix-set matrix-ref build-matrix  matrix->rectangle)))
+  (require rackunit))
 
-(define (matrix-ref m x y) (htdp:matrix-ref m y x))
-(define (matrix-set m x y new) (htdp:matrix-set m y x new))
+(require SwDev/Debugging/spy)
 
+;; ---------------------------------------------------------------------------------------------------
+
+#; {type [Matrix X] = [Listof [Listof X]]}
+
+;; ---------------------------------------------------------------------------------------------------
+(define (build-matrix x y f)
+  (build-list x (λ (ix) (build-list y (λ (iy) (f ix iy))))))
+
+(define (matrix->rectangle m) m)
+
+;; ---------------------------------------------------------------------------------------------------
+(define (matrix-ref m x y)
+  (list-ref (list-ref m x) y))
+
+;; ---------------------------------------------------------------------------------------------------
+(define (matrix-set m x y new)
+  (define row (list-ref m x))
+  (define row+1 (replace row y new)#;
+    (if (= y 0) (cons new (rest row)) (append (take row y) (list new) (drop row y))))
+  (replace m x row+1))
+
+(define (replace M i new)
+  (append (take M i) (list new) (drop M (+ i 1))))
+
+;; ---------------------------------------------------------------------------------------------------
 (define (matrix-map m f)
   (let loop ([l (matrix->rectangle m)][x 0])
     (cond
@@ -45,16 +77,29 @@
        (define row (first l))
        (define picts
          (for/list ((n (in-list row)) (y (in-naturals)) #:when (p n x y))
-           (f n y x)))
+           (f n x y)))
        (append picts (loop (rest l) (+ x 1)))])))
 
+
+;; ---------------------------------------------------------------------------------------------------
 (module+ test
-  (define M (build-matrix 2 2 (λ (y x) (list x y))))
-  (check-equal? (matrix-map M (λ (x y z) x)) '((0 0) (1 0) (0 1) (1 1)))
+  (define M (build-matrix 2 3 (λ (x y) (list y x))))
+  (define H:M (H:build-matrix 2 3 (λ (x y) (list y x))))
+  
+  (check-equal? (matrix->rectangle M) (H:matrix->rectangle H:M))
+  (check-equal? (H:matrix-ref H:M 1 2) (matrix-ref M 1 2) "1 2")
+  
+  (define M+1   (matrix-set M 1 0 'a))
+  (define H:M+1 (H:matrix-set H:M 1 0 'a))
+
+  (check-equal? (H:matrix-ref H:M+1 1 0) (matrix-ref M+1 1 0) "2 1")
+  (check-equal? (matrix->rectangle M+1) (H:matrix->rectangle H:M+1) "2 1/complete")
+  (check-equal? (matrix-map M (λ (M-at-x-y y z) M-at-x-y)) (apply append M))
 
   (define K (matrix-set M 0 0 #f))
-  (check-equal? (matrix-where K (λ (x y z) x) (λ (x y z) x)) '((1 0) (0 1) (1 1)))
-
-
+  (check-equal? (matrix-where K (λ (M-at-x-y x y) M-at-x-y) (λ (M-at-x-y x y) (list x y)))
+                ;; because M lists x and y in reverse 
+                (map reverse (apply append (rest (first K)) (rest K))))
+  
   (check-true (matrix-andmap M (λ (p x y) (>= (apply + p) 0))))
   (check-false (matrix-andmap M (λ (p x y) (not (= (first p) 0))))))
