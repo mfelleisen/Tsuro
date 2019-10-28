@@ -32,6 +32,7 @@
 ;                 ;                                                                    
 ;                 ;                                                                    
 
+(require Tsuro/Code/Players/first-s)
 (require Tsuro/Code/Common/port)
 
 (module+ test

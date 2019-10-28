@@ -29,7 +29,7 @@
 
 (require Tsuro/Code/Admin/referee)
 (require Tsuro/Code/Players/player)
-(require Tsuro/Code/Players/strategies)
+(require Tsuro/Code/Players/first-s)
 (require Tsuro/Code/Lib/xsend)
 
 (module+ test

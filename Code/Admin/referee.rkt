@@ -39,7 +39,8 @@
 (module+ test
   (require (submod ".."))
   (require Tsuro/Code/Players/player)
-  (require Tsuro/Code/Players/strategies)
+  ; (require Tsuro/Code/Players/strategies)
+  (require Tsuro/Code/Players/first-s)
   (require (submod Tsuro/Code/Common/board test))
   (require Tsuro/Code/Common/port)
   (require rackunit)
