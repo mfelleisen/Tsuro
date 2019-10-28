@@ -25,7 +25,7 @@
 
 (struct failed (value) #:transparent)
 
-(define time-out-limit (make-parameter .1))
+(define time-out-limit (make-parameter .2))
 
 (define-syntax (xsend stx)
   (syntax-parse stx 
