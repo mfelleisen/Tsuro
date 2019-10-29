@@ -26,6 +26,39 @@
 
 #; {type [Matrix X] = [Listof [Listof X]]}
 
+(module+ matrix+
+  (require (prefix-in H: (only-in htdp/matrix matrix-set matrix-ref build-matrix  matrix->rectangle)))
+  (require rackunit)
+
+  (struct matrix2 [x y rec vec] #:transparent)
+  #; {type [Matrix X] = (matrix n m (Vector-of X))}
+
+  (define (build-matrix x y f)
+    (define r (build-list x (λ (ix) (build-list y (λ (iy) (f ix iy))))))
+    (define m (apply vector (apply append r)))
+    (matrix2 x y r m))
+
+  (define (matrix-ref m x y)
+    (match-define (matrix2 x0 y0 _ v) m)
+    (vector-ref v (+ (* x (+ y 1)) y)))
+
+  (define matrix->rectangle matrix2-rec)
+
+  (define M (build-matrix 2 3 (λ (x y) (list y x))))
+  (define H:M (H:build-matrix 2 3 (λ (x y) (list y x))))
+
+  M
+  
+  (check-equal? (matrix->rectangle M) (H:matrix->rectangle H:M))
+  (check-equal? (H:matrix-ref H:M 1 2) (matrix-ref M 1 2) "1 2")
+  
+  ; (define M+1   (matrix-set M 1 0 'a))
+
+  
+
+  )
+  
+
 ;; ---------------------------------------------------------------------------------------------------
 (define (build-matrix x y f)
   (build-list x (λ (ix) (build-list y (λ (iy) (f ix iy))))))
