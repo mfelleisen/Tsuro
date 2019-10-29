@@ -1365,15 +1365,15 @@
   (define (state->pict b #:y-max (y-max 9) #:x-max (x-max #f)) ;; x-max and y-max for NSF only 
     (match-define (state squares players) b)
     (define state-as-pict
-      (let loop ([l (matrix->rectangle squares)][y 0])
+      (let loop ([l (matrix->rectangle squares)][x 0])
         (cond
-          [(or (empty? l) (>= y y-max)) (blank)]
+          [(or (empty? l) (>= x y-max)) (blank)]
           [else
            (define row (first l))
            (define picts
-             (for/list ((square (in-list row)) (x (or x-max (in-naturals))))
+             (for/list ((square (in-list row)) (y (or x-max (in-naturals))))
                (square->pict square (is-player-on players x y))))
-           (vl-append (apply hc-append picts) (loop (rest l) (+ y 1)))])))
+           (vl-append (apply hc-append picts) (loop (rest l) (+ x 1)))])))
     state-as-pict)
   
   #; {State -> Void}
@@ -1414,16 +1414,24 @@
   (show-state (collided-state (add-tile/a state-red-leaves-collision (list "red" (list 13 90))))
               #:name "red left"))
 
-
-; (module+ picts (show-state state3))
-; (module+ picts (show-state state+ #:name "expected red off"))
-; (module+ picts (show-state (add-tile/a state3 state3-action) #:name "red off"))
-
-; (module+ picts (show-state like-state-dsl))
-; (module+ picts (show-state state-dsl))
-
-; (module+ picts (show-state good-intermediate-state+++))
-; (module+ picts (show-state (add-tile good-intermediate-state++ player-red (tile-index->tile 34))))
+#;
+(module+ picts
+  (show-state state3))
+#;
+(module+ picts
+  (show-state (add-tile/a state3 state3-action) #:name "red off"))
+#;
+(module+ picts
+  (show-state like-state-dsl))
+#;
+(module+ picts
+  (show-state state-dsl))
+#;
+(module+ picts
+  (show-state good-intermediate-state+++))
+#;
+(module+ picts
+  (show-state (add-tile good-intermediate-state++ player-red (tile-index->tile 34))))
 
 ;                              
 ;      ;                       
@@ -1536,7 +1544,7 @@
     (state-from ((10 red-avatar #:on red-port) #false (12 #:rotate 90 black-avatar #:on black-port))
                 [[12 #:rotate 90 green-avatar #:on green-port++]]
                 ((33 #:rotate 90))))
-
+  
   ; (show-state state-0 #:name "0")
   ; (show-state state-1 #:name "1")
   (define (one (s .5)) (scale (state->pict state-0 #:y-max 4 #:x-max 4) s))
