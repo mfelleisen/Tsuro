@@ -1365,15 +1365,15 @@
   (define (state->pict b #:y-max (y-max 9) #:x-max (x-max #f)) ;; x-max and y-max for NSF only 
     (match-define (state squares players) b)
     (define state-as-pict
-      (let loop ([l (matrix->rectangle squares)][x 0])
+      (let loop ([l (matrix->rectangle squares)][y 0])
         (cond
-          [(or (empty? l) (>= x y-max)) (blank)]
+          [(or (empty? l) (>= y y-max)) (blank)]
           [else
            (define row (first l))
            (define picts
-             (for/list ((square (in-list row)) (y (or x-max (in-naturals))))
+             (for/list ((square (in-list row)) (x (or x-max (in-naturals))))
                (square->pict square (is-player-on players x y))))
-           (vl-append (apply hc-append picts) (loop (rest l) (+ x 1)))])))
+           (vl-append (apply hc-append picts) (loop (rest l) (+ y 1)))])))
     state-as-pict)
   
   #; {State -> Void}
@@ -1538,10 +1538,12 @@
   (define state-0
     (state-from ((10 red-avatar #:on red-port) #false (12 #:rotate 90 black-avatar #:on black-port))
                 [#false]
+                [#false]
                 ((33 #:rotate 90 green-avatar #:on green-port))))
 
   (define state-1
     (state-from ((10 red-avatar #:on red-port) #false (12 #:rotate 90 black-avatar #:on black-port))
+                [#false]
                 [[12 #:rotate 90 green-avatar #:on green-port++]]
                 ((33 #:rotate 90))))
   
@@ -1549,4 +1551,8 @@
   ; (show-state state-1 #:name "1")
   (define (one (s .5)) (scale (state->pict state-0 #:y-max 4 #:x-max 4) s))
   (define (act (s .5)) (scale (tile->pict (rotate-tile (tile-index->tile 12) #:degree 90)) s))
-  (define (two (s .5)) (scale (state->pict state-1 #:y-max 4 #:x-max 4) s)))
+  (define (two (s .5)) (scale (state->pict state-1 #:y-max 4 #:x-max 4) s))
+
+  (one)
+  (act)
+  (two))
