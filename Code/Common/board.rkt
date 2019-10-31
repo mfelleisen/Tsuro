@@ -1363,19 +1363,11 @@
   
   #; {State (Instanceof DC<%>) -> Pict}
   (define (state->pict b #:y-max (y-max 9) #:x-max (x-max #f)) ;; x-max and y-max for NSF only 
-    (match-define (state squares players) b)
-    (define state-as-pict
-      (let loop ([l (matrix->rectangle squares)][y 0])
-        (cond
-          [(or (empty? l) (>= y y-max)) (blank)]
-          [else
-           (define row (first l))
-           (define picts
-             (for/list ((square (in-list row)) (x (or x-max (in-naturals))))
-               (square->pict square (is-player-on players x y))))
-           (vl-append (apply hc-append picts) (loop (rest l) (+ y 1)))])))
-    state-as-pict)
-  
+    (match-define (state squares0 players) b)
+    (define squares1 (if (boolean? x-max) squares0 (matrix-clip squares0 x-max y-max)))
+    (define squares2 (matrix-map squares1 (λ (sq x y) (square->pict sq (is-player-on players y x)))))
+    (matrix-fold squares2 (blank) vl-append (λ (row) (apply hc-append row))))
+    
   #; {State -> Void}
   (define (show-state s #:visible (v #t) #:name (name "hello"))
     (define frame (new frame% [label name][width WIDTH][height HEIGHT]))

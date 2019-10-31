@@ -16,6 +16,8 @@
   [matrix-clip  (->i ([m matrix?] [x (m) (<-rows m)] [y (m) (<-cols m)]) (r matrix?))]
   [matrix->rectangle (-> matrix? (listof list?))]
   [matrix-andmap (-> matrix? (-> any/c N N any) boolean?)]
+  [matrix-fold   (-> matrix? any/c (-> any/c any/c any) (-> list? any) any)]
+  [matrix-map    (-> matrix? (-> any/c N N any) matrix?)]
   [matrix-where  (-> matrix? (-> any/c N N any) (-> any/c N N any) (listof any/c))]))
 
 ;; ---------------------------------------------------------------------------------------------------
@@ -60,6 +62,9 @@
       [(>= i x) '()]
       [else (cons (for/list ((j y) (n (first m))) n) (loop (+ i 1) (rest m)))])))
 
+(define (matrix-fold squares e row-f col-f)
+  (foldr row-f e (map col-f squares)))
+
 (define (matrix-map m f)
   (let loop ([l (matrix->rectangle m)][x 0])
     (cond
@@ -69,7 +74,7 @@
        (define picts
          (for/list ((n (in-list row)) (y (in-naturals)))
            (f n x y)))
-       (append picts (loop (rest l) (+ x 1)))])))
+       (cons picts (loop (rest l) (+ x 1)))])))
 
 (define (matrix-andmap m f)
   (let loop ([l (matrix->rectangle m)][x 0])
@@ -109,7 +114,7 @@
 
   (check-equal? (H:matrix-ref H:M+1 1 0) (matrix-ref M+1 0 1) "2 1")
   (check-equal? (matrix->rectangle M+1) (H:matrix->rectangle H:M+1) "2 1/complete")
-  (check-equal? (matrix-map M (λ (M-at-x-y y z) M-at-x-y)) (apply append M))
+  (check-equal? (matrix-map M (λ (M-at-x-y y z) M-at-x-y)) M)
 
   (define K (matrix-set M 0 0 #f))
   (check-equal? (matrix-where K (λ (M-at-x-y x y) M-at-x-y) (λ (M-at-x-y x y) (list x y)))
