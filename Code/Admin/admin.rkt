@@ -4,6 +4,11 @@
 ;; and produces the list of first-placed players; it informs all non-cheaters whether they were
 ;; first-placed or not (boolean)
 
+;; TODO:
+;; -- get-top-2 must also allow the subtraction of cheats
+;; -- ... and probably report cheats 
+;; -- add re-sort into get-top-2
+
 (require Tsuro/Code/Admin/basics)
 (require (only-in Tsuro/Code/Common/player-interface player/c))
 
@@ -32,6 +37,9 @@
 (require Tsuro/Code/Players/first-s)
 (require Tsuro/Code/Lib/xsend)
 
+(require SwDev/Debugging/spy)
+
+
 (module+ test
   (require (submod ".."))
   (require Tsuro/Code/Players/player)
@@ -58,19 +66,35 @@
 
 #; {[Listof Player] -> [Listof Player]}
 (define (administrator lop0)
-  (define-values (winners cheats)
-    (let administrator ([lop lop0][cheats '()])
-      (case (length lop)
-        [(0 1 2) (values lop cheats)]
-        [(3 4 5)
-         (match-define (list ranked c) (referee lop))
-         (values (if (empty? ranked) '() (first ranked)) cheats)]
-        [else
-         (define games   (prepare-games lop))
-         (define results (map referee games))
-         (define top-2   (get-top-2 results))
-         (administrator top-2 (append (append-map second results) cheats))])))
+  (define-values (winners cheats) (determine-winners lop0))
   (inform-all-non-cheaters winners lop0 cheats))
+
+#;{[Listof Player] -> (values ([Listof Player] [Listof Player]))}
+(define (determine-winners lop0)
+  ;; while there are more than 0 1 or 2 playes, play rounds 
+  (let administrator ([lop lop0][cheats '()])
+    (case (length lop)
+      [(0 1 2) (values lop cheats)]
+      [(3 4 5)
+       (define result (referee lop))
+       (match-define (list ranked c) result)
+       (if (empty? ranked) (values '() cheats) (administrator (resort (get-top-2 (list result)) lop0) c))]
+      [else
+       (define games   (prepare-games lop))
+       (define results (map referee games))
+       (define top-2   (get-top-2 results))
+       (administrator (resort top-2 lop0) (append (append-map second results) cheats))])))
+
+#;{[Listof Player] [Listof Player] -> [Listof Player]}
+(define (resort top-2 lop0)
+  (for/list ([p lop0] #:when (member p top-2)) p))
+
+(module+ test
+  (define box% (class object% [init content] (super-new)))
+  (match-define (list box1 box2 box3 box4) (map (λ (x) (new box% [content x])) '(1 2 3 4)))
+  (check-equal? (resort (list box2 box1 box3) (list box1 box2 box3 box4)) (list box1 box2 box3)))
+  
+
 
 ;                       
 ;                     ; 
@@ -230,9 +254,10 @@
 
   (define-player white as #:with bad-playing-as%)
   (define-player white with #:with bad-playing-with%)
-
+  (define baddies (list white-as-external white-with-external))
   (define one-game (list green-external red-external blue-external black-external white-external))
-  (define two-games (append (list white-as-external white-with-external) one-game))
-  
-  (administrator one-game)
-  (administrator two-games))
+  (define two-games (append baddies one-game))
+
+  (check-true (empty? (administrator (append baddies baddies))))
+  (check-true (cons? (administrator one-game)))
+  (check-true (cons? (administrator two-games))))
