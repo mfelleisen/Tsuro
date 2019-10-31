@@ -54,40 +54,21 @@
 
 ;; ---------------------------------------------------------------------------------------------------
 (define (matrix-clip m0 x y)
-  (let loop ([i 0][m m0])
-    (cond
-      [(empty? m) '()]
-      [(>= i x) '()]
-      [else
-       (define row (first m))
-       (define picts
-         (for/list ((n row) (j y)) n))
-       (cons picts (loop (+ i 1) (rest m)))])))
+  (for/list ([row (in-list m0)][i (in-range x)])
+    (for/list ((n row) (j y)) n)))
 
 (define (matrix-fold squares e row-f col-f)
   (foldr row-f e (map col-f squares)))
 
 (define (matrix-map m f)
-  (let loop ([l m][x 0])
-    (cond
-      [(empty? l) '()]
-      [else
-       (define row (first l))
-       (define picts
-         (for/list ((n (in-list row)) (y (in-naturals)))
-           (f n x y)))
-       (cons picts (loop (rest l) (+ x 1)))])))
+  (for/list ([row (in-list m)][x (in-naturals)])
+    (for/list ((n (in-list row)) (y (in-naturals)))
+      (f n x y))))
 
 (define (matrix-andmap m f)
-  (let loop ([l m][x 0])
-    (cond
-      [(empty? l) #true]
-      [else
-       (define row (first l))
-       (define picts
-         (for/and ((n (in-list row)) (y (in-naturals)))
-           (f n x y)))
-       (and picts (loop (rest l) (+ x 1)))])))
+  (for/and ((row (in-list m)) (x (in-naturals)))
+    (for/and ((n (in-list row)) (y (in-naturals)))
+      (f n x y))))
 
 ;; ---------------------------------------------------------------------------------------------------
 (module+ test
