@@ -993,16 +993,20 @@
   (match-define [list tile->jsexpr port->jsexpr] ->jsexpr)
   #; {Player* -> [Square Index Index -> [Listof JSexpr]]}
   ;; does not belong into square.rkt because that one doesn't know about (x,y)
-  (define ((square->jsexpr players) sq x y)
-    (define tj (tile->jsexpr (square-tile sq)))
-    (define players-on-x-y (is-player-on players x y))
-    (match players-on-x-y
-      ['() (list (list tj x y))]
-      [(list (list names ports) ...)
-       ;; all pprts are distinct
-       (for/list ((name names) (port ports))
-         (list tj name (port->jsexpr port) x y))]))
-  (apply append (matrix-where (state-grid s) (λ (sq x y) sq) (square->jsexpr (state-players s)))))
+  (define ((square->jsexpr players) sq y x) ;; because the matrix uses row-dominante coordinates 
+    (cond
+      [(boolean? sq) sq]
+      [else 
+       (define tj (tile->jsexpr (square-tile sq)))
+       (define players-on-x-y (is-player-on players x y))
+       (match players-on-x-y
+         ['() (list (list tj x y))]
+         [(list (list names ports) ...)
+          ;; all pprts are distinct
+          (for/list ((name names) (port ports))
+            (list tj name (port->jsexpr port) x y))])]))
+  (define grid-jsexpr (matrix-map (state-grid s) (square->jsexpr (state-players s))))
+  (matrix-fold grid-jsexpr '() append (λ (row) (apply append (filter values row)))))
 
 ;                                                                        
 ;              ;      ;                                                  

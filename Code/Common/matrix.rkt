@@ -12,12 +12,13 @@
   ;; these operations are NOT the ordinary Matrix operations but Cartesian point access operations. 
   [matrix-set   (->i ([m matrix?] [x (m) (<-cols m)] [y (m) (<-rows m)] [new any/c]) (r matrix?))]
   [matrix-ref   (->i ([m matrix?] [x (m) (<-cols m)] [y (m) (<-rows m)]) (r any/c))]
-  
+
+  ;; but these guys use plain matrix orientation
+  ;; this mess must be cleaned up eventually 
   [matrix-clip  (->i ([m matrix?] [x (m) (<-rows m)] [y (m) (<-cols m)]) (r matrix?))]
   [matrix-andmap (-> matrix? (-> any/c N N any) boolean?)]
   [matrix-fold   (-> matrix? any/c (-> any/c any/c any) (-> list? any) any)]
-  [matrix-map    (-> matrix? (-> any/c N N any) matrix?)]
-  [matrix-where  (-> matrix? (-> any/c N N any) (-> any/c N N any) (listof any/c))]))
+  [matrix-map    (-> matrix? (-> any/c N N any) matrix?)]))
 
 ;; ---------------------------------------------------------------------------------------------------
 (module+ test
@@ -88,17 +89,6 @@
            (f n x y)))
        (and picts (loop (rest l) (+ x 1)))])))
 
-(define (matrix-where m p f)
-  (let loop ([l m][x 0])
-    (cond
-      [(empty? l) '()]
-      [else
-       (define row (first l))
-       (define picts
-         (for/list ((n (in-list row)) (y (in-naturals)) #:when (p n y x))
-           (f n y x)))
-       (append picts (loop (rest l) (+ x 1)))])))
-
 ;; ---------------------------------------------------------------------------------------------------
 (module+ test
   (define M (build-matrix 2 3 (λ (x y) (list y x))))
@@ -114,10 +104,6 @@
 
   (check-equal? (H:matrix-ref H:M+1 1 0) (matrix-ref M+1 0 1) "2 1")
   (check-equal? (matrix-map M (λ (M-at-x-y y z) M-at-x-y)) M)
-
-  (define K (matrix-set M 0 0 #f))
-  (check-equal? (matrix-where K (λ (M-at-x-y x y) M-at-x-y) (λ (M-at-x-y x y) (list x y)))
-                (apply append (rest (first K)) (rest K)))
   
   (check-true (matrix-andmap M (λ (p x y) (>= (apply + p) 0))))
   (check-false (matrix-andmap M (λ (p x y) (not (= (first p) 0))))))
