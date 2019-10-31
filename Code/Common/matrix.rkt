@@ -2,14 +2,18 @@
 
 (define N natural-number/c)
 (define matrix? any/c)
-(define (good-cols m) (and/c N (</c (matrix-cols m))))
-(define (good-rows m) (and/c N (</c (matrix-rows m))))
+(define (<-cols m) (and/c N (</c (matrix-cols m))))
+(define (<-rows m) (and/c N (</c (matrix-rows m))))
 
 (provide
  (contract-out
-  [build-matrix (-> (and/c N (>/c 1)) (and/c N (>/c 1)) (-> N N any) matrix?)]
-  [matrix-set   (->i ([m matrix?] [x (m) (good-cols m)] [y (m) (good-rows m)] [new any/c]) (r matrix?))]
-  [matrix-ref   (->i ([m matrix?] [x (m) (good-cols m)] [y (m) (good-rows m)]) (r any/c))]
+  [build-matrix (-> (and/c N (>/c 0)) (and/c N (>/c 0)) (-> N N any) matrix?)]
+
+  ;; these operations are NOT the ordinary Matrix operations but Cartesian point access operations. 
+  [matrix-set   (->i ([m matrix?] [x (m) (<-cols m)] [y (m) (<-rows m)] [new any/c]) (r matrix?))]
+  [matrix-ref   (->i ([m matrix?] [x (m) (<-cols m)] [y (m) (<-rows m)]) (r any/c))]
+  
+  [matrix-clip  (->i ([m matrix?] [x (m) (<-rows m)] [y (m) (<-cols m)]) (r matrix?))]
   [matrix->rectangle (-> matrix? (listof list?))]
   [matrix-andmap (-> matrix? (-> any/c N N any) boolean?)]
   [matrix-where  (-> matrix? (-> any/c N N any) (-> any/c N N any) (listof any/c))]))
@@ -49,6 +53,13 @@
   (append (take M i) (list new) (drop M (+ i 1))))
 
 ;; ---------------------------------------------------------------------------------------------------
+(define (matrix-clip m0 x y)
+  (let loop ([i 0][m m0])
+    (cond
+      [(empty? m) '()]
+      [(>= i x) '()]
+      [else (cons (for/list ((j y) (n (first m))) n) (loop (+ i 1) (rest m)))])))
+
 (define (matrix-map m f)
   (let loop ([l (matrix->rectangle m)][x 0])
     (cond
@@ -82,13 +93,13 @@
            (f n y x)))
        (append picts (loop (rest l) (+ x 1)))])))
 
-
 ;; ---------------------------------------------------------------------------------------------------
 (module+ test
   (define M (build-matrix 2 3 (λ (x y) (list y x))))
   (define H:M (H:build-matrix 2 3 (λ (x y) (list y x))))
 
-  M
+  (define Mclipped (build-matrix 1 2 (λ (x y) (list y x))))
+  (check-equal? (matrix-clip M 1 2) Mclipped)
 
   (check-equal? (matrix->rectangle M) (H:matrix->rectangle H:M))
   (check-equal? (H:matrix-ref H:M 1 2) (matrix-ref M 2 1) "1 2")
@@ -102,8 +113,7 @@
 
   (define K (matrix-set M 0 0 #f))
   (check-equal? (matrix-where K (λ (M-at-x-y x y) M-at-x-y) (λ (M-at-x-y x y) (list x y)))
-                ;; because M lists x and y in reverse 
-                (map reverse (apply append (rest (first K)) (rest K))))
+                (apply append (rest (first K)) (rest K)))
   
   (check-true (matrix-andmap M (λ (p x y) (>= (apply + p) 0))))
   (check-false (matrix-andmap M (λ (p x y) (not (= (first p) 0))))))
