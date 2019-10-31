@@ -57,7 +57,11 @@
     (cond
       [(empty? m) '()]
       [(>= i x) '()]
-      [else (cons (for/list ((j y) (n (first m))) n) (loop (+ i 1) (rest m)))])))
+      [else
+       (define row (first m))
+       (define picts
+         (for/list ((n row) (j y)) n))
+       (cons picts (loop (+ i 1) (rest m)))])))
 
 (define (matrix-fold squares e row-f col-f)
   (foldr row-f e (map col-f squares)))
@@ -91,7 +95,7 @@
       [else
        (define row (first l))
        (define picts
-         (for/list ((n (in-list row)) (y (in-naturals)) #:when (p n x y))
+         (for/list ((n (in-list row)) (y (in-naturals)) #:when (p n y x))
            (f n y x)))
        (append picts (loop (rest l) (+ x 1)))])))
 
