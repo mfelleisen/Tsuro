@@ -57,8 +57,8 @@
   (for/list ([row (in-list m0)][i (in-range x)])
     (for/list ((n row) (j y)) n)))
 
-(define (matrix-fold squares e row-f col-f)
-  (foldr row-f e (map col-f squares)))
+(define (matrix-fold m e row-f col-f)
+  (foldr row-f e (for/list ((row m)) (col-f row))))
 
 (define (matrix-map m f)
   (for/list ([row (in-list m)][x (in-naturals)])
@@ -87,4 +87,6 @@
   (check-equal? (matrix-map M (λ (M-at-x-y y z) M-at-x-y)) M)
   
   (check-true (matrix-andmap M (λ (p x y) (>= (apply + p) 0))))
-  (check-false (matrix-andmap M (λ (p x y) (not (= (first p) 0))))))
+  (check-false (matrix-andmap M (λ (p x y) (not (= (first p) 0)))))
+
+  (check-equal? (matrix-fold '[[a b c][d e f]] '[] append values) '[a b c d e f]))
