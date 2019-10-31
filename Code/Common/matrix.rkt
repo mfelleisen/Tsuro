@@ -14,7 +14,6 @@
   [matrix-ref   (->i ([m matrix?] [x (m) (<-cols m)] [y (m) (<-rows m)]) (r any/c))]
   
   [matrix-clip  (->i ([m matrix?] [x (m) (<-rows m)] [y (m) (<-cols m)]) (r matrix?))]
-  [matrix->rectangle (-> matrix? (listof list?))]
   [matrix-andmap (-> matrix? (-> any/c N N any) boolean?)]
   [matrix-fold   (-> matrix? any/c (-> any/c any/c any) (-> list? any) any)]
   [matrix-map    (-> matrix? (-> any/c N N any) matrix?)]
@@ -37,8 +36,6 @@
 
 (define (matrix-rows m) (length m))
 (define (matrix-cols m) (or (empty? m) (length (first m))))
-
-(define (matrix->rectangle m) m)
 
 ;; ---------------------------------------------------------------------------------------------------
 (define (matrix-ref m x y)
@@ -66,7 +63,7 @@
   (foldr row-f e (map col-f squares)))
 
 (define (matrix-map m f)
-  (let loop ([l (matrix->rectangle m)][x 0])
+  (let loop ([l m][x 0])
     (cond
       [(empty? l) '()]
       [else
@@ -77,7 +74,7 @@
        (cons picts (loop (rest l) (+ x 1)))])))
 
 (define (matrix-andmap m f)
-  (let loop ([l (matrix->rectangle m)][x 0])
+  (let loop ([l m][x 0])
     (cond
       [(empty? l) #true]
       [else
@@ -88,7 +85,7 @@
        (and picts (loop (rest l) (+ x 1)))])))
 
 (define (matrix-where m p f)
-  (let loop ([l (matrix->rectangle m)][x 0])
+  (let loop ([l m][x 0])
     (cond
       [(empty? l) '()]
       [else
@@ -105,15 +102,13 @@
 
   (define Mclipped (build-matrix 1 2 (λ (x y) (list y x))))
   (check-equal? (matrix-clip M 1 2) Mclipped)
-
-  (check-equal? (matrix->rectangle M) (H:matrix->rectangle H:M))
+  
   (check-equal? (H:matrix-ref H:M 1 2) (matrix-ref M 2 1) "1 2")
   
   (define M+1   (matrix-set M 0 1 'a))
   (define H:M+1 (H:matrix-set H:M 1 0 'a))
 
   (check-equal? (H:matrix-ref H:M+1 1 0) (matrix-ref M+1 0 1) "2 1")
-  (check-equal? (matrix->rectangle M+1) (H:matrix->rectangle H:M+1) "2 1/complete")
   (check-equal? (matrix-map M (λ (M-at-x-y y z) M-at-x-y)) M)
 
   (define K (matrix-set M 0 0 #f))
