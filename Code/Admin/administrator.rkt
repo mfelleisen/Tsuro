@@ -4,11 +4,6 @@
 ;; and produces the list of first-placed players; it informs all non-cheaters whether they were
 ;; first-placed or not (boolean)
 
-;; TODO:
-;; -- get-top-2 must also allow the subtraction of cheats
-;; -- ... and probably report cheats 
-;; -- add re-sort into get-top-2
-
 (require Tsuro/Code/Admin/basics)
 (require (only-in Tsuro/Code/Common/player-interface player/c))
 
@@ -75,23 +70,55 @@
 
 #;{[Listof Player] -> (values ([Listof Player] [Listof Player]))}
 (define (run-all-games lop0)
-  ;; while there are more than 0 1 or 2 playes, play rounds 
-  (let loop ([lop lop0][cheats '()])
+  (let loop ([lop1 lop0][cheats '()])
+    (define lop (re-sort lop1 lop0))
     (cond
-      ;; are there are most two players left 
-      [(or (empty? lop) (empty? (rest lop)) (empty? (rest (rest lop)))) (values lop cheats)]
+      [(too-few-for-one-game lop) (values lop cheats)]
+      [(enough-for-one-game lop)
+       (match-define [list ranked new-cheats] (referee lop))
+       (define all-cheats (append new-cheats cheats))
+       (values (if (empty? ranked) '[] (first ranked)) all-cheats)]
       [else
        (define games   (prepare-games lop))
        (define results (map referee games))
-       (match-define [list top-2 all-cheats] (top-2-reordered/cheaters results cheats lop0))
+       (match-define [list top-2 all-cheats] (top-2-reordered/cheaters results cheats))
        (loop top-2 all-cheats)])))
+
+#|
+def run_all_games(lop0):
+  lop = lop0
+  while True:
+    if oo_few_for_a_game(lop):
+      return ...
+    if enough_for_one_game(lop):
+      .. referee(lop)
+      return ...
+    # run many games 
+    games   = prepare_games(lop)
+    results = run_all_games(games)
+    lop     = get_top_2(results)
+|#
+
+#;{Player* Player* -> Player*}
+;; sort top-2 list according to lop0 
+(define (re-sort top-2 lop0)
+  (filter (λ (x) (member x top-2)) lop0))
+
+#; {[Listof X] -> Boolean}
+(define (too-few-for-one-game lop)
+  (or (empty? lop) (empty? (rest lop)) (empty? (rest (rest lop)))))
+
+#; {[Listof X] -> Boolean}
+;; assuming lop has 3 elements 
+(define (enough-for-one-game lop)
+  (or (empty? (rest (rest (rest lop))))
+      (empty? (rest (rest (rest (rest lop)))))
+      (empty? (rest (rest (rest (rest (rest lop))))))))
 
 (module+ test
   (define box% (class object% [init content] (super-new)))
   (match-define (list box1 box2 box3 box4) (map (λ (x) (new box% [content x])) '(1 2 3 4)))
   (check-equal? (re-sort (list box2 box1 box3) (list box1 box2 box3 box4)) (list box1 box2 box3)))
-  
-
 
 ;                       
 ;                     ; 
@@ -132,45 +159,38 @@
   
   (check-equal? (inform-all-non-cheaters (list winner bad-win) all (list cheater)) (list winner)))
 
-
-
-;                       
-;                       
-;                       
-;                       
-;   ;;;;   ;   ;  ;   ; 
-;       ;  ;   ;   ; ;  
-;       ;  ;   ;   ;;;  
-;    ;;;;  ;   ;    ;   
-;   ;   ;  ;   ;   ;;;  
-;   ;   ;  ;   ;   ; ;  
-;    ;;;;   ;;;;  ;   ; 
-;                       
-;                       
-;                       
-
+;                                     
+;                                     
+;     ;                          ;;;; 
+;     ;                         ;    ;
+;   ;;;;;   ;;;   ;;;;               ;
+;     ;    ;; ;;  ;; ;;              ;
+;     ;    ;   ;  ;   ;             ; 
+;     ;    ;   ;  ;   ;            ;  
+;     ;    ;   ;  ;   ;           ;   
+;     ;    ;; ;;  ;; ;;          ;    
+;     ;;;   ;;;   ;;;;          ;;;;;;
+;                 ;                   
+;                 ;                   
+;                 ;                   
+  
 #; {[Listof Results] Player* Player* -> [List Player* Player*]}
 ;; retrieve the list of finishers in the top 2 places (if any)
 ;; order them in terms of age
 ;; compute the cheaters 
-(define (top-2-reordered/cheaters results* cheats lop0)
+(define (top-2-reordered/cheaters results* cheats)
   (define all-top-2-finishers (append-map get-top-2-aux results*))
   (define cheaters            (append-map second results*))
-  (list (re-sort all-top-2-finishers lop0) cheaters))
+  (list all-top-2-finishers cheaters))
 
 #; {[Listof Results] -> Player*}
 ;; get the top-2 rankings, as a a single list 
 (define (get-top-2-aux results)
-    (match-define (list ranked cheats) results)
-    (match ranked
-      ['() '()]
-      [`(,firsts) firsts]
-      [`(,firsts ,seconds ,others ...) (append firsts seconds)]))
-
-#;{Player* Player* -> Player*}
-;; sort top-2 list according to lop0 
-(define (re-sort top-2 lop0)
-  (for/list ([p lop0] #:when (member p top-2)) p))
+  (match-define (list ranked cheats) results)
+  (match ranked
+    ['() '()]
+    [`(,firsts) firsts]
+    [`(,firsts ,seconds ,others ...) (append firsts seconds)]))
 
 ;                                                   
 ;                                                   
@@ -268,5 +288,7 @@
   (define two-games (append baddies one-game))
 
   (check-true (empty? (administrator (append baddies baddies))))
+  (check-true (empty? (administrator (append baddies baddies baddies baddies))))
+  (check-equal? (administrator one-game) (first (first (referee one-game))))
   (check-true (cons? (administrator one-game)))
   (check-true (cons? (administrator two-games))))
