@@ -81,23 +81,8 @@
       [else
        (define games   (prepare-games lop))
        (define results (map referee games))
-       (match-define [list top-2 all-cheats] (top-2-reordered/cheaters results cheats))
+       (match-define `[,top-2 ,all-cheats] (top-2/cheats results cheats))
        (loop top-2 all-cheats)])))
-
-#|
-def run_all_games(lop0):
-  lop = lop0
-  while True:
-    if oo_few_for_a_game(lop):
-      return ...
-    if enough_for_one_game(lop):
-      .. referee(lop)
-      return ...
-    # run many games 
-    games   = prepare_games(lop)
-    results = run_all_games(games)
-    lop     = get_top_2(results)
-|#
 
 #;{Player* Player* -> Player*}
 ;; sort top-2 list according to lop0 
@@ -178,7 +163,7 @@ def run_all_games(lop0):
 ;; retrieve the list of finishers in the top 2 places (if any)
 ;; order them in terms of age
 ;; compute the cheaters 
-(define (top-2-reordered/cheaters results* cheats)
+(define (top-2/cheats results* cheats)
   (define all-top-2-finishers (append-map get-top-2-aux results*))
   (define cheaters            (append-map second results*))
   (list all-top-2-finishers cheaters))
