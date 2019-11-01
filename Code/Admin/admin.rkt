@@ -39,7 +39,6 @@
 
 (require SwDev/Debugging/spy)
 
-
 (module+ test
   (require (submod ".."))
   (require Tsuro/Code/Players/player)
@@ -64,35 +63,33 @@
 ;                                ;  ;               
 ;                                 ;;                
 
+#; {type Player* = [Listof Player]}
+#; {type Results = [List [Listof Player*] Player*]}
+;; [Listof Player*] represents the rankings; the sub-lists are non-empty?;
+;; Player* are the cheaters 
+
 #; {[Listof Player] -> [Listof Player]}
 (define (administrator lop0)
-  (define-values (winners cheats) (determine-winners lop0))
+  (define-values (winners cheats) (run-all-games lop0))
   (inform-all-non-cheaters winners lop0 cheats))
 
 #;{[Listof Player] -> (values ([Listof Player] [Listof Player]))}
-(define (determine-winners lop0)
+(define (run-all-games lop0)
   ;; while there are more than 0 1 or 2 playes, play rounds 
-  (let administrator ([lop lop0][cheats '()])
-    (case (length lop)
-      [(0 1 2) (values lop cheats)]
-      [(3 4 5)
-       (define result (referee lop))
-       (match-define (list ranked c) result)
-       (if (empty? ranked) (values '() cheats) (administrator (resort (get-top-2 (list result)) lop0) c))]
+  (let loop ([lop lop0][cheats '()])
+    (cond
+      ;; are there are most two players left 
+      [(or (empty? lop) (empty? (rest lop)) (empty? (rest (rest lop)))) (values lop cheats)]
       [else
        (define games   (prepare-games lop))
        (define results (map referee games))
-       (define top-2   (get-top-2 results))
-       (administrator (resort top-2 lop0) (append (append-map second results) cheats))])))
-
-#;{[Listof Player] [Listof Player] -> [Listof Player]}
-(define (resort top-2 lop0)
-  (for/list ([p lop0] #:when (member p top-2)) p))
+       (match-define [list top-2 all-cheats] (top-2-reordered/cheaters results cheats lop0))
+       (loop top-2 all-cheats)])))
 
 (module+ test
   (define box% (class object% [init content] (super-new)))
   (match-define (list box1 box2 box3 box4) (map (λ (x) (new box% [content x])) '(1 2 3 4)))
-  (check-equal? (resort (list box2 box1 box3) (list box1 box2 box3 box4)) (list box1 box2 box3)))
+  (check-equal? (re-sort (list box2 box1 box3) (list box1 box2 box3 box4)) (list box1 box2 box3)))
   
 
 
@@ -152,25 +149,50 @@
 ;                       
 ;                       
 
-#; {[Listof [List [Listof Player*] Player*]] -> [Listof Player]}
-;; get the list of finishers in the top 2 places (if any)
-(define (get-top-2 results*)
-  (define (get-top-2 results)
+#; {[Listof Results] Player* Player* -> [List Player* Player*]}
+;; retrieve the list of finishers in the top 2 places (if any)
+;; order them in terms of age
+;; compute the cheaters 
+(define (top-2-reordered/cheaters results* cheats lop0)
+  (define all-top-2-finishers (append-map get-top-2-aux results*))
+  (define cheaters            (append-map second results*))
+  (list (re-sort all-top-2-finishers lop0) cheaters))
+
+#; {[Listof Results] -> Player*}
+;; get the top-2 rankings, as a a single list 
+(define (get-top-2-aux results)
     (match-define (list ranked cheats) results)
     (match ranked
       ['() '()]
       [`(,firsts) firsts]
       [`(,firsts ,seconds ,others ...) (append firsts seconds)]))
-  (append-map get-top-2 results*))
+
+#;{Player* Player* -> Player*}
+;; sort top-2 list according to lop0 
+(define (re-sort top-2 lop0)
+  (for/list ([p lop0] #:when (member p top-2)) p))
+
+;                                                   
+;                                                   
+;                                                   
+;                                                   
+;   ;;;;    ;;;;   ;;;   ;;;;   ;;;;    ;;;;   ;;;  
+;   ;; ;;   ;;  ; ;;  ;  ;; ;;      ;   ;;  ; ;;  ; 
+;   ;   ;   ;     ;   ;; ;   ;      ;   ;     ;   ;;
+;   ;   ;   ;     ;;;;;; ;   ;   ;;;;   ;     ;;;;;;
+;   ;   ;   ;     ;      ;   ;  ;   ;   ;     ;     
+;   ;; ;;   ;     ;      ;; ;;  ;   ;   ;     ;     
+;   ;;;;    ;      ;;;;  ;;;;    ;;;;   ;      ;;;; 
+;   ;                    ;                          
+;   ;                    ;                          
+;   ;                    ;                          
 
 #; {[Listof Player] -> [Listof [Listof Player]]}
-;; lop contains GAME# or more players 
-(define (prepare-games lop)
+(define/contract (prepare-games lop0)
+  (-> (and/c list? (λ (l) (>= (length l) MIN-PLAYERS))) (listof list?))
   ;; GEN REC
-  (define first-game (take lop MAX-PLAYERS))
-  (define remaining  (drop lop MAX-PLAYERS))
   (reverse
-   (let loop ([lop remaining][N (length remaining)][games-of-proper-length (list first-game)])
+   (let loop ([lop lop0][N (length lop0)][games-of-proper-length '()])
      (case N
        [(0) games-of-proper-length]
        [(1)
@@ -190,22 +212,9 @@
         (define remaining (drop lop MAX-PLAYERS))
         (loop remaining (- N MAX-PLAYERS) (cons next-game games-of-proper-length))]))))
 
-;                                                                 
-;                                                                 
-;                                 ;                    ;          
-;                                 ;                    ;          
-;   ;;;;   ;   ;  ;   ;         ;;;;;   ;;;    ;;;   ;;;;;   ;;;  
-;       ;  ;   ;   ; ;            ;    ;;  ;  ;   ;    ;    ;   ; 
-;       ;  ;   ;   ;;;            ;    ;   ;; ;        ;    ;     
-;    ;;;;  ;   ;    ;             ;    ;;;;;;  ;;;     ;     ;;;  
-;   ;   ;  ;   ;   ;;;            ;    ;          ;    ;        ; 
-;   ;   ;  ;   ;   ; ;            ;    ;      ;   ;    ;    ;   ; 
-;    ;;;;   ;;;;  ;   ;           ;;;   ;;;;   ;;;     ;;;   ;;;  
-;                                                                 
-;                                                                 
-;                                                                 
-
 (module+ test
+  (check-equal? (prepare-games '(a b c)) '[(a b c)])
+  (check-equal? (prepare-games '(a b c d)) '[(a b c d)])
   (check-equal? (prepare-games '(a b c d e f)) '[(a b c) (d e f)])
   (check-equal? (prepare-games '(a b c d e f g)) '[(a b c d) (e f g)])
   (check-equal? (prepare-games '(a b c d e f g h)) '[(a b c d e) (f g h)])
