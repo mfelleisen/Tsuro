@@ -75,7 +75,8 @@
   (define cheaters0 (inform-about-self-and-others internal*))
   (match-define (list state0 cheaters remaining) (initial-placements (remove* cheaters0 internal*)))
   ;; there are always enough tiles left so remaining doesn't need to be refilled
-  (play-game state0 remaining (remove* cheaters internal*)))
+  (match-define (list ranked cheaters1) (play-game state0 remaining (remove* cheaters internal*)))
+  (list ranked (map internal-external (append cheaters1 cheaters0))))
 
 ;; ---------------------------------------------------------------------------------------------------
 #; {[Listof Player] -> [Listof Internal]}
@@ -101,7 +102,7 @@
 (module+ test
   (define strategy (new first-strategy%))
   
-  (define-syntax (define-external/internal stx)
+  (define-syntax (define-player stx)
     (syntax-parse stx
       [(_ avatar:id name #;{:str or :id} (~optional (~seq #:with %) #:defaults ([% #'player%])))
        (with-syntax ([name-external (make-name stx "external" #'avatar #'name)]
@@ -115,18 +116,23 @@
     (define n (format "~a" (syntax-e name)))
     (if (string=? n "") (format-id stx "~a-~a" a tag) (format-id stx "~a-~a-~a" a n tag)))
 
-  (define-external/internal green "")
-  (define-external/internal red   "")
-  (define-external/internal blue  "")
-  (define-external/internal black "")
-  (define-external/internal white ""))
+  (define-player green "")
+  (define-player red   "")
+  (define-player blue  "")
+  (define-player black "")
+  (define-player white ""))
 
 (module+ test 
-  (define-external/internal white as #:with bad-playing-as%)
-  (define-external/internal white with #:with bad-playing-with%)
+  (define-player white as #:with bad-playing-as%)
+  (define-player white with #:with bad-playing-with%)
   
   (define inform0 (list white-as-internal red-internal white-with-internal))
-  (check-equal? (inform-about-self-and-others inform0) (list (third inform0) (first inform0))))
+  (check-equal? (inform-about-self-and-others inform0) (list (third inform0) (first inform0)))
+  
+  (define baddies (list white-as-external white-with-external))
+
+  ;; reverse because they get cons-ed on to the empty list as the ref folds over the list
+  (check-equal? (second (referee (append baddies baddies))) (reverse (append baddies baddies))))
 
 ;                                                   
 ;                                                   
@@ -152,13 +158,13 @@
   (define state0  (initialize places0))
   (define-values (_ state cheaters remaining)
     (for/fold ([initials places0][state state0][cheats '()][remaining TILES]) ([i internal*])
-      (assign-avatar-and-inform-of-others i initials state cheats remaining)))
+      (one-initial-turn i initials state cheats remaining)))
   (list state cheaters remaining))
 
 #; {Internal [Listof Initial] State [Listof Player] [Listof TileIndex]
              ->
              (values [Listof Initial] State [Listof Player] [Listof TileIndex])}
-(define (assign-avatar-and-inform-of-others i initials state cheats remaining)
+(define (one-initial-turn i initials state cheats remaining)
   (match-define (internal external avatar) i)
   (match-define [list (list tile1 tile2 tile3) tiles+1] (split-tiles remaining INIT#))
   (define choice-failed (xsend external initial initials tile1 tile2 tile3))
@@ -176,8 +182,8 @@
   (list tile avatar port x y))
 
 (module+ test
-  (define-external/internal white init-time #:with bad-init-time%)
-  (define-external/internal white choice #:with bad-init-choice%)
+  (define-player white init-time #:with bad-init-time%)
+  (define-player white choice #:with bad-init-choice%)
 
   (define initial0 (list red-internal white-init-time-internal white-choice-internal))
   (define good-init (send/apply red-external initial '[] (take TILES 3)))
@@ -203,7 +209,7 @@
 
 (define TURN# 2)
 
-#; {State [Listof TileIndex] [Listof Internal] -> (list Rankings [Listof Player])}
+#; {State [Listof TileIndex] [Listof Internal] -> (list Rankings [Listof Internal])}
 (define (play-game state0 tiles0 internal*)
   (let play ([state state0][tiles tiles0][rankings '[]][cheats '[]])
     (cond
@@ -219,8 +225,8 @@
   (if (empty? ranked) rankings (cons ranked rankings)))
 
 (module+ test #; play-game
-  (define-external/internal red turn-time #:with bad-turn-time%)
-  (define-external/internal blue turn-time #:with bad-turn-time%)
+  (define-player red turn-time #:with bad-turn-time%)
+  (define-player blue turn-time #:with bad-turn-time%)
 
   (define forced-suicide-tiles (list state-suicide-index state-suicide-index))
   (define 2-rounds-suicide (append forced-suicide-tiles forced-suicide-tiles))
@@ -254,7 +260,7 @@
 ;                                     
 
 #; {State [Listof TileIndex] [Listof Internal] ->
-          (list State [Listf TileIndex] [Listof Player] [Listof Player])}
+          (list State [Listf TileIndex] [Listof Player] [Listof Internal])}
 (define (play-one-round state0 tiles0 internal*)
   (define finder (find-external internal*))
   (define-values (state-N tiles-N ranked cheats)
@@ -276,7 +282,7 @@
                 (list (minus-player state-suicide "red")
                       (cddr chosen-suicide-tiles)
                       '[]
-                      `[,red-external])
+                      `[,red-internal])
                 "chosen suicide of last player")
   
   (define rankings `[[,red-external]])
@@ -310,7 +316,7 @@
 ;                              
 
 #; {Internal State [Listof TileIndex] Rankings [Listof Player] [Avatar -> Player] ->
-             (values State [Listf TileIndex] [Listof Player] [Listof Player])}
+             (values State [Listf TileIndex] [Listof Player] [Listof Internal])}
 (define (play-one-turn i state tiles ranked cheats finder)
   (match-define (internal external avatar) i)
   (cond
@@ -324,7 +330,7 @@
        [(legal-take-turn state avatar tile1 tile2 choice-failed)
         => (λ (next) (values next tiles+1 (add-to ranked finder state next) cheats))]
        [else
-        (values (minus-player state avatar) tiles+1 ranked (cons (finder avatar) cheats))])]))
+        (values (minus-player state avatar) tiles+1 ranked (cons i cheats))])]))
 
 ;; ---------------------------------------------------------------------------------------------------
 #; {Rankings [Avatar -> Player] State State -> Rankings}
