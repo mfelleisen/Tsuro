@@ -1,49 +1,63 @@
 #lang racket/gui
 
+(provide
+ #; {type Turn = [list [list avatar? [list tile-index? degree?]] tile1-index tile2-index]}
+ #; {State Turn [U False State] -> Void}
+ ;; accept information about the current state for a regular turn,
+ ;; the action requested by the active avatar, and
+ ;; the next state or #false if it is illegal 
+ show)
+
 (require Tsuro/Code/Common/board)
 (require (submod Tsuro/Code/Common/board picts))
+(require Tsuro/Code/Common/grid)
 (require (submod Tsuro/Code/Common/tiles picts))
 (require (submod Tsuro/Code/Common/tiles json))
 (require Tsuro/Code/Common/tiles)
 (require Tsuro/Code/Common/rules)
-(require (only-in pict filled-rectangle draw-pict text vc-append vl-append hc-append))
+(require (only-in pict scale filled-rectangle draw-pict text vc-append vl-append hc-append))
 
-#;{type Turn = [list [list avatar? [list tile-index? degree?]] tile1-index tile2-index]}
+;; the scale factor for the Pict and the graphics setup 
+(define SCALE-FACTOR 1)
 
-;; the graphics (a bit of a hack)
-(define INSET  (+ 20 TILE-SIZE))
-(define WIDTH  (+ INSET (* 10 TILE-SIZE) INSET))
-(define HEIGHT (+ INSET (* 11 TILE-SIZE) INSET))
+;; the graphics constants for the frame 
+(match-define (list INSET WIDTH HEIGHT)
+  (let* ([INSET  TILE-SIZE]
+         [WIDTH  (+ INSET (* 2 TILE-SIZE) (* SIZE TILE-SIZE) INSET)]
+         [HEIGHT (+ INSET (* 2 TILE-SIZE) (* (+ SIZE 1) TILE-SIZE) INSET)])
+    (map (compose inexact->exact round (curry * SCALE-FACTOR)) (list INSET WIDTH HEIGHT))))
 
 #; {State Turn [U False State] -> Void}
 (define (show state turn-rep legal)
   (define frame (new frame% [label "game observer"][width WIDTH][height HEIGHT]))
   (define (paint _e dc) (draw-pict (combine-turn-and-state state turn-rep legal) dc INSET INSET))
-  (define canvas (new canvas% [parent frame] [paint-callback paint]))
+  (define canvas (new canvas% [parent frame] [style '(vscroll hscroll)] [paint-callback paint]))
+  (send canvas show-scrollbars #t #t)
+  (send canvas init-auto-scrollbars WIDTH HEIGHT 0. 0.)
   (send canvas on-paint)
   (send frame show #t))
 
 #; {State Turn [U False State] -> Pict}
 (define (combine-turn-and-state state turn-rep legal)
-  (define avatars-pict (apply vc-append 20 (map avatar->pict (survivors state))))
+  (define avatars-pict (apply vc-append TILE-SIZE (map avatar->pict (survivors state))))
   (define turn-pict    (turn->pict turn-rep legal))
   (define state-pict   (state->pict state))
-  (vc-append 20 turn-pict (hc-append 10 avatars-pict state-pict)))
+  (define complete     (hc-append TILE-SIZE avatars-pict (vc-append TILE-SIZE turn-pict state-pict)))
+  (scale complete SCALE-FACTOR))
 
 (define (avatar->pict a)
-  (filled-rectangle 10 10 #:color a))
-
-(avatar->pict "green")
+  (filled-rectangle TILE-SIZE TILE-SIZE #:color a))
 
 #; {Turn [U False State] -> Pict}
 (define (turn->pict turn-rep legal)
-  (match-define [list [list avatar tile-spec] ti1 ti2] turn-rep)
-  (define tile   (tile->pict (jsexpr->tile tile-spec)))
-  (define choice (text (format "~a chose to place the following tile" avatar)))
-  (define from   (text (format "from the following given tile types")))
-  (define alts   (map tile->pict (map tile-index->tile (list ti1 ti2))))
-  (define decision (text (format "which is ~a" (if (boolean? legal) "illegal" "legal"))))
-  (vl-append (apply hc-append 10 choice tile from alts) decision))
+  (match-define   [list [list avatar tile-spec] ti1 ti2] turn-rep)
+  (define tile    (tile->pict (jsexpr->tile tile-spec)))
+  (define choice  (text "chose to place the following tile"))
+  (define from    (text (format "from the following given tile types")))
+  (define t1-pict (tile->pict (tile-index->tile ti1)))
+  (define t2-pict (tile->pict (tile-index->tile ti2)))
+  (define legal?  (text (format "which is ~a" (if (boolean? legal) "illegal" "legal"))))
+  (hc-append 10 (avatar->pict avatar) choice tile from t1-pict t2-pict legal?))
 
 (module+ test
   (require (submod Tsuro/Code/Common/board json))
