@@ -97,11 +97,12 @@
 ;                                                   
 ;                                                   
 
-(define (referee external* #:observers (o* '()))
+(define (referee external* #:observers (o*0 '()))
   (define internal* (assign-avatars external*))
   (define cheaters0 (inform-about-self-and-others internal*))
   (match-define (list state0 cheaters remaining) (initial-placements (remove* cheaters0 internal*)))
   ;; there are always enough tiles left so remaining doesn't need to be refilled
+  (define o* (map (λ (uninit-observer) (uninit-observer)) o*0))
   (match-define (list ranked cheaters1) (play-game state0 remaining (remove* cheaters internal*) o*))
   (list ranked (map internal-external (append cheaters1 cheaters0))))
 
@@ -389,14 +390,12 @@
                 (map internal-external (rest active2))))
 
 (module+ test
-  (log-error "refereeing 3")
 
   (require Tsuro/Code/Admin/game-observer)
-
-  (check-equal? 
-   (referee (list red-external white-external green-external) #:observers (list show-turn))
-   (list (list (list white-external)) (list green-external red-external)))
-
+  
+  (log-error "refereeing 3")
+  ;; the colors that are assigned to the players have nothing to do with their names 
+  (referee (list red-external white-external green-external) #:observers (list show-turn))
   (log-error "refereeing 4")
   (referee (list red-external white-external green-external blue-external))
   (log-error "refereeing 5")
