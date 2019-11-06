@@ -127,7 +127,7 @@
 
 #; {Turn [U False State] -> Pict}
 (define (turn->pict turn-rep legal)
-  (match-define   [list [list avatar tile-spec] ti1 ti2] turn-rep)
+  (match-define   [list [list avatar age tile-spec] ti1 ti2] turn-rep)
   (define tile    (tile->pict (jsexpr->tile tile-spec)))
   (define choice  (text "chose to place the following tile"))
   (define from    (text (format "from the following given tile types")))

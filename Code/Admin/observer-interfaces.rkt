@@ -9,7 +9,7 @@
 (require Tsuro/Code/Common/tokens)
 (require Tsuro/Code/Common/tiles)
 
-(define turn? [list/c [list/c avatar? turn-action/c] tile-index? tile-index?])
+(define turn? [list/c [list/c avatar? natural-number/c turn-action/c] tile-index? tile-index?])
 (define game-observer/c
   ;; accept information about the current state for a regular turn,
   ;; the action requested by the active avatar, and

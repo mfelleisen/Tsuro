@@ -355,15 +355,16 @@
     [else 
      (match-define (list (list tile1 tile2) tiles+1) (split-tiles tiles TURN#))
      (define choice-failed (xsend external take-turn (state->intermediate* state) tile1 tile2))
+     (define potential-turn (list (list avatar age choice-failed) tile1 tile2))
      (cond
        [(failed? choice-failed)
         (values (minus-player state avatar) tiles+1 ranked (cons (finder avatar) cheats) observers)]
        [(legal-take-turn state avatar tile1 tile2 choice-failed)
         => (λ (next)
-             (define o* (xinform-observers observers state avatar tile1 tile2 choice-failed next))
+             (define o* (xinform-observers observers state potential-turn next))
              (values next tiles+1 (add-to ranked finder state next) cheats o*))]
        [else
-        (define o* (xinform-observers observers state avatar tile1 tile2 choice-failed #false))
+        (define o* (xinform-observers observers state potential-turn #false))
         (values (minus-player state avatar) tiles+1 ranked (cons i cheats) o*)])]))
 
 ;; ---------------------------------------------------------------------------------------------------
@@ -453,8 +454,7 @@
 #; {[Listof Observer] [List Avatar TurnAction TileIndex TileIndex [U State #false]]
                       -> [Listof Observer]}
 ;; inform observers about the current turn; produce all those that interact properly 
-(define (xinform-observers observers0 state avatar ti1 ti2 action legal)
-  (define turn (list (list avatar action) ti1 ti2))
+(define (xinform-observers observers0 state turn legal)
   (let loop ([observers observers0][broken '[]])
     (cond
       [(empty? observers) (remove* broken observers0)]
