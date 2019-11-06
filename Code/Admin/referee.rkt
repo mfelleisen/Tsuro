@@ -8,10 +8,16 @@
 (define referee-player/c*  (listof referee-player/c))
 (define ranked/c [listof referee-player/c*])
 
+(require Tsuro/Code/Admin/observer-interfaces)
+
 (provide
  (contract-out
   (referee
-   (-> (and/c [listof referee-player/c] distinct? enough?) (list/c ranked/c referee-player/c*)))))
+   ;; run a complete game from initial moves thru final stages
+   ;; EFFECT provide observers with updates on regular turns 
+   (->* [(and/c [listof referee-player/c] distinct? enough?)] [#:observers (listof game-observer/c)]
+        ;; yields 
+        (list/c ranked/c referee-player/c*)))))
 
 ;                                                                                      
 ;       ;                                  ;                                           
@@ -48,6 +54,34 @@
   (require (for-syntax racket/syntax))
   (require (for-syntax syntax/parse)))
 
+;                                                                 
+;       ;                                                         
+;       ;           ;                                             
+;       ;           ;                                             
+;    ;;;;  ;;;;   ;;;;;  ;;;;           ;;;;   ;;;   ;;;;         
+;   ;; ;;      ;    ;        ;          ;;  ; ;;  ;  ;; ;;        
+;   ;   ;      ;    ;        ;          ;     ;   ;; ;   ;        
+;   ;   ;   ;;;;    ;     ;;;;          ;     ;;;;;; ;   ;        
+;   ;   ;  ;   ;    ;    ;   ;          ;     ;      ;   ;        
+;   ;; ;;  ;   ;    ;    ;   ;          ;     ;      ;; ;;   ;;   
+;    ;;;;   ;;;;    ;;;   ;;;;          ;      ;;;;  ;;;;    ;;   
+;                                                    ;            
+;                                                    ;            
+;                                                    ;            
+
+(define TILES (range TILES#))
+
+#; {type Tiles* = [Listof TileIndex]}
+
+#; {type Rankings = [Listof Player*]}
+#; (type Player*  = [Listof Player])
+#; {type Observer* = [Listof Observer]}
+
+(struct internal [external avatar] #:transparent)
+#; {type Internal = (internal Player Avatar)}
+
+#; {type Internal* = [Listof Internal]}
+
 ;                                                   
 ;                    ;;                             
 ;                   ;                               
@@ -63,23 +97,16 @@
 ;                                                   
 ;                                                   
 
-(define TILES (range TILES#))
-
-#; {type Rankings = [Listof [Listof Player]]}
-
-(struct internal [external avatar] #:transparent)
-#; {type Internal = (internal Player Avatar)}
-
-(define (referee external*)
+(define (referee external* #:observers (o* '()))
   (define internal* (assign-avatars external*))
   (define cheaters0 (inform-about-self-and-others internal*))
   (match-define (list state0 cheaters remaining) (initial-placements (remove* cheaters0 internal*)))
   ;; there are always enough tiles left so remaining doesn't need to be refilled
-  (match-define (list ranked cheaters1) (play-game state0 remaining (remove* cheaters internal*)))
+  (match-define (list ranked cheaters1) (play-game state0 remaining (remove* cheaters internal*) o*))
   (list ranked (map internal-external (append cheaters1 cheaters0))))
 
 ;; ---------------------------------------------------------------------------------------------------
-#; {[Listof Player] -> [Listof Internal]}
+#; {Player* -> Internal*}
 (define (assign-avatars external*)
   (for/list ((e external*) (c AVATAR-COLORS))
     (internal e c)))
@@ -88,7 +115,7 @@
   (check-equal? (assign-avatars '(0 1 2)) (map internal (range 3) (take AVATAR-COLORS 3))))
 
 ;; ---------------------------------------------------------------------------------------------------
-#; {[Listof Internal] -> [Listof Internal]}
+#; {Internal* -> Internal*}
 (define (inform-about-self-and-others internal*)
   (define all-avatars (map internal-avatar internal*))
   (for/fold ((cheaters '())) ((i internal*))
@@ -151,7 +178,7 @@
 
 (define INIT# 3)
 
-#; {[Listof Internal] -> (list State [Listof Internal] [Listof TileIndex])}
+#; {Internal* -> (list State Internal* Tiles*)}
 ;; KNOWLEDGE there are enough tile types to initialize the board 
 (define (initial-placements internal*)
   (define places0 '[])
@@ -161,9 +188,7 @@
       (one-initial-turn i initials state cheats remaining)))
   (list state cheaters remaining))
 
-#; {Internal [Listof Initial] State [Listof Player] [Listof TileIndex]
-             ->
-             (values [Listof Initial] State [Listof Player] [Listof TileIndex])}
+#; {Internal [Listof Initial] State Player* Tiles* -> (values [Listof Initial] State Player* Tiles*)}
 (define (one-initial-turn i initials state cheats remaining)
   (match-define (internal external avatar) i)
   (match-define [list (list tile1 tile2 tile3) tiles+1] (split-tiles remaining INIT#))
@@ -209,18 +234,18 @@
 
 (define TURN# 2)
 
-#; {State [Listof TileIndex] [Listof Internal] -> (list Rankings [Listof Internal])}
-(define (play-game state0 tiles0 internal*)
-  (let play ([state state0][tiles tiles0][rankings '[]][cheats '[]])
+#; {State Tiles* Internal* Observer* -> (list Rankings Internal*)}
+(define (play-game state0 tiles0 i* (o* '()))
+  (let play ([state state0][tiles tiles0][rankings '[]][cheats '[]][o* o*])
     (cond
       [(final? state)
        (define s (survivors state))
-       (list (add-rank (map (find-external internal*) s) rankings) cheats)]
+       (list (add-rank (map (find-external i*) s) rankings) cheats)]
       [else
-       (match-define [list state+1 tiles+1 ranked cheats+1] (play-one-round state tiles internal*))
-       (play state+1 tiles+1 (add-rank ranked rankings) (append cheats+1 cheats))])))
+       (match-define [list state+1 tiles+1 ranked cheats+1 o*+1] (play-1-round state tiles i* o*))
+       (play state+1 tiles+1 (add-rank ranked rankings) (append cheats+1 cheats) o*+1)])))
 
-#; {[Listof Player] Rankings -> Rankings}
+#; {Player* Rankings -> Rankings}
 (define (add-rank ranked rankings)
   (if (empty? ranked) rankings (cons ranked rankings)))
 
@@ -259,44 +284,46 @@
 ;                                     
 ;                                     
 
-#; {State [Listof TileIndex] [Listof Internal] ->
-          (list State [Listf TileIndex] [Listof Player] [Listof Internal])}
-(define (play-one-round state0 tiles0 internal*)
+#; {State Tiles* Internal* Observer* -> (list State [Listf TileIndex] Player* Internal* Observer*)}
+(define (play-1-round state0 tiles0 internal* (observers0 '()))
   (define finder (find-external internal*))
-  (define-values (state-N tiles-N ranked cheats)
-    (for/fold ([state state0][tiles tiles0][ranked '[]][cheats '()]) ([i internal*])
-      (play-one-turn i state tiles ranked cheats finder)))
-  (list state-N tiles-N ranked cheats))
+  (define-values (state-N tiles-N ranked cheats observers)
+    (for/fold ([state state0][tiles tiles0][ranked '[]][cheats '()][o* observers0]) ([i internal*])
+      (play-1-turn i state tiles ranked cheats finder o*)))
+  (list state-N tiles-N ranked cheats observers))
 
 (module+ test #; play-one-round 
   (define active3 (list red-turn-time-internal))
-  (check-equal? (play-one-round state-suicide TILES active3)
+  (check-equal? (play-1-round state-suicide TILES active3)
                 (list (minus-player state-suicide "red")
                       (cddr TILES)
                       '[]
-                      `[,red-turn-time-external])
+                      `[,red-turn-time-external]
+                      '[])
                 "turn diverges")
 
   (define chosen-suicide-tiles (cons state-suicide-index TILES))
-  (check-equal? (play-one-round state-suicide chosen-suicide-tiles (list red-internal))
+  (check-equal? (play-1-round state-suicide chosen-suicide-tiles (list red-internal))
                 (list (minus-player state-suicide "red")
                       (cddr chosen-suicide-tiles)
                       '[]
-                      `[,red-internal])
+                      `[,red-internal]
+                      '[])
                 "chosen suicide of last player")
   
   (define rankings `[[,red-external]])
   (define cheats   '[])
-  (check-equal? (play-one-round state-suicide forced-suicide-tiles (list red-internal))
-                (list state-suicide++ TILES `[,red-external] '[])
+  (check-equal? (play-1-round state-suicide forced-suicide-tiles (list red-internal))
+                (list state-suicide++ TILES `[,red-external] '[] '[])
                 "forced suicide of last player")
   
   ;; this test case shows that the "at periphery or 2 neightbors" condition on intermediates
   ;; is too strong; but it is not clear what to replace it with because sometimes it's okay
-  (check-equal? (play-one-round collision-state+++ 2-rounds-suicide `(,red-internal ,white-internal))
+  (check-equal? (play-1-round collision-state+++ 2-rounds-suicide `(,red-internal ,white-internal))
                 (list (minus-player (minus-player collision-state+++ "red") "white")
                       (cddr 2-rounds-suicide)
                       (map internal-external (list white-internal red-internal))
+                      '[]
                       '[])
                 "one turn infinite loop of two players (1)"))
 
@@ -315,22 +342,26 @@
 ;                              
 ;                              
 
-#; {Internal State [Listof TileIndex] Rankings [Listof Player] [Avatar -> Player] ->
-             (values State [Listf TileIndex] [Listof Player] [Listof Internal])}
-(define (play-one-turn i state tiles ranked cheats finder)
+#; {type Find = [Avatar -> Player]}
+
+#; {Internal State Tiles* Rankings Player* Find -> (values State Tiles* Player* Internal* Observer*)}
+(define (play-1-turn i state tiles ranked cheats finder (observers '()))
   (match-define (internal external avatar) i)
   (cond
-    [(boolean? (member avatar (survivors state))) (values state tiles ranked cheats)]
+    [(boolean? (member avatar (survivors state))) (values state tiles ranked cheats observers)]
     [else 
      (match-define (list (list tile1 tile2) tiles+1) (split-tiles tiles TURN#))
      (define choice-failed (xsend external take-turn (state->intermediate* state) tile1 tile2))
      (cond
        [(failed? choice-failed)
-        (values (minus-player state avatar) tiles+1 ranked (cons (finder avatar) cheats))]
+        (values (minus-player state avatar) tiles+1 ranked (cons (finder avatar) cheats) observers)]
        [(legal-take-turn state avatar tile1 tile2 choice-failed)
-        => (λ (next) (values next tiles+1 (add-to ranked finder state next) cheats))]
+        => (λ (next)
+             (define o* (xinform-observers observers state avatar tile1 tile2 choice-failed next))
+             (values next tiles+1 (add-to ranked finder state next) cheats o*))]
        [else
-        (values (minus-player state avatar) tiles+1 ranked (cons i cheats))])]))
+        (define o* (xinform-observers observers state avatar tile1 tile2 choice-failed #false))
+        (values (minus-player state avatar) tiles+1 ranked (cons i cheats) o*)])]))
 
 ;; ---------------------------------------------------------------------------------------------------
 #; {Rankings [Avatar -> Player] State State -> Rankings}
@@ -341,7 +372,7 @@
     [(set=? survivors-1 survivors-n) rankings]
     [else (append (map finder (set->list (set-subtract survivors-n survivors-1))) rankings)]))
 
-#; {[Listof Internal] -> [ Avatar -> Player ]}
+#; {Internal* -> [ Avatar -> Player ]}
 (define [(find-external internal*) avatar]
   (internal-external (first (memf (λ (i) (equal? (internal-avatar i) avatar)) internal*))))
 
@@ -359,7 +390,13 @@
 
 (module+ test
   (log-error "refereeing 3")
-  (referee (list red-external white-external green-external))
+
+  (require Tsuro/Code/Admin/game-observer)
+
+  (check-equal? 
+   (referee (list red-external white-external green-external) #:observers (list show-turn))
+   (list (list (list white-external)) (list green-external red-external)))
+
   (log-error "refereeing 4")
   (referee (list red-external white-external green-external blue-external))
   (log-error "refereeing 5")
@@ -380,7 +417,7 @@
 ;                                                                        
 ;                                                                        
 
-#; {[Listof TileIndex] N -> (List [Listof TileIndex] [Listof TileIndex])}
+#; {Tiles* N -> (List Tiles* Tiles*)}
 ;; the second list has at least n elements 
 (define (split-tiles r n)
   (define remaining (drop r n))
@@ -389,6 +426,36 @@
 (module+ test
   (check-equal? (split-tiles '(a b c d) 2) '[(a b) [c d]])
   (check-equal? (split-tiles '(a b c) 3) (list '(a b c) TILES)))
+
+;                                                                 
+;          ;                                                      
+;          ;                                                      
+;          ;                                                      
+;    ;;;   ;;;;    ;;;    ;;;    ;;;;  ;   ;   ;;;    ;;;;   ;;;  
+;   ;; ;;  ;; ;;  ;   ;  ;;  ;   ;;  ; ;   ;  ;;  ;   ;;  ; ;   ; 
+;   ;   ;  ;   ;  ;      ;   ;;  ;      ; ;   ;   ;;  ;     ;     
+;   ;   ;  ;   ;   ;;;   ;;;;;;  ;      ; ;   ;;;;;;  ;      ;;;  
+;   ;   ;  ;   ;      ;  ;       ;      ; ;   ;       ;         ; 
+;   ;; ;;  ;; ;;  ;   ;  ;       ;       ;    ;       ;     ;   ; 
+;    ;;;   ;;;;    ;;;    ;;;;   ;       ;     ;;;;   ;      ;;;  
+;                                                                 
+;                                                                 
+;                                                                 
+
+#; {[Listof Observer] [List Avatar TurnAction TileIndex TileIndex [U State #false]]
+                      -> [Listof Observer]}
+;; inform observers about the current turn; produce all those that interact properly 
+(define (xinform-observers observers0 state avatar ti1 ti2 action legal)
+  (define turn (list (list avatar action) ti1 ti2))
+  (let loop ([observers observers0][broken '[]])
+    (cond
+      [(empty? observers) (remove* broken observers0)]
+      [else 
+       (define o1 (first observers))
+       (define void-failed (o1 state turn legal))
+       (if (failed? void-failed)
+           (loop (remove o1 (rest observers)) (cons o1 broken))
+           (loop (rest observers) broken))])))
 
 ;; ---------------------------------------------------------------------------------------------------
 (define BAD-PLACEMENT:fmt "~a broke the rules of placing initial avatars~a")
