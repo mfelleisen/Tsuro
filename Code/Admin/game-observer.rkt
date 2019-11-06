@@ -103,7 +103,7 @@
 (define (combine-turn-and-state state turn-rep legal)
   (define avatars-pict (apply vc-append TILE-SIZE (map avatar->pict (survivors state))))
   (define turn-pict    (turn->pict turn-rep legal))
-  (define state-pict   (state->pict state))
+  (define state-pict   (state->pict (or legal state)))
   (define complete     (hc-append TILE-SIZE avatars-pict (vc-append TILE-SIZE turn-pict state-pict)))
   (scale complete SCALE-FACTOR))
 
