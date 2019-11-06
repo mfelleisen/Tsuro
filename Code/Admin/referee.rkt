@@ -78,8 +78,8 @@
 #; (type Player*  = [Listof Player])
 #; {type Observer* = [Listof Observer]}
 
-(struct internal [external avatar] #:transparent)
-#; {type Internal = (internal Player Avatar)}
+(struct internal [external avatar age] #:transparent)
+#; {type Internal = (internal Player Avatar N)}
 
 #; {type Internal* = [Listof Internal]}
 
@@ -110,18 +110,19 @@
 ;; ---------------------------------------------------------------------------------------------------
 #; {Player* -> Internal*}
 (define (assign-avatars external*)
-  (for/list ((e external*) (c AVATAR-COLORS))
-    (internal e c)))
+  (define max (length external*))
+  (for/list ((e external*) (c AVATAR-COLORS) (age (in-naturals)))
+    (internal e c (- max age))))
 
 (module+ test
-  (check-equal? (assign-avatars '(0 1 2)) (map internal (range 3) (take AVATAR-COLORS 3))))
+  (check-equal? (assign-avatars '(0 1 2)) (map internal (range 3) (take AVATAR-COLORS 3) '(3 2 1))))
 
 ;; ---------------------------------------------------------------------------------------------------
 #; {Internal* -> Internal*}
 (define (inform-about-self-and-others internal*)
   (define all-avatars (map internal-avatar internal*))
   (for/fold ((cheaters '())) ((i internal*))
-    (match-define (internal external avatar) i)
+    (match-define (internal external avatar age) i)
     (define void-failed (xsend external playing-as avatar))
     (cond
       [(failed? void-failed) (cons i cheaters)]
@@ -138,7 +139,7 @@
                      [name-internal (make-name stx "internal" #'avatar #'name)])
          #'(define-values (name-external name-internal)
              (let* ([player (if (eq? player% %) (new % [strategy first-s]) [new %])])
-               (values player (internal player (~a 'avatar))))))]))
+               (values player (internal player (~a 'avatar) 0)))))]))
 
   (define-for-syntax (make-name stx tag avatar name)
     (define a (symbol->string (syntax-e avatar)))
@@ -192,7 +193,7 @@
 
 #; {Internal [Listof Initial] State Player* Tiles* -> (values [Listof Initial] State Player* Tiles*)}
 (define (one-initial-turn i initials state cheats remaining)
-  (match-define (internal external avatar) i)
+  (match-define (internal external avatar age) i)
   (match-define [list (list tile1 tile2 tile3) tiles+1] (split-tiles remaining INIT#))
   (define choice-failed (xsend external initial initials tile1 tile2 tile3))
   (cond
@@ -348,7 +349,7 @@
 
 #; {Internal State Tiles* Rankings Player* Find -> (values State Tiles* Player* Internal* Observer*)}
 (define (play-1-turn i state tiles ranked cheats finder (observers '()))
-  (match-define (internal external avatar) i)
+  (match-define (internal external avatar age) i)
   (cond
     [(boolean? (member avatar (survivors state))) (values state tiles ranked cheats observers)]
     [else 
