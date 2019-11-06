@@ -47,6 +47,7 @@
   (require Tsuro/Code/Players/player)
   ; (require Tsuro/Code/Players/strategies)
   (require Tsuro/Code/Players/first-s)
+  (require Tsuro/Code/Players/second-s)
   (require (submod Tsuro/Code/Common/board test))
   (require Tsuro/Code/Common/port)
   (require rackunit)
@@ -128,7 +129,7 @@
             (if (failed? void-failed) (cons i cheaters) cheaters)])))
 
 (module+ test
-  (define strategy (new first-strategy%))
+  (define first-s (new first-strategy%))
   
   (define-syntax (define-player stx)
     (syntax-parse stx
@@ -136,7 +137,7 @@
        (with-syntax ([name-external (make-name stx "external" #'avatar #'name)]
                      [name-internal (make-name stx "internal" #'avatar #'name)])
          #'(define-values (name-external name-internal)
-             (let* ([player (if (eq? player% %) (new % [strategy strategy]) [new %])])
+             (let* ([player (if (eq? player% %) (new % [strategy first-s]) [new %])])
                (values player (internal player (~a 'avatar))))))]))
 
   (define-for-syntax (make-name stx tag avatar name)
@@ -396,6 +397,13 @@
   (log-error "refereeing 3")
   ;; the colors that are assigned to the players have nothing to do with their names 
   (referee (list red-external white-external green-external) #:observers (list show-turn))
+
+  (define (make-p) (new player% [strategy (new second-strategy%)]))
+  (define a (make-p))
+  (define b (make-p))
+  (define c (make-p))
+  (referee (list a b c) #:observers (list show-turn))
+  
   (log-error "refereeing 4")
   (referee (list red-external white-external green-external blue-external))
   (log-error "refereeing 5")
