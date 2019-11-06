@@ -27,7 +27,7 @@
 (require (submod Tsuro/Code/Common/tiles json))
 (require Tsuro/Code/Common/tiles)
 (require Tsuro/Code/Common/rules)
-(require (only-in pict blank scale filled-rectangle draw-pict text vc-append vl-append hc-append))
+(require (except-in pict table)) 
 
 ;                              
 ;          ;                   
@@ -122,8 +122,11 @@
 ;                              
 ;                              
 
-(define (avatar->pict a)
-  (filled-rectangle TILE-SIZE TILE-SIZE #:color a))
+(define (avatar->pict a (age ""))
+  (define image  (filled-rectangle TILE-SIZE TILE-SIZE #:color a))
+  (define tcolor (if (equal? a "black") "white" "black"))
+  (define order  (colorize (text (~a age) 'roman (- (pict-height image) 2)) tcolor))
+  (cc-superimpose image order))
 
 #; {Turn [U False State] -> Pict}
 (define (turn->pict turn-rep legal)
@@ -134,7 +137,7 @@
   (define t1-pict (tile->pict (tile-index->tile ti1)))
   (define t2-pict (tile->pict (tile-index->tile ti2)))
   (define legal?  (text (format "which is ~a" (if (boolean? legal) "illegal" "legal"))))
-  (hc-append 10 (avatar->pict avatar) choice tile from t1-pict t2-pict legal?))
+  (hc-append 10 (avatar->pict avatar age) choice tile from t1-pict t2-pict legal?))
 
 ;                                     
 ;                                     
@@ -174,8 +177,9 @@
       ("collision" ,collision-state-jsexpr         ,collision-action)))
   (define N-CHOICES (length CHOICES))
 
-  (define-values [tag state turn] (pick-a-state-and-a-turn "red"))
-  (match-define [list [list avatar action] t1 t2] turn)
+  (define-values [tag state turn0] (pick-a-state-and-a-turn "red"))
+  (match-define [list [list avatar action] t1 t2] turn0)
+  (define turn (list (list avatar 1 action) t1 t2))
   (define state-next (jsexpr->state state))
 
   (define show (show-turn))
