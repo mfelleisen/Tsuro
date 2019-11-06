@@ -46,7 +46,7 @@
 
 ;; the scale factor for the Pict and the graphics setup 
 (define SCALE-FACTOR 1)
-(define SLEEP-TIME 3.99)
+(define SLEEP-TIME .99)
 
 ;; the graphics constants for the frame 
 (match-define (list INSET WIDTH HEIGHT)
@@ -58,18 +58,46 @@
 #; {-> (State Turn [U False State] -> Void)}
 (define (show-turn)
   (define frame (new frame% [label "game observer"][width WIDTH][height HEIGHT]))
-  (define *the-picture (blank WIDTH HEIGHT))
-  (define (paint _e dc) (draw-pict *the-picture dc INSET INSET))
-  (define canvas (new canvas% [parent frame] [style '(vscroll hscroll)] [paint-callback paint]))    
+  (define canvas (new history-canvas% [parent frame] [style '(vscroll hscroll)]))
   (send canvas show-scrollbars #t #t)
   (send canvas init-auto-scrollbars WIDTH HEIGHT 0. 0.)
   (send frame show #t)
   (define (callback state turn-rep legal)
-    (set! *the-picture (combine-turn-and-state state turn-rep legal))
-    (send canvas refresh-now)
-    (send canvas on-paint)
+    (send canvas set (combine-turn-and-state state turn-rep legal))
     (sleep SLEEP-TIME))
   callback)
+
+(define history-canvas%
+  (class canvas%
+    (inherit on-paint refresh-now)
+
+    (super-new [paint-callback (λ (_e dc) (draw-pict picture dc INSET INSET))])
+
+    (define empty (blank WIDTH HEIGHT))
+
+    (field [picture empty])
+    (field [history (make-vector 100 empty)])
+    (field [filled  0])
+    (field [pointer 0])
+
+    (define/public (set new-picture)
+      (set! filled  (add1 filled))
+      (set! pointer filled)
+      (vector-set! history filled new-picture)
+      (paint new-picture))
+
+    (define/override (on-char e)
+      (define direction 
+        (case (send e get-key-code)
+          [(right) (set! pointer (min (add1 pointer) 100))]
+          [(left)  (set! pointer (max (sub1 pointer) 0))]
+          [else    pointer]))
+      (paint (vector-ref history pointer)))
+      
+    (define/private (paint new-picture)
+      (set! picture new-picture)
+      (refresh-now)
+      (on-paint))))
 
 #; {State Turn [U False State] -> Pict}
 (define (combine-turn-and-state state turn-rep legal)
