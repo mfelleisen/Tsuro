@@ -451,8 +451,7 @@
 ;                                                                 
 ;                                                                 
 
-#; {[Listof Observer] [List Avatar TurnAction TileIndex TileIndex [U State #false]]
-                      -> [Listof Observer]}
+#; {[Listof Observer] Turn (U State #false) -> [Listof Observer]}
 ;; inform observers about the current turn; produce all those that interact properly 
 (define (xinform-observers observers0 state turn legal)
   (let loop ([observers observers0][broken '[]])
