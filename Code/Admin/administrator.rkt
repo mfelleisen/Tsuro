@@ -7,10 +7,12 @@
 (require Tsuro/Code/Admin/basics)
 (require (only-in Tsuro/Code/Common/player-interface player/c))
 
+(define player*/c [listof player/c])
+
 ;; ---------------------------------------------------------------------------------------------------
 (provide
  (contract-out
-  [administrator (-> (and/c [listof player/c] cons? distinct?) (listof player/c))]))
+  [administrator (-> (and/c player*/c cons? distinct?) (list/c player*/c player*/c))]))
 
 ;                                                                                      
 ;       ;                                  ;                                           
@@ -123,15 +125,17 @@
 #; {[Listof Player] [Listof Player] [Listof Player] -> [Listof Player]}
 ;; EFFECT inform lop0 - cheaters of whether they are a member of winners
 ;; eliminate winners that fail this message 
-(define (inform-all-non-cheaters winners lop0 cheats)
-  (reverse 
-   (for/fold ([final-winners '()]) ([p (in-set (set-subtract (apply set lop0) (apply set cheats)))])
+(define (inform-all-non-cheaters winners lop0 cheats0)
+  (define all-live-players (set-subtract (apply set lop0) (apply set cheats0)))
+  (define-values (final-winners cheaters)
+   (for/fold ([final-winners '()][cheats cheats0]) ([p (in-set all-live-players)])
      (define is-winner (cons? (member p winners)))
      (define void-failed (xsend p end-of-tournament is-winner))
      (cond
-       [(failed? void-failed) final-winners]
-       [is-winner (cons p final-winners)]
-       [else final-winners]))))
+       [(failed? void-failed) (values final-winners (cons p cheats))]
+       [is-winner (values (cons p final-winners) cheats)]
+       [else (values final-winners cheats)])))
+  (list final-winners cheaters))
 
 (module+ test
   (define strategy (new first-strategy%))
@@ -272,8 +276,9 @@
   (define one-game (list green-external red-external blue-external black-external white-external))
   (define two-games (append baddies one-game))
 
-  (check-true (empty? (administrator (append baddies baddies))))
-  (check-true (empty? (administrator (append baddies baddies baddies baddies))))
-  (check-equal? (administrator one-game) (first (first (referee one-game))))
+  (check-true (empty? (first (administrator (append baddies baddies)))))
+  (check-true (empty? (first (administrator (append baddies baddies baddies baddies)))))
+  (match-define [list ranked cheats] (referee one-game))
+  (check-equal? (administrator one-game) (list (first ranked) cheats))
   (check-true (cons? (administrator one-game)))
   (check-true (cons? (administrator two-games))))
