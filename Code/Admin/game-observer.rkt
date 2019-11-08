@@ -67,6 +67,21 @@
     (sleep SLEEP-TIME))
   callback)
 
+;                                                   
+;   ;                                               
+;   ;         ;            ;                        
+;   ;                      ;                        
+;   ; ;;    ;;;    ;;;   ;;;;;   ;;;    ;;;;  ;   ; 
+;   ;;  ;     ;   ;   ;    ;    ;; ;;   ;;  ; ;   ; 
+;   ;   ;     ;   ;        ;    ;   ;   ;      ; ;  
+;   ;   ;     ;    ;;;     ;    ;   ;   ;      ; ;  
+;   ;   ;     ;       ;    ;    ;   ;   ;      ; ;  
+;   ;   ;     ;   ;   ;    ;    ;; ;;   ;      ;;   
+;   ;   ;   ;;;;;  ;;;     ;;;   ;;;    ;       ;   
+;                                               ;   
+;                                              ;    
+;                                             ;;    
+
 (define history-canvas%
   (class canvas%
     (inherit on-paint refresh-now)
@@ -76,7 +91,7 @@
     (define empty (blank WIDTH HEIGHT))
 
     (field [picture empty])
-    (field [history (make-vector 100 empty)])
+    (field [history (make-vector (* SIZE SIZE) empty)])
     (field [filled  0])
     (field [pointer 0])
 
@@ -136,9 +151,16 @@
   (define from    (text (format "from the following given tile types")))
   (define t1-pict (tile->pict (tile-index->tile ti1)))
   (define t2-pict (tile->pict (tile-index->tile ti2)))
-  (define legal?  (text (format "which is ~a" (if (boolean? legal) "illegal" "legal"))))
-  (hc-append 10 (avatar->pict avatar age) choice tile from t1-pict t2-pict legal?))
-
+  (cond
+    [(boolean? legal)
+     (define stuff (text "which is illegal"))
+     (hc-append 10 (avatar->pict avatar age) choice tile from t1-pict t2-pict stuff)]
+    [else 
+     (define stuff (text "which is legal and results in the following state"))
+     (vl-append
+      (hc-append 10 (avatar->pict avatar age) choice tile from t1-pict t2-pict)
+      stuff)]))
+  
 ;                                     
 ;                                     
 ;     ;                    ;          
