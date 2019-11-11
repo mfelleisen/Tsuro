@@ -760,17 +760,23 @@
 (define (find-free-spots s0)
   (match-define (state grid players) s0)
   (reverse 
-   (for/fold ([rresult '()]) ((loc clock-wise))
+   (for/fold ([rresult '()]) ((loc clockwise))
      (if (free-for-init grid loc)
          (append (reverse (map (λ (p) (cons p loc)) (pick-port loc))) rresult)
          rresult))))
 
 #; {-> [Listof Location]}
-(define clock-wise ;; starting at (0,0) [exclusive]
-  (append (for/list ([i (in-range 9)]) (list (+ i 1) 0))
-          (for/list ([j (in-range 9)]) (list 9 (+ j 1)))
+(define clockwise ;; starting at (0,0) [exclusive]
+  (append (for/list ([i (in-range 0 +9 +1)]) (list (+ i 1) 0))
+          (for/list ([j (in-range 0 +9 +1)]) (list 9 (+ j 1)))
           (for/list ([i (in-range 8 -1 -1)]) (list i 9))
           (for/list ([j (in-range 8 -1 -1)]) (list 0 j))))
+
+(define counter-clockwise
+  (append (for/list ((y (in-range 1 10 +1))) (list 0 y))
+          (for/list ((x (in-range 1 9 +1))) (list x 9))
+          (for/list ((y (in-range 9 0 -1))) (list 9 y))
+          (for/list ((x (in-range 9 -1 -1))) (list x 0))))
 
 #; {Location -> [Listof Port]}
 ;; ASSUME no neighboring tile 
