@@ -2,7 +2,7 @@
 
 (require (only-in Tsuro/Code/Players/strategies strategy/c))
 
-(provide (contract-out [second-strategy% strategy/c]))
+(provide (contract-out [first-strategy% strategy/c]))
 
 ;; --------------------------------------------------------------------------------------------------
 (require (except-in Tsuro/Code/Players/strategies strategy/c))
@@ -17,7 +17,7 @@
   (require rackunit))
 
 ;; ---------------------------------------------------------------------------------------------------
-(define second-strategy%
+(define first-strategy%
   (class base-strategy%
     (super-new)
 
@@ -33,7 +33,7 @@
 
 ;; ---------------------------------------------------------------------------------------------------
 (module+ test
-  (define strategy (new second-strategy%))
+  (define strategy (new strategy%))
   (define me "red")
   (check-equal? (send strategy take-turn me state3 1 2) (list 1 0))
   (check-equal? (send strategy take-turn me state3 4 34) (list 4 0)))
