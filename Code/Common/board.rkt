@@ -769,8 +769,8 @@
 (define clock-wise ;; starting at (0,0) [exclusive]
   (append (for/list ([i (in-range 9)]) (list (+ i 1) 0))
           (for/list ([j (in-range 9)]) (list 9 (+ j 1)))
-          (reverse (for/list ([i (in-range 9)]) (list i 9)))
-          (reverse (for/list ([j (in-range 9)]) (list 0 j)))))
+          (for/list ([i (in-range 8 -1 -1)]) (list i 9))
+          (for/list ([j (in-range 8 -1 -1)]) (list 0 j))))
 
 #; {Location -> [Listof Port]}
 ;; ASSUME no neighboring tile 
