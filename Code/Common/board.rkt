@@ -302,7 +302,10 @@
   [find-free-spots
    ;; find all legal initial positions starting from (0,0) in clockwise direction
    ;; with free ports also specified in clockwise fashion starting from top left 
-   (-> state? (listof spot/c))]
+   (-> state? (listof location/c) (listof spot/c))]
+
+  [clockwise (listof location/c)]
+  [counter-clockwise (listof location/c)]
 
   [place-first-tile
    (->i ([s (and/c state? initial-state?)]
@@ -757,25 +760,25 @@
 ;                                                                               
 ;                                                                               
 
-(define (find-free-spots s0)
+(define (find-free-spots s0 direction)
   (match-define (state grid players) s0)
   (reverse 
-   (for/fold ([rresult '()]) ((loc clockwise))
+   (for/fold ([rresult '()]) ((loc direction))
      (if (free-for-init grid loc)
          (append (reverse (map (λ (p) (cons p loc)) (pick-port loc))) rresult)
          rresult))))
 
 #; {-> [Listof Location]}
 (define clockwise ;; starting at (0,0) [exclusive]
-  (append (for/list ([i (in-range 0 +9 +1)]) (list (+ i 1) 0))
-          (for/list ([j (in-range 0 +9 +1)]) (list 9 (+ j 1)))
+  (append (for/list ([i (in-range 1 10 +1)]) (list i 0))
+          (for/list ([j (in-range 1 10 +1)]) (list 9 j))
           (for/list ([i (in-range 8 -1 -1)]) (list i 9))
           (for/list ([j (in-range 8 -1 -1)]) (list 0 j))))
 
 (define counter-clockwise
   (append (for/list ((y (in-range 1 10 +1))) (list 0 y))
-          (for/list ((x (in-range 1 9 +1))) (list x 9))
-          (for/list ((y (in-range 9 0 -1))) (list 9 y))
+          (for/list ((x (in-range 1  9 +1))) (list x 9))
+          (for/list ((y (in-range 9  0 -1))) (list 9 y))
           (for/list ((x (in-range 9 -1 -1))) (list x 0))))
 
 #; {Location -> [Listof Port]}
@@ -789,13 +792,13 @@
   (define two (index->port 2))
   (define (fff x y) (curry filter (λ (z) (equal? (list x y) (rest z)))))
   
-  (check-equal? ((fff 0 0) (find-free-spots (initialize '())))
+  (check-equal? ((fff 0 0) (find-free-spots (initialize '()) clockwise))
                 `[[,(index->port 2) 0 0]
                   [,(index->port 3) 0 0]
                   [,(index->port 4) 0 0]
                   [,(index->port 5) 0 0]])
 
-  (check-equal? ((fff 2 0) (find-free-spots (initialize `[(,tile-00 "black" ,two 0 0)])))
+  (check-equal? ((fff 2 0) (find-free-spots (initialize `[(,tile-00 "black" ,two 0 0)]) clockwise))
                 `[[,(index->port 2) 2 0]
                   [,(index->port 3) 2 0]
                   [,(index->port 4) 2 0]
