@@ -28,7 +28,7 @@
     ;; use first free spot starting from (0,0) [exclusive] where a tile can be placed at the periphery
     ;; use first free port facing an empty tile; search clockwise in both cases 
     (define/public (initial board tile1 tile2 tile3)
-      (define spot (first (find-free-spots board)))
+      (define spot (first (find-free-spots board clockwise)))
       (cons (list tile3 0) spot))
 
     (define/public (take-turn me state tile1 tile2)

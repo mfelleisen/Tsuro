@@ -33,7 +33,7 @@
 
 ;; ---------------------------------------------------------------------------------------------------
 (module+ test
-  (define strategy (new strategy%))
+  (define strategy (new first-strategy%))
   (define me "red")
   (check-equal? (send strategy take-turn me state3 1 2) (list 1 0))
   (check-equal? (send strategy take-turn me state3 4 34) (list 4 0)))
