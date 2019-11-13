@@ -45,9 +45,8 @@
 (module+ test
   (require (submod ".."))
   (require Tsuro/Code/Players/player)
-  ; (require Tsuro/Code/Players/strategies)
-  (require Tsuro/Code/Players/first-s)
-  (require Tsuro/Code/Players/second-s)
+  (require (prefix-in 1: Tsuro/Code/Players/first-s))
+  (require (prefix-in 2: Tsuro/Code/Players/second-s))
   (require (submod Tsuro/Code/Common/board test))
   (require Tsuro/Code/Common/port)
   (require rackunit)
@@ -130,7 +129,7 @@
             (if (failed? void-failed) (cons i cheaters) cheaters)])))
 
 (module+ test
-  (define first-s (new first-strategy%))
+  (define first-s (new 1:first-strategy%))
   
   (define-syntax (define-player stx)
     (syntax-parse stx
@@ -393,23 +392,32 @@
                 (map internal-external (rest active2))))
 
 (module+ test
-
+  (provide 3-illegal-with-observer 3-legal-with-observer)
   (require Tsuro/Code/Admin/game-observer)
   
   (log-error "refereeing 3")
-  ;; the colors that are assigned to the players have nothing to do with their names 
-  (referee (list red-external white-external green-external) #:observers (list show-turn))
+  ;; the colors that are assigned to the players have nothing to do with their names
+  (define (3-illegal-with-observer)
+    (referee (list red-external white-external green-external) #:observers (list show-turn)))
 
-  (define (make-p) (new player% [strategy (new second-strategy%)]))
+  (define (make-p) (new player% [strategy (new 2:first-strategy%)]))
   (define a (make-p))
   (define b (make-p))
   (define c (make-p))
-  (referee (list a b c) #:observers (list show-turn))
+
+  (define (3-legal-with-observer)
+    (referee (list a b c) #:observers (list show-turn)))
   
   (log-error "refereeing 4")
   (referee (list red-external white-external green-external blue-external))
   (log-error "refereeing 5")
   (referee (list red-external white-external green-external blue-external black-external)))
+
+(module+ picts
+  (require (submod ".." test))
+  (3-illegal-with-observer)
+  (3-legal-with-observer))
+
 
 ;                                                                        
 ;                                                                        

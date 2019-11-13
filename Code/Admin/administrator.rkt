@@ -68,7 +68,7 @@
 #; {[Listof Player] -> [Listof Player]}
 (define (administrator lop0)
   (define-values (winners cheats) (run-all-games lop0))
-  (inform-all-non-cheaters winners lop0 cheats))
+  (inform-all/not-cheaters winners lop0 cheats))
 
 #;{[Listof Player] -> (values ([Listof Player] [Listof Player]))}
 (define (run-all-games lop0)
@@ -125,7 +125,7 @@
 #; {[Listof Player] [Listof Player] [Listof Player] -> [Listof Player]}
 ;; EFFECT inform lop0 - cheaters of whether they are a member of winners
 ;; eliminate winners that fail this message 
-(define (inform-all-non-cheaters winners lop0 cheats0)
+(define (inform-all/not-cheaters winners lop0 cheats0)
   (define all-live-players (set-subtract (apply set lop0) (apply set cheats0)))
   (define-values (final-winners cheaters)
    (for/fold ([final-winners '()][cheats cheats0]) ([p (in-set all-live-players)])
@@ -146,7 +146,8 @@
 
   (define all (list winner bad-win loser cheater))
   
-  (check-equal? (inform-all-non-cheaters (list winner bad-win) all (list cheater)) (list winner)))
+  (check-equal? (inform-all/not-cheaters `[,winner ,bad-win] all `[,cheater])
+                `[[,winner] [,bad-win ,cheater]]))
 
 ;                                     
 ;                                     

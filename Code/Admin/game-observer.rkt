@@ -204,6 +204,12 @@
   (define turn (list (list avatar 1 action) t1 t2))
   (define state-next (jsexpr->state state))
 
-  (define show (show-turn))
-  (show state-next turn (legal-take-turn state-next avatar t1 t2 action))
-  (show state-next turn (legal-take-turn state-next avatar t1 t2 action)))
+  (provide demo)
+  (define (demo)
+    (define show (show-turn))
+    (show state-next turn (legal-take-turn state-next avatar t1 t2 action))
+    (show state-next turn (legal-take-turn state-next avatar t1 t2 action))))
+
+(module+ picts
+  (require (submod ".." test))
+  (demo))
