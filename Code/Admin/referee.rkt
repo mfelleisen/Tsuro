@@ -185,10 +185,9 @@
 (define (initial-placements internal*)
   (define places0 '[])
   (define state0  (initialize places0))
-  (define-values (_ state cheaters remaining)
-    (for/fold ([initials places0][state state0][cheats '()][remaining TILES]) ([i internal*])
-      (one-initial-turn i initials state cheats remaining)))
-  (list state cheaters remaining))
+  (for/fold ([initials places0][state state0][cheats '()][remaining TILES]
+	     #:result (list state cheats remaining)) ([i internal*])
+    (one-initial-turn i initials state cheats remaining)))
 
 #; {Internal [Listof Initial] State Player* Tiles* -> (values [Listof Initial] State Player* Tiles*)}
 (define (one-initial-turn i initials state cheats remaining)
@@ -289,10 +288,9 @@
 #; {State Tiles* Internal* Observer* -> (list State [Listf TileIndex] Player* Internal* Observer*)}
 (define (play-1-round state0 tiles0 internal* (observers0 '()))
   (define finder (find-external internal*))
-  (define-values (state-N tiles-N ranked cheats observers)
-    (for/fold ([state state0][tiles tiles0][ranked '[]][cheats '()][o* observers0]) ([i internal*])
-      (play-1-turn i state tiles ranked cheats finder o*)))
-  (list state-N tiles-N ranked cheats observers))
+  (for/fold ([state state0][tiles tiles0][ranked '[]][cheats '()][o* observers0]
+	     #:result (list state tiles ranked cheats o*)) ([i internal*])
+     (play-1-turn i state tiles ranked cheats finder o*)))
 
 (module+ test #; play-one-round 
   (define active3 (list red-turn-time-internal))

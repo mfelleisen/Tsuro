@@ -127,15 +127,13 @@
 ;; eliminate winners that fail this message 
 (define (inform-all/not-cheaters winners lop0 cheats0)
   (define all-live-players (set-subtract (apply set lop0) (apply set cheats0)))
-  (define-values (final-winners cheaters)
-   (for/fold ([final-winners '()][cheats cheats0]) ([p (in-set all-live-players)])
-     (define is-winner (cons? (member p winners)))
-     (define void-failed (xsend p end-of-tournament is-winner))
-     (cond
-       [(failed? void-failed) (values final-winners (cons p cheats))]
-       [is-winner (values (cons p final-winners) cheats)]
-       [else (values final-winners cheats)])))
-  (list final-winners cheaters))
+  (for/fold ([final-winners '()][cheats cheats0] #:result (list final-winners cheats)) ([p (in-set all-live-players)])
+    (define is-winner (cons? (member p winners)))
+    (define void-failed (xsend p end-of-tournament is-winner))
+    (cond
+      [(failed? void-failed) (values final-winners (cons p cheats))]
+      [is-winner (values (cons p final-winners) cheats)]
+      [else (values final-winners cheats)])))
 
 (module+ test
   (define strategy (new first-strategy%))

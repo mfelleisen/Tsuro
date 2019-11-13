@@ -436,12 +436,10 @@
   #; {Tile [Listof [List Avatar Port]] -> Pict}
   (define (tile+players->pict tile p)
     (match-define (list (list colors ports) ...) p)
-    (define-values (pict _)
-      (for/fold ([pict (tile->pict tile)][seen '()]) ([c colors][p ports])
-        (define often (memf (curry equal? p) seen))
-        (define jack (jack-o-lantern (- PLAYER-SIZE (* 3 (if often (length often) 0))) c))
-        (values (add-player pict jack p) (cons p seen))))
-    pict))
+    (for/fold ([pict (tile->pict tile)] [seen '()] #:result pict) ([c colors][p ports])
+      (define often (memf (curry equal? p) seen))
+      (define jack (jack-o-lantern (- PLAYER-SIZE (* 3 (if often (length often) 0))) c))
+      (values (add-player pict jack p) (cons p seen)))))
 
 #;
 (module+ test

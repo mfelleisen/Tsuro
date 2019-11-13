@@ -658,15 +658,13 @@
 
 (define (sft/proc grid0 players0 rectangle)
   (define init-list (init-list-from-tiles/proc rectangle))
-  (define-values (grid players)
-    (for/fold ((grid grid0) (players players0)) ((t init-list))
-      (match t
-        [`(,tile ,x ,y)
-         (values (add-new-square-update-neighbors grid tile x y) players)]
-        [`(,tile ,name ,port ,x ,y)
-         (define new-player (player name port x y))
-         (values (add-new-square-update-neighbors grid tile x y) (set-add players new-player))])))
-  (state grid players))
+  (for/fold ((grid grid0) (players players0) #:result (state grid players)) ((t init-list))
+    (match t
+      [`(,tile ,x ,y)
+       (values (add-new-square-update-neighbors grid tile x y) players)]
+      [`(,tile ,name ,port ,x ,y)
+       (define new-player (player name port x y))
+       (values (add-new-square-update-neighbors grid tile x y) (set-add players new-player))])))
 
 ;; ---------------------------------------------------------------------------------------------------
 (module+ test ;; testing the DSL
@@ -715,11 +713,9 @@
   (define players
     (for/set ([p (in-list lo-placements)])
       (apply player (rest p))))
-  (define grid
-    (for/fold ((grid the-empty-grid)) ((placement (in-list lo-placements)))
-      (match-define `(,tile ,_  ,_ ,x ,y) placement)
-      (add-new-square-update-neighbors grid tile x y)))
-  (state grid players))
+  (for/fold ((grid the-empty-grid) #:result (state grid players)) ((placement (in-list lo-placements)))
+    (match-define `(,tile ,_  ,_ ,x ,y) placement)
+    (add-new-square-update-neighbors grid tile x y)))
 
 (module+ test ;; initialize 
   (check-exn exn:fail:contract? (λ () (initialize `((,tile-00 "x" 2 0 0)))) "port, not index")
@@ -762,11 +758,10 @@
 
 (define (find-free-spots s0 direction)
   (match-define (state grid players) s0)
-  (reverse 
-   (for/fold ([rresult '()]) ((loc direction))
+  (for/fold ([rresult '()] #:result (reverse rresult)) ((loc direction))
      (if (free-for-init grid loc)
          (append (reverse (map (λ (p) (cons p loc)) (pick-port loc))) rresult)
-         rresult))))
+         rresult)))
 
 #; {-> [Listof Location]}
 (define clockwise ;; starting at (0,0) [exclusive]
@@ -887,16 +882,14 @@
 ;; produces the state as specified without checking whether it is valid 
 (define (intermediate+ l-intermediate)
   (define grid0 the-empty-grid)
-  (define-values (grid players)
-    (for/fold ((grid grid0) (players (set))) ([p l-intermediate])
-      (match p
-        [(list tile x y)
-         (values (add-new-square-update-neighbors grid tile x y)
-                 players)]
-        [(list tile name port x y)
-         (values (add-new-square-update-neighbors grid tile x y)
-                 (set-add players (player name port x y)))])))
-  (state grid players))
+  (for/fold ((grid grid0) (players (set)) #:result (state grid players)) ([p l-intermediate])
+    (match p
+      [(list tile x y)
+       (values (add-new-square-update-neighbors grid tile x y)
+	 players)]
+      [(list tile name port x y)
+       (values (add-new-square-update-neighbors grid tile x y)
+	 (set-add players (player name port x y)))])))
 
 ;; ---------------------------------------------------------------------------------------------------
 ;; bad intermediate state specs
@@ -1249,19 +1242,17 @@
 ;; -- the third value is the list of drop-outs that get into an infinite loop 
 
 (define (move-players grid players x y)
-  (define-values (moved out inf)
-    (for/fold ((moved (set)) (out '()) (inf '())) ((p (in-set players)))
-      (match-define  (player name port x-p y-p) p)
-      (define-values (x-at y-at) (looking-at port x-p y-p))
-      (cond
-        [(and (= x-at x) (= y-at y))
-         (define p-moved (move-one-player grid p))
-         (cond
-           [(out? p-moved) (values moved (cons p-moved out) inf)]
-           [(inf? p-moved) (values moved out (cons (inf-player p-moved) inf))]
-           [else (values (set-add moved p-moved) out inf)])]
-        [else (values (set-add moved p) out inf)])))
-  (values moved out inf))
+  (for/fold ((moved (set)) (out '()) (inf '())) ((p (in-set players)))
+    (match-define  (player name port x-p y-p) p)
+    (define-values (x-at y-at) (looking-at port x-p y-p))
+    (cond
+      [(and (= x-at x) (= y-at y))
+       (define p-moved (move-one-player grid p))
+       (cond
+	 [(out? p-moved) (values moved (cons p-moved out) inf)]
+	 [(inf? p-moved) (values moved out (cons (inf-player p-moved) inf))]
+	 [else (values (set-add moved p-moved) out inf)])]
+      [else (values (set-add moved p) out inf)])))
 
 (struct out [player] #:transparent)
 (struct inf [player] #:transparent)
