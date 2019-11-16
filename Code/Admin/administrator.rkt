@@ -72,9 +72,13 @@
 
 #;{[Listof Player] -> (values ([Listof Player] [Listof Player]))}
 (define (run-all-games lop0)
-  (let loop ([lop1 lop0][cheats '()])
+  (let loop ([lop1 lop0][lop#-previous-round +inf.0][cheats '()])
     (define lop (re-sort lop1 lop0))
+    (define lop# (length lop))
     (cond
+      [(>= lop# lop#-previous-round)
+       (log-error "infinite loop detected")
+       (values lop cheats)]
       [(too-few-for-one-game lop) (values lop cheats)]
       [(enough-for-one-game lop)
        (match-define [list ranked new-cheats] (referee lop))
@@ -84,7 +88,7 @@
        (define games   (prepare-games lop))
        (define results (map referee games))
        (match-define `[,top-2 ,all-cheats] (top-2/cheats results cheats))
-       (loop top-2 all-cheats)])))
+       (loop top-2 lop# all-cheats)])))
 
 #;{Player* Player* -> Player*}
 ;; sort top-2 list according to lop0 
