@@ -10,7 +10,7 @@
      [inset   positive?])
     [set
      ;; add the given picture to this canvas at the end of the history 
-     (->m pict? any/c)])]))
+     (->m pict? any)])]))
 
 ;; ---------------------------------------------------------------------------------------------------
 (require pict)

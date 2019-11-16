@@ -15,4 +15,7 @@
   ;; the action requested by the active avatar, and
   ;; the next state or #false if it is illegal
   ;; when a player cheats, the observer is not called 
-  (-> (-> state? turn? (or/c false state?) void?)))
+  (-> (-> state? turn? (or/c false state?) any)))
+
+(define tournament-observer/c
+  (-> (-> (listof player/c) (listof player/c) any)))
