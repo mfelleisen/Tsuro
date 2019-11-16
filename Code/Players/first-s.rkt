@@ -1,14 +1,9 @@
 #lang racket
 
-(require (only-in Tsuro/Code/Players/strategies strategy/c))
+(require Tsuro/Code/Players/strategies)
+(provide-strategy first-s%)
 
-(provide (contract-out [first-strategy% strategy/c]))
-
-;; ---------------------------------------------------------------------------------------------------
-(require Tsuro/Code/Common/player-interface)
-(require (except-in Tsuro/Code/Players/strategies strategy/c))
-
-(define first-strategy%
+(define first-s%
   (class (base-strategy% clockwise ports-clockwise (λ _ 'dummy) (λ _ 'dummy))
     (super-new)
     ;; use the first tile, don't rotate 
@@ -17,9 +12,6 @@
 
 (module+ test
   (require (submod ".."))
-  (require (submod Tsuro/Code/Common/board test))
-  (require rackunit)
-  
-  (define strategy (new first-strategy%))
+  (define strategy (new first-s%))
   (define me "red")
   (check-equal? (send strategy take-turn me state3 1 2) (list 1 0)))

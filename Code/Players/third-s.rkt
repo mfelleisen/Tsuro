@@ -1,24 +1,15 @@
 #lang racket
 
-(require (only-in Tsuro/Code/Players/strategies strategy/c))
+(require Tsuro/Code/Players/strategies)
+(provide-strategy third-s%)
 
-(provide (contract-out [first-strategy% strategy/c]))
+(define (default-tile tiles) `[,(second tiles) 0])
 
-;; --------------------------------------------------------------------------------------------------
-(require Tsuro/Code/Common/player-interface)
-(require (except-in Tsuro/Code/Players/strategies strategy/c))
-
-(define (default-tile tiles) `[,(first tiles) 0])
-
-(define first-strategy% (base-strategy% counter-clockwise ports-counterclockwise backwards default-tile))
+(define third-s% (base-strategy% counter-clockwise ports-counterclockwise backwards default-tile))
 
 (module+ test
   (require (submod ".."))
-  (require (submod Tsuro/Code/Common/board test))
-  (require Tsuro/Code/Common/port)
-  (require rackunit)
-  
-  (define strategy (new first-strategy%))
+  (define strategy (new third-s%))
   (define me "red")
 
   (check-equal? (send strategy initial (initialize '[]) 1 2 3) `[(3 0) ,(index->port 0) 0 1])

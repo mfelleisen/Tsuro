@@ -63,6 +63,20 @@
 (define ports-clockwise PORTS)
 (define ports-counterclockwise (cons (first PORTS) (reverse (rest PORTS))))
 
+(provide provide-strategy)
+(define-syntax (provide-strategy stx)
+  (define new-stx
+    '(require
+       Tsuro/Code/Common/player-interface
+       (submod Tsuro/Code/Common/board test)
+       Tsuro/Code/Common/port
+       Tsuro/Code/Players/strategies
+       rackunit))
+  (syntax-case stx []
+    [(_ name)
+     #`(begin #,(datum->syntax stx new-stx)
+              (provide (contract-out [name strategy/c][rename name first-strategy% strategy/c])))]))
+
 ;; ---------------------------------------------------------------------------------------------------
 (module+ test
   (define strategy (new (base-strategy% clockwise PORTS (λ _ '[]) (λ (tiles) (error 't "abstract")))))
