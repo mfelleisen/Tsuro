@@ -713,7 +713,7 @@
   (define players
     (for/set ([p (in-list lo-placements)])
       (apply player (rest p))))
-  (for/fold ((grid the-empty-grid) #:result (state grid players)) ((placement (in-list lo-placements)))
+  (for/fold ((grid the-empty-grid) #:result (state grid players)) ((placement lo-placements))
     (match-define `(,tile ,_  ,_ ,x ,y) placement)
     (add-new-square-update-neighbors grid tile x y)))
 
