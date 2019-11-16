@@ -8,7 +8,9 @@
 (require Tsuro/Code/Common/player-interface)
 (require (except-in Tsuro/Code/Players/strategies strategy/c))
 
-(define first-strategy% (base-strategy% clockwise forwards (λ (tiles) `[,(first tiles) 0])))
+(define (default-tile tiles) `[,(first tiles) 0])
+(define first-strategy% (base-strategy% clockwise ports-clockwise forwards default-tile))
+
 
 (module+ test
   (require (submod ".."))

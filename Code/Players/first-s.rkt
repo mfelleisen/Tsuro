@@ -9,7 +9,7 @@
 (require (except-in Tsuro/Code/Players/strategies strategy/c))
 
 (define first-strategy%
-  (class (base-strategy% clockwise (λ _ 'dummy) (λ _ 'dummy))
+  (class (base-strategy% clockwise ports-clockwise (λ _ 'dummy) (λ _ 'dummy))
     (super-new)
     ;; use the first tile, don't rotate 
     (define/override (take-turn me board tile1 tile2)
