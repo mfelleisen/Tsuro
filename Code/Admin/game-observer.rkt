@@ -27,7 +27,8 @@
 (require (submod Tsuro/Code/Common/tiles json))
 (require Tsuro/Code/Common/tiles)
 (require Tsuro/Code/Common/rules)
-(require (except-in pict table)) 
+(require Tsuro/Code/Lib/canvas-with-history)
+(require (except-in pict table))
 
 ;                              
 ;          ;                   
@@ -45,20 +46,23 @@
 ;                              
 
 ;; the scale factor for the Pict and the graphics setup 
-(define SCALE-FACTOR 1)
+(define SCALE* 1)
 (define SLEEP-TIME .99)
 
 ;; the graphics constants for the frame 
-(match-define (list INSET WIDTH HEIGHT)
+(match-define (list EMPTY INSET WIDTH HEIGHT)
   (let* ([INSET  TILE-SIZE]
          [WIDTH  (+ INSET (* 2 TILE-SIZE) (* SIZE TILE-SIZE) INSET)]
-         [HEIGHT (+ INSET (* 2 TILE-SIZE) (* (+ SIZE 1) TILE-SIZE) INSET)])
-    (map (compose inexact->exact round (curry * SCALE-FACTOR)) (list INSET WIDTH HEIGHT))))
+         [HEIGHT (+ INSET (* 2 TILE-SIZE) (* (+ SIZE 1) TILE-SIZE) INSET)]
+         [EMPTY   (blank WIDTH HEIGHT)])
+    (cons EMPTY (map (compose inexact->exact round (curry * SCALE*)) (list INSET WIDTH HEIGHT)))))
 
 #; {-> (State Turn [U False State] -> Void)}
 (define (show-turn)
   (define frame (new frame% [label "game observer"][width WIDTH][height HEIGHT]))
-  (define canvas (new history-canvas% [parent frame] [style '(vscroll hscroll)]))
+  (define canvas
+    (new history-canvas% [parent frame] [style '(vscroll hscroll)]
+         [inset INSET] [history (make-vector (* SIZE SIZE) EMPTY)] [empty EMPTY]))
   (send canvas show-scrollbars #t #t)
   (send canvas init-auto-scrollbars WIDTH HEIGHT 0. 0.)
   (send frame show #t)
@@ -67,60 +71,13 @@
     (sleep SLEEP-TIME))
   callback)
 
-;                                                   
-;   ;                                               
-;   ;         ;            ;                        
-;   ;                      ;                        
-;   ; ;;    ;;;    ;;;   ;;;;;   ;;;    ;;;;  ;   ; 
-;   ;;  ;     ;   ;   ;    ;    ;; ;;   ;;  ; ;   ; 
-;   ;   ;     ;   ;        ;    ;   ;   ;      ; ;  
-;   ;   ;     ;    ;;;     ;    ;   ;   ;      ; ;  
-;   ;   ;     ;       ;    ;    ;   ;   ;      ; ;  
-;   ;   ;     ;   ;   ;    ;    ;; ;;   ;      ;;   
-;   ;   ;   ;;;;;  ;;;     ;;;   ;;;    ;       ;   
-;                                               ;   
-;                                              ;    
-;                                             ;;    
-
-(define history-canvas%
-  (class canvas%
-    (inherit on-paint refresh-now)
-
-    (super-new [paint-callback (λ (_e dc) (draw-pict picture dc INSET INSET))])
-
-    (define empty (blank WIDTH HEIGHT))
-
-    (field [picture empty])
-    (field [history (make-vector (* SIZE SIZE) empty)])
-    (field [filled  0])
-    (field [pointer 0])
-
-    (define/public (set new-picture)
-      (set! filled  (add1 filled))
-      (set! pointer filled)
-      (vector-set! history filled new-picture)
-      (paint new-picture))
-
-    (define/override (on-char e)
-      (define direction 
-        (case (send e get-key-code)
-          [(right) (set! pointer (min (add1 pointer) 100))]
-          [(left)  (set! pointer (max (sub1 pointer) 0))]
-          [else    pointer]))
-      (paint (vector-ref history pointer)))
-      
-    (define/private (paint new-picture)
-      (set! picture new-picture)
-      (refresh-now)
-      (on-paint))))
-
 #; {State Turn [U False State] -> Pict}
 (define (combine-turn-and-state state turn-rep legal)
   (define avatars-pict (apply vc-append TILE-SIZE (map avatar->pict (survivors state))))
   (define turn-pict    (turn->pict turn-rep legal))
   (define state-pict   (state->pict (or legal state)))
   (define complete     (hc-append TILE-SIZE avatars-pict (vc-append TILE-SIZE turn-pict state-pict)))
-  (scale complete SCALE-FACTOR))
+  (scale complete SCALE*))
 
 ;                              
 ;                              
