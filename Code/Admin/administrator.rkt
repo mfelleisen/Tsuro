@@ -129,15 +129,15 @@
 #; {[Listof Player] [Listof Player] [Listof Player] -> [Listof Player]}
 ;; EFFECT inform lop0 - cheaters of whether they are a member of winners
 ;; eliminate winners that fail this message 
-(define (inform-all/not-cheaters winners lop0 cheats0)
-  (define all-live-players (set-subtract (apply set lop0) (apply set cheats0)))
-  (for/fold ([final-winners '()][cheats cheats0] #:result (list final-winners cheats)) ([p (in-set all-live-players)])
-    (define is-winner (cons? (member p winners)))
+(define (inform-all/not-cheaters winners0 lop0 cheats0)
+  (define alive-players (set-subtract (apply set lop0) (apply set cheats0)))
+  (for/fold ([winners '()][cheats cheats0] #:result `[,winners ,cheats]) ([p (in-set alive-players)])
+    (define is-winner (cons? (member p winners0)))
     (define void-failed (xsend p end-of-tournament is-winner))
     (cond
-      [(failed? void-failed) (values final-winners (cons p cheats))]
-      [is-winner (values (cons p final-winners) cheats)]
-      [else (values final-winners cheats)])))
+      [(failed? void-failed) (values winners (cons p cheats))]
+      [is-winner (values (cons p winners) cheats)]
+      [else (values winners cheats)])))
 
 (module+ test
   (define strategy (new first-strategy%))
