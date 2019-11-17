@@ -63,9 +63,9 @@
 #; (N -> [N [Listof [Listof [List N]]] -> Void])
 (define (show-tournament max-age)
   (define frame (new frame% [label "game observer"][width WIDTH][height HEIGHT]))
+  (define history* (make-vector PLAYER# EMPTY))
   (define canvas
-    (new history-canvas% [parent frame] [style '(vscroll hscroll)]
-         [inset INSET] [history (make-vector PLAYER# EMPTY)] [empty EMPTY]))
+    (new history-canvas% [parent frame] [style '(vscroll hscroll)] [inset INSET] [history history*]))
   (send canvas show-scrollbars #t #t)
   (send canvas init-auto-scrollbars WIDTH HEIGHT 0. 0.)
   (send frame show #t)

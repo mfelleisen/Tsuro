@@ -1,12 +1,13 @@
 #lang racket/gui
 
+(define (non-empty-vector/c v) (> (vector-length v) 0))
+
 (provide
  (contract-out
   [history-canvas%
    (class/c
     (init-field
-     [empty   pict?]            ;; the default image 
-     [history (vectorof pict?)] ;; the maximal history 
+     [history (and/c (vectorof pict?) non-empty-vector/c)] ;; the maximal history 
      [inset   positive?])
     [set
      ;; add the given picture to this canvas at the end of the history 
@@ -17,12 +18,12 @@
 
 ;; ---------------------------------------------------------------------------------------------------
 (define history-canvas%
-  (class canvas% (init-field empty inset history)
+  (class canvas% (init-field inset history)
     (inherit on-paint refresh-now)
 
     (super-new [paint-callback (λ (_e dc) (draw-pict picture dc inset inset))])
     
-    (field [picture empty])
+    (field [picture (vector-ref history 0)])
     (field [filled  0])
     (field [pointer 0])
 

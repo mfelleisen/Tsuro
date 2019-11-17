@@ -60,9 +60,9 @@
 #; {-> (State Turn [U False State] -> Void)}
 (define (show-turn)
   (define frame (new frame% [label "game observer"][width WIDTH][height HEIGHT]))
-  (define canvas
-    (new history-canvas% [parent frame] [style '(vscroll hscroll)]
-         [inset INSET] [history (make-vector (* SIZE SIZE) EMPTY)] [empty EMPTY]))
+  (define history* (make-vector (* SIZE SIZE) EMPTY))
+  (define canvas 
+    (new history-canvas% [parent frame] [style '(vscroll hscroll)] [inset INSET] [history history*]))
   (send canvas show-scrollbars #t #t)
   (send canvas init-auto-scrollbars WIDTH HEIGHT 0. 0.)
   (send frame show #t)
