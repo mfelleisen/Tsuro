@@ -135,7 +135,6 @@
 
 (module+ test
   (require (submod Tsuro/Code/Common/board json))
-  (require (submod Tsuro/Code/Common/board test))
 
   (define (pick-a-state-and-a-turn name)
     (define choice  (list-ref CHOICES (or (secret name) (random N-CHOICES))))

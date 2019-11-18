@@ -9,7 +9,13 @@
 (define ports/c [listof port?])
 
 (provide
+ #; (provide-strategy name:id)
+ ;; import standard test facilities: player-interface, (sumod board test-cases), port and this module;
+ ;; provide the strategy called name both as name and as first-strategy (for dynamic loading)
+ provide-strategy
+ 
  strategy/c
+ 
  (contract-out
   [ports-clockwise        ports/c]
   [ports-counterclockwise ports/c]
@@ -24,7 +30,7 @@
 
 (module+ test
   (require (submod ".."))
-  (require (submod Tsuro/Code/Common/board test))
+  (require (submod Tsuro/Code/Common/board test-cases))
   (require (except-in Tsuro/Code/Common/port port?))
   (require rackunit))
 
@@ -63,12 +69,12 @@
 (define ports-clockwise PORTS)
 (define ports-counterclockwise (cons (first PORTS) (reverse (rest PORTS))))
 
-(provide provide-strategy)
+;; ---------------------------------------------------------------------------------------------------
 (define-syntax (provide-strategy stx)
   (define new-stx
     '(require
        Tsuro/Code/Common/player-interface
-       (submod Tsuro/Code/Common/board test)
+       (submod Tsuro/Code/Common/board test-cases)
        Tsuro/Code/Common/port
        Tsuro/Code/Players/strategies
        rackunit))

@@ -163,11 +163,6 @@
     (for/and ((n (neighbor-locations loc)))
       (not (member n all-but)))))
 
-(module+ test
-  (define (inits0 x) `[ [,(tile-index->tile 1) "white" 4 0 0] [,(tile-index->tile 1) "red" 2 ,x 0] ])
-  (check-true (no-neighbors? (inits0 2)) "2 leaves one empty square")
-  (check-false (no-neighbors? (inits0 1)) "1 means there are neigbors"))
-
 (define player-on-tile/c (make-placement/c at-periphery-facing-inward))
 
 #; {[Listof Intermediate] -> Boolean : locations are distinct }
@@ -347,6 +342,35 @@
  
   [final? (-> state? boolean?)]))
 
+(module+ test-cases
+  (provide
+   state-suicide
+   state3
+   state3-action
+   inits-for-state-with-3-players
+   state3-action-infinite
+   state3-infinite
+
+   state-suicide-index
+   state-suicide++
+
+   state3+green-spot
+   state3+green-ti
+   state3+green
+
+   collision-state
+   collision-action
+   collision-state++
+   collision-state+++
+   state3-action-infinite ;; again 
+   collision-state++++
+
+   good-intermediate-state
+   good-state-actions
+   good-intermediate-state+
+   good-intermediate-state++
+   good-intermediate-state+++))
+
 (module+ json
   (provide
    state->jsexpr
@@ -396,35 +420,6 @@
    state-red-leaves-collision-jsexpr
    state-red-collide-action ))
 
-(module+ test
-  (provide
-   state-suicide
-   state3
-   state3-action
-   inits-for-state-with-3-players
-   state3-action-infinite
-   state3-infinite
-
-   state-suicide-index
-   state-suicide++
-
-   state3+green-spot
-   state3+green-ti
-   state3+green
-
-   collision-state
-   collision-action
-   collision-state++
-   collision-state+++
-   state3-action-infinite ;; again 
-   collision-state++++
-
-   good-intermediate-state
-   good-state-actions
-   good-intermediate-state+
-   good-intermediate-state++
-   good-intermediate-state+++))
-
 (module+ picts
   (require racket/gui)
   
@@ -462,9 +457,11 @@
 
 (module+ test
   (require (submod ".."))
+  (require (submod ".." test-cases))
   (require rackunit))
 
 (module+ json
+  (require (submod ".." test-cases))
   (require (submod Tsuro/Code/Common/tiles json))
   (require SwDev/Lib/pattern-matching)
   (require rackunit))
@@ -472,6 +469,12 @@
 (module+ picts
   (require (submod Tsuro/Code/Common/tiles picts))
   (require (submod Tsuro/Code/Common/grid picts)))
+
+;; placed here because otherwise test-cases gets placed behind test
+(module+ test
+  (define (inits0 x) `[ [,(tile-index->tile 1) "white" 4 0 0] [,(tile-index->tile 1) "red" 2 ,x 0] ])
+  (check-true (no-neighbors? (inits0 2)) "2 leaves one empty square")
+  (check-false (no-neighbors? (inits0 1)) "1 means there are neigbors"))
 
 ;                                                                 
 ;       ;                                                         
@@ -759,9 +762,9 @@
 (define (find-free-spots s0 tile-list port-list)
   (match-define (state grid players) s0)
   (for/fold ([rresult '()] #:result (reverse rresult)) ((loc tile-list))
-     (if (free-for-init grid loc)
-         (append (reverse (map (λ (p) (cons p loc)) (pick-port loc port-list))) rresult)
-         rresult)))
+    (if (free-for-init grid loc)
+        (append (reverse (map (λ (p) (cons p loc)) (pick-port loc port-list))) rresult)
+        rresult)))
 
 #; {-> [Listof Location]}
 (define clockwise ;; starting at (0,0) [exclusive]
@@ -840,10 +843,8 @@
     (define players+1 (set-add players (player name port x y)))
     (state grid+1 players+1)))
 
-(module+ test
-
-  (check-equal? (place-first-tile (initialize '()) "black"  tile-00`[,(index->port 2) 0 0])
-                (initialize `[(,tile-00 "black" ,two 0 0)]))
+(module+ test-cases
+  (provide state3+green-tile)
 
   (define state3+green-ti 17)
   (define state3+green-tile (tile-index->tile state3+green-ti))
@@ -853,8 +854,11 @@
       (match-define [list port x y] state3+green-spot)
       (define g (add-new-square-update-neighbors (state-grid state3) state3+green-tile x y))
       (define p (set-add (state-players state3) (apply player "green" state3+green-spot)))
-      (state g p)))
-  
+      (state g p))))
+
+(module+ test
+  (check-equal? (place-first-tile (initialize '()) "black"  tile-00`[,(index->port 2) 0 0])
+                (initialize `[(,tile-00 "black" ,two 0 0)]))
   (check-equal? (place-first-tile state3 "green" state3+green-tile state3+green-spot) state3+green))
                 
 
@@ -887,10 +891,10 @@
     (match p
       [(list tile x y)
        (values (add-new-square-update-neighbors grid tile x y)
-	 players)]
+               players)]
       [(list tile name port x y)
        (values (add-new-square-update-neighbors grid tile x y)
-	 (set-add players (player name port x y)))])))
+               (set-add players (player name port x y)))])))
 
 ;; ---------------------------------------------------------------------------------------------------
 ;; bad intermediate state specs
@@ -1056,27 +1060,30 @@
 ;; ---------------------------------------------------------------------------------------------------
 ;; good state transitions
 
-(define tile-to-add-to-grid-3-index 33)
-(define state3-action `(,player-red (,tile-to-add-to-grid-3-index 90)))
-(define state3++
-  (state-from #:grid0 grid3
-              #:set0 (set-remove (state-players state3) red-player)
-              (#f (tile-to-add-to-grid-3-index #:rotate 90))))
+(module+ test-cases
+  (provide state3++ grid3++)
 
-(define good-state-tiles '(11 12 34))
-(define good-state-actions `[(,player-red (11 0)) (,player-red (12 0)) (,player-red (34 0))])
-(define good-intermediate-state+
-  (state-from (34 (11 "red" #:on #\E) (34 #:rotate 90 "blue" #:on port-blue))
-              (33)
-              ((33 #:rotate 180 "white" #:on port-white))))
-(define good-intermediate-state++
-  (state-from (34 11                   (34 #:rotate 90 "blue" #:on port-blue))
-              (33 (12 "red" #:on #\E))
-              ((33 #:rotate 180 "white" #:on port-white))))
-(define good-intermediate-state+++
-  (state-from (34 11                   (34 #:rotate 90 "blue" #:on port-blue))
-              (33 (12 "red" #:on #\D))
-              ((33 #:rotate 180) 34)))
+  (define tile-to-add-to-grid-3-index 33)
+  (define state3-action `(,player-red (,tile-to-add-to-grid-3-index 90)))
+  (define state3++
+    (state-from #:grid0 grid3
+                #:set0 (set-remove (state-players state3) red-player)
+                (#f (tile-to-add-to-grid-3-index #:rotate 90))))
+
+  (define good-state-tiles '(11 12 34))
+  (define good-state-actions `[(,player-red (11 0)) (,player-red (12 0)) (,player-red (34 0))])
+  (define good-intermediate-state+
+    (state-from (34 (11 "red" #:on #\E) (34 #:rotate 90 "blue" #:on port-blue))
+                (33)
+                ((33 #:rotate 180 "white" #:on port-white))))
+  (define good-intermediate-state++
+    (state-from (34 11                   (34 #:rotate 90 "blue" #:on port-blue))
+                (33 (12 "red" #:on #\E))
+                ((33 #:rotate 180 "white" #:on port-white))))
+  (define good-intermediate-state+++
+    (state-from (34 11                   (34 #:rotate 90 "blue" #:on port-blue))
+                (33 (12 "red" #:on #\D))
+                ((33 #:rotate 180) 34))))
 
 (module+ test ;; add-tile
   (check-equal? (find-player 3players "red") red-player)
@@ -1095,20 +1102,24 @@
 
 
 ;; ---------------------------------------------------------------------------------------------------
-;; infinite loops, plus more driving red off the board 
+;; infinite loops, plus more driving red off the board
 
-(define state3+infinite-index 34)
-(define (state3-action-infinite* d) (list player-red (list state3+infinite-index d)))
-(define state3-action-infinite (state3-action-infinite* 0))
+(module+ test-cases
+  (provide state3-action-infinite*)
 
-(define state-suicide (state-from [(21 "red" #:on port-blue)]))
-(define state-suicide-index state3+infinite-index)
-(define state-suicide++ (state-from (21) (34)))
+  (define state3+infinite-index 34)
+  (define (state3-action-infinite* d) (list player-red (list state3+infinite-index d)))
+  (define state3-action-infinite (state3-action-infinite* 0))
+
+  (define state-suicide (state-from [(21 "red" #:on port-blue)]))
+  (define state-suicide-index state3+infinite-index)
+  (define state-suicide++ (state-from (21) (34)))
+
+  (define state3-infinite (add-tile/a state3 state3-action-infinite)))
 
 (module+ test 
   (check-true (infinite? (add-tile/a state3 state3-action-infinite)) "red player goes infinite")
-  (define state3-infinite (add-tile/a state3 state3-action-infinite))
-
+  
   (check-equal? (add-tile/a state-suicide (state3-action-infinite* 270)) state-suicide++ "270")
   (check-equal? (add-tile/a state-suicide (state3-action-infinite* 180)) state-suicide++ "180")
   (check-equal? (add-tile/a state-suicide (state3-action-infinite* 90)) state-suicide++ "90")
@@ -1250,9 +1261,9 @@
       [(and (= x-at x) (= y-at y))
        (define p-moved (move-one-player grid p))
        (cond
-	 [(out? p-moved) (values moved (cons p-moved out) inf)]
-	 [(inf? p-moved) (values moved out (cons (inf-player p-moved) inf))]
-	 [else (values (set-add moved p-moved) out inf)])]
+         [(out? p-moved) (values moved (cons p-moved out) inf)]
+         [(inf? p-moved) (values moved out (cons (inf-player p-moved) inf))]
+         [else (values (set-add moved p-moved) out inf)])]
       [else (values (set-add moved p) out inf)])))
 
 (struct out [player] #:transparent)
@@ -1304,15 +1315,17 @@
     [(seen? place seen) (inf (player name port-out x y))]
     [else (list port-out x y (set-add seen place))]))
 
-(define grid3++ (state-grid state3++))
-(define sq-00+  (matrix-ref grid3++ 0 0))
-(define (red i) (player "red" (index->port i) 1 0))
-(define red-out (out (red 1)))
+(module+ test-cases
+  (provide  sq-00+ red-out red grid-inf)
+  (define grid3++ (state-grid state3++))
+  (define sq-00+  (matrix-ref grid3++ 0 0))
+  (define (red i) (player "red" (index->port i) 1 0))
+  (define red-out (out (red 1)))
 
-(match-define (state grid-inf _)
-  (state-from [(34 "red" #:on port-red) 34 (34 #:rotate 90 "blue" #:on port-blue)]
-              [33]
-              [(33 #:rotate 180 "white" #:on port-white)]))
+  (match-define (state grid-inf _)
+    (state-from [(34 "red" #:on port-red) 34 (34 #:rotate 90 "blue" #:on port-blue)]
+                [33]
+                [(33 #:rotate 180 "white" #:on port-white)])))
 
 (module+ test ;; move player
   (check-equal? (move-player-one-square grid3++ sq-00+ port-red "red" (set)) red-out "move red 1")

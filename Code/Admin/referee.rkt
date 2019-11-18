@@ -47,7 +47,7 @@
   (require Tsuro/Code/Players/player)
   (require (prefix-in 1: Tsuro/Code/Players/first-s))
   (require (prefix-in 2: Tsuro/Code/Players/second-s))
-  (require (submod Tsuro/Code/Common/board test))
+  (require (submod Tsuro/Code/Common/board test-cases))
   (require Tsuro/Code/Common/port)
   (require rackunit)
 

@@ -35,7 +35,7 @@
 
 (module+ test
   (require (submod ".."))
-  (require (submod Tsuro/Code/Common/board test))
+  (require (submod Tsuro/Code/Common/board test-cases))
   (require (submod Tsuro/Code/Common/board picts))
   (require rackunit))
 
