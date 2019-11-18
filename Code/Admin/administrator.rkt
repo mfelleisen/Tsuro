@@ -9,10 +9,17 @@
 
 (define player*/c [listof player/c])
 
+(require Tsuro/Code/Admin/observer-interfaces)
+
 ;; ---------------------------------------------------------------------------------------------------
 (provide
  (contract-out
-  [administrator (-> (and/c player*/c cons? distinct?) (list/c player*/c player*/c))]))
+  [administrator
+   (->* [(and/c player*/c cons? distinct?)] [#:observers (listof tournament-observer/c)]
+        ;; yields 
+        (list/c player*/c player*/c))]))
+
+
 
 ;                                                                                      
 ;       ;                                  ;                                           
@@ -66,29 +73,37 @@
 ;; Player* are the cheaters 
 
 #; {[Listof Player] -> [Listof Player]}
-(define (administrator lop0)
-  (define-values (winners cheats) (run-all-games lop0))
+(define (administrator lop0 #:observers (o*0 '()))
+  (define max-age (length lop0))
+  (define o* (map (λ (uninit-observer) (uninit-observer max-age)) o*0))
+  (define-values (winners cheats) (run-all-games lop0 o*))
   (inform-all/not-cheaters winners lop0 cheats))
 
-#;{[Listof Player] -> (values ([Listof Player] [Listof Player]))}
-(define (run-all-games lop0)
-  (let loop ([lop1 lop0][lop#-previous-round +inf.0][cheats '()])
+#;{[Listof Player] [Listof Observer] -> (values ([Listof Player] [Listof Player]))}
+(define (run-all-games lop0 o*0)
+  (let loop ([lop1 lop0][lop#-previous-round +inf.0][cheats '()][o* o*0])
     (define lop (re-sort lop1 lop0))
     (define lop# (length lop))
     (cond
       [(>= lop# lop#-previous-round)
        (log-error "infinite loop detected")
+       (xinform-observers o* (list lop) lop0) ;; final observation
        (values lop cheats)]
-      [(too-few-for-one-game lop) (values lop cheats)]
+      [(too-few-for-one-game lop)
+       (xinform-observers o* (list lop) lop0) ;; final observation
+       (values lop cheats)]
       [(enough-for-one-game lop)
+       (define o*1 (xinform-observers o* (list lop) lop0))
        (match-define [list ranked new-cheats] (referee lop))
+       (xinform-observers o*1 ranked lop0) ;; final observation
        (define all-cheats (append new-cheats cheats))
        (values (if (empty? ranked) '[] (first ranked)) all-cheats)]
       [else
        (define games   (prepare-games lop))
+       (define o*1     (xinform-observers o* games lop0))
        (define results (map referee games))
        (match-define `[,top-2 ,all-cheats] (top-2/cheats results cheats))
-       (loop top-2 lop# all-cheats)])))
+       (loop top-2 lop# all-cheats o*1)])))
 
 #;{Player* Player* -> Player*}
 ;; sort top-2 list according to lop0 
@@ -233,6 +248,61 @@
   (check-equal? (prepare-games '(a b c d e f g h i j)) '[(a b c d e) (f g h i j)])
   (check-equal? (prepare-games '(z y x u v a b c d e f)) '[(z y x u v) (a b c) (d e f)]))
 
+
+;                                                                 
+;          ;                                                      
+;          ;                                                      
+;          ;                                                      
+;    ;;;   ;;;;    ;;;    ;;;    ;;;;  ;   ;   ;;;    ;;;;   ;;;  
+;   ;; ;;  ;; ;;  ;   ;  ;;  ;   ;;  ; ;   ;  ;;  ;   ;;  ; ;   ; 
+;   ;   ;  ;   ;  ;      ;   ;;  ;      ; ;   ;   ;;  ;     ;     
+;   ;   ;  ;   ;   ;;;   ;;;;;;  ;      ; ;   ;;;;;;  ;      ;;;  
+;   ;   ;  ;   ;      ;  ;       ;      ; ;   ;       ;         ; 
+;   ;; ;;  ;; ;;  ;   ;  ;       ;       ;    ;       ;     ;   ; 
+;    ;;;   ;;;;    ;;;    ;;;;   ;       ;     ;;;;   ;      ;;;  
+;                                                                 
+;                                                                 
+;                                                                 
+
+
+#; {[Listof Observer] [Listof [Listof Player]] [Listof Player] -> [Listof Observer]}
+;; inform observers about the current turn; produce all those that interact properly 
+(define (xinform-observers observers0 games lop0)
+  (define ages (games->ages games lop0))
+  (let loop ([observers observers0][broken '[]])
+    (cond
+      [(empty? observers) (remove* broken observers0)]
+      [else 
+       (define o1 (first observers))
+       (define void-failed (o1 ages))
+       (if (failed? void-failed)
+           (loop (remove o1 (rest observers)) (cons o1 broken))
+           (loop (rest observers) broken))])))
+
+#; {[Listof [Listof Player]] [Listof Player] -> [Listof [Listof N]]}
+(define (games->ages games lop0)
+  (define player->age-local (player->age lop0))
+  (map (λ (1game) (map player->age-local 1game)) games))
+
+#; {[Listof Player] -> Player -> N}
+(define ((player->age lop0) player)
+  (- (length (member player lop0)) 1))
+
+(module+ test
+  (define oldest-3 (box 3))
+  (define middle-2 (box 2))
+  (define middle-1 (box 1))
+  (define youngest (box 0))
+  (define players `[,oldest-3 ,middle-2 ,middle-1 ,youngest])
+
+  (check-equal? ((player->age players) oldest-3) 3)
+  (check-equal? ((player->age players) youngest) 0)
+
+
+  (check-equal? (games->ages `[[,oldest-3 ,middle-2] [,middle-1 ,youngest]] players) `[[3 2][1 0]]))
+
+
+
 ;                                                                        
 ;                                                                        
 ;                    ;                   ;                    ;          
@@ -249,6 +319,9 @@
 ;                                                                        
 
 (module+ test
+
+  (require Tsuro/Code/Admin/tournament-observer)
+
   (define-syntax (define-player stx)
     (syntax-parse stx
       [(_ avatar:id name #;{:str or :id} (~optional (~seq #:with %) #:defaults ([% #'player%])))
@@ -284,4 +357,19 @@
   (match-define [list ranked cheats] (referee one-game))
   (check-equal? (administrator one-game) (list (first ranked) cheats))
   (check-true (cons? (administrator one-game)))
-  (check-true (cons? (administrator two-games))))
+  (check-true (cons? (administrator two-games)))
+
+  (provide legal-admin-with illegal-admin-with)
+  (define (legal-admin-with)
+    (administrator two-games #:observers (list show-tournament)))
+  (define (illegal-admin-with)
+    (define-player white as #:with bad-playing-as%)
+    (define-player white with #:with bad-playing-with%)
+    (define baddies2 (list white-as-external white-with-external))
+    (administrator (append baddies baddies2) #:observers (list show-tournament))))
+
+(module+ picts
+  (require (submod ".." test))
+  (legal-admin-with)
+  [illegal-admin-with])
+  

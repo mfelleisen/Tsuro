@@ -62,7 +62,7 @@
 
 #; (N -> [N [Listof [Listof [List N]]] -> Void])
 (define (show-tournament max-age)
-  (define frame (new frame% [label "game observer"][width WIDTH][height HEIGHT]))
+  (define frame (new frame% [label "tournament observer"][width WIDTH][height HEIGHT]))
   (define history* (make-vector PLAYER# EMPTY))
   (define canvas
     (new history-canvas% [parent frame] [style '(vscroll hscroll)] [inset INSET] [history history*]))
@@ -79,16 +79,16 @@
   callback)
 
 #; { N [Listof [Listof N]] : sorted -> Pict }
-(define (games->pict max-age games)
+(define (games->pict maxage games)
   (define active (apply append games))
+  (define p0 (if (empty? games) (text "no active players left") (blank PWIDTH HEIGHT)))
   (define active-players
-    (for*/fold ([pict (blank PWIDTH HEIGHT)])
-               ([i (in-range max-age)][age (in-value (- max-age i 1))] #:when (member age active))
-      (pin-over pict SPACE (age->height i) (player->pict age))))
+    (for*/fold ([p p0]) ([i (in-range maxage)][a (in-value (- maxage i 1))] #:when (member a active))
+      (pin-over p SPACE (age->height i) (player->pict a))))
   (for/fold ((pict active-players)) ([1game games][1color COLORS])
     (define omega (last 1game))
-    (define y0 (- (age->height (- max-age (first 1game) 1)) 2))
-    (define y1 (+ (age->height (- max-age (last 1game))) 2))
+    (define y0 (- (age->height (- maxage (first 1game) 1)) 2))
+    (define y1 (+ (age->height (- maxage (last 1game))) 2))
     (define gp (game->pict (- y1 y0) 1color))
     (pin-over pict (/ SPACE 2) (- y0 2) gp)))
 
