@@ -26,4 +26,4 @@
 (define tournament-observer/c
   ;; set up the canvas arrangement by specifying age in [0,max-age)
   (->i ([max-age natural-number/c])
-       (r (->i ([games (and/c (listof (listof ages/c)) sorted-ages/c)]) (r any/c)))))
+       (r (->i ([games (and/c (listof (and/c cons? (listof ages/c))) sorted-ages/c)]) (r any/c)))))

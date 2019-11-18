@@ -95,10 +95,14 @@
       [(enough-for-one-game lop)
        (define o*1 (xinform-observers o* (list lop) lop0))
        (match-define [list ranked new-cheats] (referee lop))
-       (define winners (if (empty? ranked) '[] (first ranked)))
-       (xinform-observers o*1 (list (re-sort winners lop0)) lop0) ;; final observation
        (define all-cheats (append new-cheats cheats))
-       (values winners all-cheats)]
+       (cond
+         [(empty? ranked)
+          (xinform-observers o*1 '[] lop0) ;; final observation
+          (values '[] all-cheats)]
+         [else
+          (xinform-observers o*1 (list (re-sort (first ranked) lop0)) lop0)
+          (values (first ranked) all-cheats)])]
       [else
        (define games   (prepare-games lop))
        (define o*1     (xinform-observers o* games lop0))
