@@ -267,7 +267,7 @@
   (define blue-+-players `(,blue-turn-time-internal ,red-internal ,white-internal))
   (check-equal? (play-game blue-collision 2-rounds-suicide blue-+-players)
                 (list (list (map internal-external (list white-internal red-internal)))
-                      `[,blue-turn-time-external])
+                      `[,blue-turn-time-internal])
                 "play one game forced infinite loop of two players"))
 
 ;                                     
@@ -298,7 +298,7 @@
                 (list (minus-player state-suicide "red")
                       (cddr TILES)
                       '[]
-                      `[,red-turn-time-external]
+                      `[,red-turn-time-internal]
                       '[])
                 "turn diverges")
 
@@ -355,7 +355,7 @@
      (define potential-turn (list (list avatar age choice-failed) tile1 tile2))
      (cond
        [(failed? choice-failed)
-        (values (minus-player state avatar) tiles+1 ranked (cons (finder avatar) cheats) observers)]
+        (values (minus-player state avatar) tiles+1 ranked (cons i #;(finder avatar) cheats) observers)]
        [(legal-take-turn state avatar tile1 tile2 choice-failed)
         => (λ (next)
              (define o* (xinform-observers observers state potential-turn next))
