@@ -79,7 +79,7 @@
   (define-values (ranked cheats) (run-all-games lop0 o*))
   (if (empty? ranked)
       (list '[] cheats) ;; everybody is a cheater 
-      (inform-all/not-cheaters (first ranked) (apply append (rest ranked)) cheats)))
+      (inform-all/not-cheaters (first ranked) (rest ranked) cheats)))
 
 #;{[Listof Player] [Listof Observer] -> (values ([Listof Player] [Listof Player]))}
 (define (run-all-games lop0 o*0)
@@ -101,7 +101,7 @@
        (cond
          [(empty? ranked)
           (xinform-observers o*1 '[] lop0) ;; final observation
-          (values '[[]] all-cheats)]
+          (values '[] all-cheats)]
          [else
           (xinform-observers o*1 (list (re-sort (first ranked) lop0)) lop0)
           (values ranked all-cheats)])]
