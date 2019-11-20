@@ -87,30 +87,21 @@
     (define lop (re-sort lop1 lop0))
     (define lop# (length lop))
     (cond
-      [(>= lop# lop#-previous-round)
-       (log-error "infinite loop detected")
+      [(or (= lop# lop#-previous-round) (too-few-for-one-game lop))
+       (when (too-few-for-one-game lop) (log-error "infinite loop detected"))
        (xinform-observers o* (list lop) lop0) ;; final observation
-       (values (list lop) cheats)]
-      [(too-few-for-one-game lop)
-       (xinform-observers o* (list lop) lop0) ;; final observation
-       (values (list lop) cheats)]
+       (values (if (empty? lop) '[] (list lop)) cheats)]
       [(enough-for-one-game lop)
        (define o*1 (xinform-observers o* (list lop) lop0))
        (match-define [list ranked new-cheats] (referee lop))
-       (define all-cheats (append new-cheats cheats))
-       (cond
-         [(empty? ranked)
-          (xinform-observers o*1 '[] lop0) ;; final observation
-          (values '[] all-cheats)]
-         [else
-          (xinform-observers o*1 (list (re-sort (first ranked) lop0)) lop0)
-          (values ranked all-cheats)])]
+       (xinform-observers o*1 (if (empty? ranked) '[] (list (re-sort (first ranked) lop0))) lop0)
+       (values ranked (append new-cheats cheats))]
       [else
        (define games   (prepare-games lop))
        (define o*1     (xinform-observers o* games lop0))
        (define results (map referee games))
-       (match-define `[,top-2 ,all-cheats] (top-2/cheats results cheats))
-       (loop top-2 lop# all-cheats o*1)])))
+       (match-define `[,top-2 ,new-cheats] (top-2/cheats results))
+       (loop top-2 lop# (append new-cheats cheats) o*1)])))
 
 #;{Player* Player* -> Player*}
 ;; sort top-2 list according to lop0 
@@ -195,11 +186,11 @@
 ;                 ;                   
 ;                 ;                   
   
-#; {[Listof Results] Player* Player* -> [List Player* Player*]}
+#; {[Listof Results] Player* -> [List Player* Player*]}
 ;; retrieve the list of finishers in the top 2 places (if any)
 ;; order them in terms of age
 ;; compute the cheaters 
-(define (top-2/cheats results* cheats)
+(define (top-2/cheats results*)
   (define all-top-2-finishers (append-map get-top-2-aux results*))
   (define cheaters            (append-map second results*))
   (list all-top-2-finishers cheaters))
@@ -366,8 +357,8 @@
   (define one-game (list green-external red-external blue-external black-external white-external))
   (define two-games (append baddies one-game))
 
-  (check-true (empty? (caar (administrator (append baddies baddies)))))
-  (check-true (empty? (caar (administrator (append baddies baddies baddies baddies)))))
+  (check-true (empty? (first (administrator (append baddies baddies)))))
+  (check-true (empty? (first (administrator (append baddies baddies baddies baddies)))))
   (match-define [list ranked cheats] (referee one-game))
   (check-equal? (administrator one-game) (list ranked cheats))
   (check-true (cons? (administrator one-game)))
