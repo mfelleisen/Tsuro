@@ -17,7 +17,7 @@
   [administrator
    (->* [(and/c player*/c cons? distinct?)] [#:observers (listof tournament-observer/c)]
         ;; yields 
-        (list/c player*/c player*/c))]))
+        (list/c (listof player*/c) player*/c))]))
 
 
 
@@ -72,12 +72,14 @@
 ;; [Listof Player*] represents the rankings; the sub-lists are non-empty?;
 ;; Player* are the cheaters 
 
-#; {[Listof Player] -> [Listof Player]}
+#; {[Listof Player] -> Results}
 (define (administrator lop0 #:observers (o*0 '()))
   (define max-age (length lop0))
   (define o* (map (λ (uninit-observer) (uninit-observer max-age)) o*0))
-  (define-values (winners cheats) (run-all-games lop0 o*))
-  (inform-all/not-cheaters winners lop0 cheats))
+  (define-values (ranked cheats) (run-all-games lop0 o*))
+  (if (empty? ranked)
+      (list '[] cheats) ;; everybody is a cheater 
+      (inform-all/not-cheaters (first ranked) (apply append (rest ranked)) cheats)))
 
 #;{[Listof Player] [Listof Observer] -> (values ([Listof Player] [Listof Player]))}
 (define (run-all-games lop0 o*0)
@@ -88,10 +90,10 @@
       [(>= lop# lop#-previous-round)
        (log-error "infinite loop detected")
        (xinform-observers o* (list lop) lop0) ;; final observation
-       (values lop cheats)]
+       (values (list lop) cheats)]
       [(too-few-for-one-game lop)
        (xinform-observers o* (list lop) lop0) ;; final observation
-       (values lop cheats)]
+       (values (list lop) cheats)]
       [(enough-for-one-game lop)
        (define o*1 (xinform-observers o* (list lop) lop0))
        (match-define [list ranked new-cheats] (referee lop))
@@ -99,10 +101,10 @@
        (cond
          [(empty? ranked)
           (xinform-observers o*1 '[] lop0) ;; final observation
-          (values '[] all-cheats)]
+          (values '[[]] all-cheats)]
          [else
           (xinform-observers o*1 (list (re-sort (first ranked) lop0)) lop0)
-          (values (first ranked) all-cheats)])]
+          (values ranked all-cheats)])]
       [else
        (define games   (prepare-games lop))
        (define o*1     (xinform-observers o* games lop0))
@@ -146,30 +148,37 @@
 ;                       
 ;                       
 
-#; {[Listof Player] [Listof Player] [Listof Player] -> [Listof Player]}
-;; EFFECT inform lop0 - cheaters of whether they are a member of winners
-;; eliminate winners that fail this message 
-(define (inform-all/not-cheaters winners0 lop0 cheats0)
-  (define alive-players (set-subtract (apply set lop0) (apply set cheats0)))
-  (for/fold ([winners '()][cheats cheats0] #:result `[,winners ,cheats]) ([p (in-set alive-players)])
-    (define is-winner (cons? (member p winners0)))
-    (define void-failed (xsend p end-of-tournament is-winner))
-    (cond
-      [(failed? void-failed) (values winners (cons p cheats))]
-      [is-winner (values (cons p winners) cheats)]
-      [else (values winners cheats)])))
+#; {[Listof Player] [Listof Player] [Listof Player] -> Results}
+;; EFFECT inform winners and losers; move players that fail this message into cheaters 
+(define (inform-all/not-cheaters winners0 losers0 cheats0)
+  (define-values (winners cheats1)
+    (for/fold ([winners '()][cheats cheats0]) ([p (in-list winners0)])
+      (inform-one p #true winners cheats)))
+  (define-values (losers cheaters)
+    (for/fold ([losers '()][cheats2 cheats1]) ([ranked losers0])
+      (for/fold ([lost '[]][cheats cheats2] #:result (values (cons* lost losers) cheats)) ((r ranked))
+        (inform-one r #false lost cheats))))
+  (list (cons winners (reverse losers)) cheaters))
 
-(module+ test
-  (define strategy (new first-strategy%))
-  (define winner  (new player% [strategy strategy]))
-  (define bad-win (new bad-end-of-tournament%))
-  (define loser   (new player% [strategy strategy]))
-  (define cheater (new bad-turn-time%))
+#; {Player Boolean [Listof Player] [Listof Player] -> (values [Listof Player] [Listof Player])}
+(define (inform-one p msg winners cheats)
+  (define void-failed (xsend p end-of-tournament msg))
+  (if (failed? void-failed)
+      (values winners (cons p cheats))
+      (values (cons p winners) cheats)))
 
-  (define all (list winner bad-win loser cheater))
+(define (cons* x lox) (if (empty? x) lox (cons x lox)))
   
-  (check-equal? (inform-all/not-cheaters `[,winner ,bad-win] all `[,cheater])
-                `[[,winner] [,bad-win ,cheater]]))
+(module+ test
+  (define strategy  (new first-strategy%))
+  (define winner    (new player% [strategy strategy]))
+  (define bad-win   (new bad-end-of-tournament%))
+  (define loser     (new player% [strategy strategy]))
+  (define bad-loser (new bad-end-of-tournament%))
+  (define cheater   (new bad-turn-time%))
+  
+  (check-equal? (inform-all/not-cheaters `[,winner ,bad-win] `[[,loser] [,bad-loser]] `[,cheater])
+                `[[[,winner] [,loser]] [,bad-loser ,bad-win ,cheater]]))
 
 ;                                     
 ;                                     
@@ -357,10 +366,10 @@
   (define one-game (list green-external red-external blue-external black-external white-external))
   (define two-games (append baddies one-game))
 
-  (check-true (empty? (first (administrator (append baddies baddies)))))
-  (check-true (empty? (first (administrator (append baddies baddies baddies baddies)))))
+  (check-true (empty? (caar (administrator (append baddies baddies)))))
+  (check-true (empty? (caar (administrator (append baddies baddies baddies baddies)))))
   (match-define [list ranked cheats] (referee one-game))
-  (check-equal? (administrator one-game) (list (first ranked) cheats))
+  (check-equal? (administrator one-game) (list ranked cheats))
   (check-true (cons? (administrator one-game)))
   (check-true (cons? (administrator two-games)))
 
