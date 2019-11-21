@@ -63,9 +63,6 @@
 (define (forwards tiles) tiles)
 (define (backwards tiles) (reverse tiles))
 
-; (define ports-clockwise PORTS)
-; (define ports-counterclockwise (cons (first PORTS) (reverse (rest PORTS))))
-
 ;; ---------------------------------------------------------------------------------------------------
 (define-syntax (provide-strategy stx)
   (define new-stx
