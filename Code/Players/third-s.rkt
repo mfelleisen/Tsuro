@@ -4,8 +4,8 @@
 (provide-strategy third-s%)
 
 (define A (index->port 0))
-(define (default-tile tiles) `[,(second tiles) 0])
-(define third-s% (base-strategy% counter-clockwise (ports-counterclockwise A) backwards default-tile))
+(define (dt tiles) `[,(second tiles) 0])
+(define third-s% (base-strategy% (counter-clockwise '[0 0]) (ports-counterclockwise A) backwards dt))
 
 (module+ test
   (require (submod ".."))

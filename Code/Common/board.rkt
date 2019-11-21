@@ -299,8 +299,9 @@
    ;; with free ports also specified in clockwise fashion starting from top left 
    (-> state? (listof location/c) (listof port?) (listof spot/c))]
 
-  [clockwise (listof location/c)]
-  [counter-clockwise (listof location/c)]
+  ;; go in .. direction, with given location placed at end of tour 
+  [clockwise         (-> location/c (listof location/c))]
+  [counter-clockwise (-> location/c (listof location/c))]
 
   [place-first-tile
    (->i ([s (and/c state? initial-state?)]
@@ -764,8 +765,24 @@
   (for*/list ((loc tile-list) #:when (free-for-init grid loc) [p (pick-port loc port-list)])
     (cons p loc)))
 
-#; {-> [Listof Location]}
-(define clockwise ;; starting at (0,0) [exclusive]
+(define counterclockwise-starting-at-0-0
+  (append (for/list ((y (in-range 0 9 +1))) (list 0 y))
+          (for/list ((x (in-range 0 9 +1))) (list x 9))
+          (for/list ((y (in-range 9 0 -1))) (list 9 y))
+          (for/list ((x (in-range 9 0 -1))) (list x 0))))
+
+#; { [[Listof Location] -> [Listof Location]] -> Location -> [Listof Location] }
+(define ((start-traversing-excluding direction) not-loc)
+  (let loop ([locs (direction counterclockwise-starting-at-0-0)][post '()])
+    (cond
+      [(equal? (first locs) not-loc) (append (rest locs) (reverse (cons not-loc post)))]
+      [else (loop (rest locs) (cons (first locs) post))])))
+
+(define clockwise (start-traversing-excluding reverse))
+(define counter-clockwise (start-traversing-excluding values))
+
+(module+ test
+  (define clockwise ;; starting at (0,0) [exclusive]
   (append (for/list ([i (in-range 1 10 +1)]) (list i 0))
           (for/list ([j (in-range 1 10 +1)]) (list 9 j))
           (for/list ([i (in-range 8 -1 -1)]) (list i 9))
@@ -776,6 +793,9 @@
           (for/list ((x (in-range 1  9 +1))) (list x 9))
           (for/list ((y (in-range 9  0 -1))) (list 9 y))
           (for/list ((x (in-range 9 -1 -1))) (list x 0))))
+
+  (check-equal? ((start-traversing-excluding reverse) '[0 0]) clockwise)
+  (check-equal? ((start-traversing-excluding values) '[0 0]) counter-clockwise))
 
 #; {Location [Listof Port] -> [Listof Port]}
 ;; ASSUME no neighboring tile 

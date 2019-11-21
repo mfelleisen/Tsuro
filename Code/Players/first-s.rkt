@@ -5,7 +5,7 @@
 
 (define A (index->port 0))
 (define first-s%
-  (class (base-strategy% clockwise (ports-clockwise A) (λ _ 'dummy) (λ _ 'dummy))
+  (class (base-strategy% (clockwise '[0 0]) (ports-clockwise A) (λ _ 'dummy) (λ _ 'dummy))
     (super-new)
     ;; use the first tile, don't rotate 
     (define/override (take-turn me board tile1 tile2)

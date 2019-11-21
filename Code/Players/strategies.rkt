@@ -79,8 +79,8 @@
 
 ;; ---------------------------------------------------------------------------------------------------
 (module+ test
-  (define strategy (new (base-strategy% clockwise PORTS (λ _ '[]) (λ (tiles) (error 't "abstract")))))
+  (define strat (new (base-strategy% (clockwise '[0 0]) PORTS (λ _ '[]) (λ (tiles) (error 't "A")))))
   (define me "red")
   
-  (check-equal? (send strategy initial (initialize '()) 1 2 3) `[[3 0] ,(index->port 2) 1 0])
-  (check-exn exn:fail? (λ () (send strategy take-turn me state3 1 2))))
+  (check-equal? (send strat initial (initialize '()) 1 2 3) `[[3 0] ,(index->port 2) 1 0])
+  (check-exn exn:fail? (λ () (send strat take-turn me state3 1 2))))

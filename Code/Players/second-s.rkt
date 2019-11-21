@@ -5,7 +5,7 @@
 
 (define A (index->port 0))
 (define (default-tile tiles) `[,(first tiles) 0])
-(define second-s% (base-strategy% clockwise (ports-clockwise A) forwards default-tile))
+(define second-s% (base-strategy% (clockwise '[0 0]) (ports-clockwise A) forwards default-tile))
 
 (module+ test
   (require (submod ".."))
