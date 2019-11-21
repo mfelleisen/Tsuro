@@ -760,11 +760,9 @@
 ;                                                                               
 
 (define (find-free-spots s0 tile-list port-list)
-  (match-define (state grid players) s0)
-  (for/fold ([rresult '()] #:result (reverse rresult)) ((loc tile-list))
-    (if (free-for-init grid loc)
-        (append (reverse (map (λ (p) (cons p loc)) (pick-port loc port-list))) rresult)
-        rresult)))
+  (match-define (state grid _players) s0)
+  (for*/list ((loc tile-list) #:when (free-for-init grid loc) [p (pick-port loc port-list)])
+    (cons p loc)))
 
 #; {-> [Listof Location]}
 (define clockwise ;; starting at (0,0) [exclusive]
