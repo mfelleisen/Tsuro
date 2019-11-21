@@ -375,6 +375,9 @@
 (module+ json
   (provide
    state->jsexpr
+   
+   intermediate*->jsexpr
+   jsexpr->intermediate*
 
    ;; if JSexpr matches state-pat, it is a candidate for the creation of an intermediate board
    state-pat
@@ -1501,6 +1504,9 @@
     (match j
       [(init-pat ti-d name p x y)  (list (jsexpr->tile ti-d) name (jsexpr->port p) x y)]
       [(intermediate-pat ti-d x y) (list (jsexpr->tile ti-d) x y)]))
+
+  (define (jsexpr->intermediate* sj)
+    (map jsexpr->intermediate sj))
 
   (define (jsexpr->state sj)
     (define ims (match sj [(state-pat) (map jsexpr->intermediate sj)]))
