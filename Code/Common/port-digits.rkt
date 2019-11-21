@@ -58,5 +58,19 @@
   (check-equal? (jsexpr->port "A") 0)
   (check-equal? (jsexpr->port "X") #false))
                    
-(define ports-clockwise PORTS)
-(define ports-counterclockwise (cons (first PORTS) (reverse (rest PORTS))))
+#; {[[Listof Port] -> [Listof Port]] Port -> [Listof Port]}
+(define ((port-traversal-starting-at direction) p)
+  (let loop ([my-ports (direction PORTS)][post '()])
+    (cond
+      [(equal? (first my-ports) p) (append my-ports (reverse post))]
+      [else (loop (rest my-ports) (cons (first my-ports) post))])))
+
+(define ports-clockwise (port-traversal-starting-at values))
+(define ports-counterclockwise (port-traversal-starting-at reverse))
+
+(module+ test
+  (define ports-clockwise PORTS)
+  (define ports-counterclockwise (cons (first PORTS) (reverse (rest PORTS))))
+
+  (check-equal? ((port-traversal-starting-at values) 0) ports-clockwise)
+  (check-equal? ((port-traversal-starting-at reverse) 0) ports-counterclockwise))

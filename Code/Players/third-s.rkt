@@ -3,9 +3,9 @@
 (require Tsuro/Code/Players/strategies)
 (provide-strategy third-s%)
 
+(define A (index->port 0))
 (define (default-tile tiles) `[,(second tiles) 0])
-
-(define third-s% (base-strategy% counter-clockwise ports-counterclockwise backwards default-tile))
+(define third-s% (base-strategy% counter-clockwise (ports-counterclockwise A) backwards default-tile))
 
 (module+ test
   (require (submod ".."))
