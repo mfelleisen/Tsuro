@@ -43,6 +43,7 @@
 
                    #; {JSexrpr -> (U False Port)}
                    ;; satisfies port-pat
-                   jsexpr->port)))
+                   jsexpr->port
 
-  
+                   ports-clockwise
+                   ports-counterclockwise)))

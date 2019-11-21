@@ -57,3 +57,6 @@
   
   (check-equal? (jsexpr->port "A") 0)
   (check-equal? (jsexpr->port "X") #false))
+                   
+(define ports-clockwise PORTS)
+(define ports-counterclockwise (cons (first PORTS) (reverse (rest PORTS))))

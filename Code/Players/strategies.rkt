@@ -17,8 +17,6 @@
  strategy/c
  
  (contract-out
-  [ports-clockwise        ports/c]
-  [ports-counterclockwise ports/c]
   [forwards               (-> tiles/c tiles/c)]
   [backwards              (-> tiles/c tiles/c)]
   [base-strategy% (-> locs/c ports/c (-> tiles/c tiles/c) (-> tiles/c turn-action/c) strategy/c)]))
@@ -31,7 +29,6 @@
 (module+ test
   (require (submod ".."))
   (require (submod Tsuro/Code/Common/board test-cases))
-  (require (except-in Tsuro/Code/Common/port port?))
   (require rackunit))
 
 ;; ---------------------------------------------------------------------------------------------------
@@ -66,8 +63,8 @@
 (define (forwards tiles) tiles)
 (define (backwards tiles) (reverse tiles))
 
-(define ports-clockwise PORTS)
-(define ports-counterclockwise (cons (first PORTS) (reverse (rest PORTS))))
+; (define ports-clockwise PORTS)
+; (define ports-counterclockwise (cons (first PORTS) (reverse (rest PORTS))))
 
 ;; ---------------------------------------------------------------------------------------------------
 (define-syntax (provide-strategy stx)
