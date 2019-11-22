@@ -46,8 +46,8 @@
 ;                              
 
 ;; the scale factor for the Pict and the graphics setup 
-(define SCALE* 1)
-(define SLEEP-TIME .99)
+(define SCALE* .88)
+(define SLEEP-TIME .11)
 
 ;; the graphics constants for the frame 
 (match-define (list EMPTY INSET WIDTH HEIGHT)

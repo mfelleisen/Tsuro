@@ -44,9 +44,11 @@
 
 (module+ test
   (require (submod ".."))
+  (require Tsuro/Code/Admin/game-observer)
   (require Tsuro/Code/Players/player)
   (require (prefix-in 1: Tsuro/Code/Players/first-s))
   (require (prefix-in 2: Tsuro/Code/Players/second-s))
+  (require (prefix-in 3: Tsuro/Code/Players/third-s))
   (require (submod Tsuro/Code/Common/board test-cases))
   (require Tsuro/Code/Common/port)
   (require rackunit)
@@ -344,6 +346,8 @@
 
 #; {type Find = [Avatar -> Player]}
 
+(require Tsuro/Code/Common/board pict)
+
 #; {Internal State Tiles* Rankings Player* Find -> (values State Tiles* Player* Internal* Observer*)}
 (define (play-1-turn i state tiles ranked cheats finder (observers '()))
   (match-define (internal external avatar age) i)
@@ -352,10 +356,11 @@
     [else 
      (match-define (list (list tile1 tile2) tiles+1) (split-tiles tiles TURN#))
      (define choice-failed (xsend external take-turn (state->intermediate* state) tile1 tile2))
-     (define potential-turn (list (list avatar age choice-failed) tile1 tile2))
+     (spy (state->pict state))
+     (define potential-turn  (spy (list (list avatar age choice-failed) tile1 tile2)))
      (cond
        [(failed? choice-failed)
-        (values (minus-player state avatar) tiles+1 ranked (cons i #;(finder avatar) cheats) observers)]
+        (values (minus-player state avatar) tiles+1 ranked (cons i cheats) observers)]
        [(legal-take-turn state avatar tile1 tile2 choice-failed)
         => (λ (next)
              (define o* (xinform-observers observers state potential-turn next))
@@ -389,9 +394,24 @@
   (check-equal? (add-to '[] finder2 good-intermediate-state+ state-suicide)
                 (map internal-external (rest active2))))
 
+;                                                                        
+;                                                                        
+;                    ;                   ;                    ;          
+;                                        ;                    ;          
+;  ;;;;;;  ;;;;    ;;;   ; ;;          ;;;;;   ;;;    ;;;   ;;;;;   ;;;  
+;  ;  ;  ;     ;     ;   ;;  ;           ;    ;;  ;  ;   ;    ;    ;   ; 
+;  ;  ;  ;     ;     ;   ;   ;           ;    ;   ;; ;        ;    ;     
+;  ;  ;  ;  ;;;;     ;   ;   ;           ;    ;;;;;;  ;;;     ;     ;;;  
+;  ;  ;  ; ;   ;     ;   ;   ;           ;    ;          ;    ;        ; 
+;  ;  ;  ; ;   ;     ;   ;   ;           ;    ;      ;   ;    ;    ;   ; 
+;  ;  ;  ;  ;;;;   ;;;;; ;   ;           ;;;   ;;;;   ;;;     ;;;   ;;;  
+;                                                                        
+;                                                                        
+;                                                                        
+
+#;
 (module+ test
   (provide 3-illegal-with-observer 3-legal-with-observer)
-  (require Tsuro/Code/Admin/game-observer)
   
   (log-error "refereeing 3")
   ;; the colors that are assigned to the players have nothing to do with their names
@@ -411,6 +431,48 @@
   (log-error "refereeing 5")
   (referee (list red-external white-external green-external blue-external black-external)))
 
+(module+ test 
+  (log-error "report of potential bug")
+
+
+
+
+
+
+
+
+
+
+
+
+  ;; the most common reported error occurs in: 
+  #|
+    [{"name":"a","strategy":"Tsuro/Code/Players/second-s.rkt"},
+     {"name":"b","strategy":"Tsuro/Code/Players/third-s.rkt"},
+     {"name":"c","strategy":"Tsuro/Code/Players/first-s.rkt"},
+     {"name":"d","strategy":"Tsuro/Code/Players/first-s.rkt"}]
+  |#
+
+  (define 10-1 (new player% [strategy (new 2:second-s%)]))
+  (define 10-2 (new player% [strategy (new 3:third-s%)]))
+  (define 10-3 (new player% [strategy (new 1:first-s%)]))
+  (define 10-4 (new player% [strategy (new 1:first-s%)]))
+  
+  (define i10 (internal 10-3 "red" 2)) (send 10-2 playing-as "red")
+  (define b10 (internal 10-1 "black" 1)) (send 10-1 playing-as "black")
+  
+  (check-equal? (let-values (([s b c d e] (play-1-turn i10 state10-pre '(24 25) '[] '[] (λ _ 10-3))))
+                  (list s d)) ;; [state, cheats]
+                (list (minus-player state10-pre "red") (list i10))
+                "probable failure from hw9")
+  
+  (check-equal? (fourth (play-1-round state10-pre '[24 25] (list i10 b10) )) (list i10))
+
+  (check-equal? (second (play-game state10-pre '[24 25] (list i10 b10))) (list i10))
+
+  (check-equal? (cadr (referee (list 10-1 10-2 10-3 10-4) #:observers `(,show-turn))) `(,10-3 ,10-4)))
+
+#;
 (module+ picts
   (require (submod ".." test))
   (3-illegal-with-observer)

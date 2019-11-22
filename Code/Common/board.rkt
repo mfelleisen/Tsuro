@@ -1123,6 +1123,21 @@
 
 
 ;; ---------------------------------------------------------------------------------------------------
+;; potential bug in test case 10 from homework 9
+
+(module+ test-cases
+  (provide state10-pre state10-action)
+
+  (define two (index->port 2))
+  (define five (index->port 5))
+
+  (define state10-pre
+    (state-from
+     [(15 #:rotate 180) 2  (12 #:rotate 90) 8                        16 (11 "red" #:on five) 18]
+     [5                 #f 20               (23 "black" #:on two)]))
+  (define state10-action '["red" [24 0]]))
+
+;; ---------------------------------------------------------------------------------------------------
 ;; infinite loops, plus more driving red off the board
 
 (module+ test-cases

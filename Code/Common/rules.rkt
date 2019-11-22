@@ -137,6 +137,9 @@
   (check-turn collision-state collision-action collision-state++ "collision")
   
   (match-define [list a1 a2 a3] good-state-actions)
-  (check-turn good-intermediate-state #:t2 0 a1 good-intermediate-state+ "+")
-  (check-turn good-intermediate-state+ #:t2 0 a2 good-intermediate-state++ "++")
-  (check-turn good-intermediate-state++ #:t2 0 a3 good-intermediate-state+++ "+++"))
+  (check-turn good-intermediate-state a1 #:t2 0 good-intermediate-state+ "+")
+  (check-turn good-intermediate-state+ a2 #:t2 0 good-intermediate-state++ "++")
+  (check-turn good-intermediate-state++ a3 #:t2 0 good-intermediate-state+++ "+++")
+
+  state10-pre
+  (check-turn state10-pre state10-action #false #:t1 24 #:t2 25 "probable failure from hw9"))
