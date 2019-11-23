@@ -462,6 +462,21 @@
   (check-equal? (second (referee (list 10-1 10-2 10-3 10-4))) `(,10-4 ,10-3)))
 
 #;
+(module+ test
+
+  ;; test case Code/9/all-tests/8-in.json 
+  #|
+  [{"name":"a","strategy":"Tsuro/Code/Players/third-s.rkt"},
+   {"name":"b","strategy":"Tsuro/Code/Players/third-s.rkt"},
+   {"name":"c","strategy":"Tsuro/Code/Players/third-s.rkt"},
+   {"name":"d","strategy":"Tsuro/Code/Players/third-s.rkt"},
+   {"name":"e","strategy":"Tsuro/Code/Players/third-s.rkt"}]
+  |#
+
+  (define (make-9) (new player% [strategy (new 3:third-s%)]))
+  (referee (list (make-9) (make-9) (make-9) (make-9) (make-9)) #:observers (list show-turn)))
+
+#;
 (module+ picts
   (require (submod ".." test))
   (3-illegal-with-observer)
