@@ -197,12 +197,18 @@
 
 #; {State -> Boolean}
 (define (players-are-on-distinct-places s)
-  (match-define (state _ players) s)
-  (define places
-    (for/set ((p (in-set players)))
-      (match-define (player _ port x y) p)
-      (list port x y)))
-  (= (set-count players) (set-count places)))
+  (= (set-count (players-on-same-spot s)) 0))
+
+#; {State -> [Setof Player]}
+(define (players-on-same-spot s)
+  (define spots '[])
+  (define (spot-of p)
+    (match-define (player _ port x y) p)
+    (list port x y))
+  (for*/set ((p (in-set (state-players s)))
+             (s (in-value (spot-of p)))
+             #:when (begin0 (member s spots) (set! spots (cons s spots))))
+    p))
 
 #; {State -> Boolean : every player faces an open square}
 ;; for initialize and add-tile and intermediate 
@@ -1060,11 +1066,23 @@
   (define-values  (x-new y-new) (looking-at port x y))
   (define nu-grid (add-new-square-update-neighbors grid tile x-new y-new))
   (define-values  (moved out* inf*) (move-players nu-grid players x-new y-new))
-  (define col*    (players-are-on-distinct-places (state '_ moved)))
+  (define state1  (state nu-grid moved))
+  (define newc    (new-collision state0 state1))
   (cond
-    [(cons? inf*) (infinite (state nu-grid moved) (map player-name inf*))]
-    [(not col*)   (collided (state nu-grid moved))]
-    [else (state nu-grid moved)]))
+    [(cons? inf*) (infinite state1 (map player-name inf*))]
+    [newc         (collided state1)]
+    [else         state1]))
+
+#; {State State -> Boolean}
+(define (new-collision pre-state post-state)
+  (define pre (players-are-on-distinct-places pre-state))
+  (define post (players-are-on-distinct-places post-state))
+  (cond
+    [(and pre       post)       #false]
+    [(and (not pre) post)       #false]
+    [(and pre       (not post)) #true]
+    [(and (not pre) (not post))
+     (not (set=? (players-on-same-spot pre-state) (players-on-same-spot post-state)))]))
 
 #; {type Action = [List Avatar [List TileIndex Degree]]}
 
@@ -1120,22 +1138,30 @@
                 good-intermediate-state+++
                 "red fwd 3"))
 
-
-
 ;; ---------------------------------------------------------------------------------------------------
 ;; potential bug in test case 10 from homework 9
 
 (module+ test-cases
-  (provide state10-pre state10-action)
+  (provide state10-pre state10-action state10-post)
 
   (define two (index->port 2))
+  (define three (index->port 3))
   (define five (index->port 5))
 
   (define state10-pre
-    (state-from
-     [(15 #:rotate 180) 2  (12 #:rotate 90) 8                        16 (11 "red" #:on five) 18]
-     [5                 #f 20               (23 "black" #:on two)]))
-  (define state10-action '["red" [24 0]]))
+    (state-from #:set0 (set (player "white" two 3 1))
+     [(15 #:rotate 180) 2  12 8                       16 (11 "red" #:on five) (18 "green" #:on three)]
+     [5                 #f 20 (23 "black" #:on two)]))
+
+  (define state10-action '["red" [24 0]])
+
+  (define state10-post
+    (state-from #:set0 (set (player "white" two 3 1))
+     [(15 #:rotate 180) 2  12 8                     16 11 (18 "green" #:on three)]
+     [5                 #f 20 (23 "black" #:on two) #f 24])))
+
+(module+ test
+  (check-equal? (add-tile/a state10-pre state10-action) state10-post ""))
 
 ;; ---------------------------------------------------------------------------------------------------
 ;; infinite loops, plus more driving red off the board
