@@ -102,11 +102,11 @@
 (define (referee external* #:observers (o*0 '()))
   (define internal* (assign-avatars external*))
   (define cheaters0 (inform-about-self-and-others internal*))
-  (match-define (list state0 cheaters remaining) (initial-placements (remove* cheaters0 internal*)))
+  (match-define (list state0 cheaters1 remaining) (initial-placements (remove* cheaters0 internal*)))
   ;; there are always enough tiles left so remaining doesn't need to be refilled
   (define o* (map (λ (uninit-observer) (uninit-observer)) o*0))
-  (match-define (list ranked cheaters1) (play-game state0 remaining (remove* cheaters internal*) o*))
-  (list ranked (map internal-external (append cheaters1 cheaters0))))
+  (match-define (list ranked cheaters2) (play-game state0 remaining (remove* cheaters1 internal*) o*))
+  (list ranked (map internal-external (append cheaters2 cheaters1 cheaters0))))
 
 ;; ---------------------------------------------------------------------------------------------------
 #; {Player* -> Internal*}
@@ -346,8 +346,6 @@
 
 #; {type Find = [Avatar -> Player]}
 
-(require Tsuro/Code/Common/board pict)
-
 #; {Internal State Tiles* Rankings Player* Find -> (values State Tiles* Player* Internal* Observer*)}
 (define (play-1-turn i state tiles ranked cheats finder (observers '()))
   (match-define (internal external avatar age) i)
@@ -356,8 +354,7 @@
     [else 
      (match-define (list (list tile1 tile2) tiles+1) (split-tiles tiles TURN#))
      (define choice-failed (xsend external take-turn (state->intermediate* state) tile1 tile2))
-     (spy (state->pict state))
-     (define potential-turn  (spy (list (list avatar age choice-failed) tile1 tile2)))
+     (define potential-turn (list (list avatar age choice-failed) tile1 tile2))
      (cond
        [(failed? choice-failed)
         (values (minus-player state avatar) tiles+1 ranked (cons i cheats) observers)]
@@ -434,17 +431,6 @@
 (module+ test 
   (log-error "report of potential bug")
 
-
-
-
-
-
-
-
-
-
-
-
   ;; the most common reported error occurs in: 
   #|
     [{"name":"a","strategy":"Tsuro/Code/Players/second-s.rkt"},
@@ -458,8 +444,11 @@
   (define 10-3 (new player% [strategy (new 1:first-s%)]))
   (define 10-4 (new player% [strategy (new 1:first-s%)]))
   
-  (define i10 (internal 10-3 "red" 2)) (send 10-2 playing-as "red")
   (define b10 (internal 10-1 "black" 1)) (send 10-1 playing-as "black")
+  (define w10 (internal 10-2 "white" 2)) (send 10-2 playing-as "white")
+  (define i10 (internal 10-3 "red" 2))   (send 10-3 playing-as "red")
+  (define g10 (internal 10-4 "green" 2)) (send 10-4 playing-as "green")
+  (define internals (list i10 b10 w10 g10))
   
   (check-equal? (let-values (([s b c d e] (play-1-turn i10 state10-pre '(24 25) '[] '[] (λ _ 10-3))))
                   (list s d)) ;; [state, cheats]
@@ -468,9 +457,9 @@
   
   (check-equal? (fourth (play-1-round state10-pre '[24 25] (list i10 b10) )) (list i10))
 
-  (check-equal? (second (play-game state10-pre '[24 25] (list i10 b10))) (list i10))
+  (check-equal? (second (play-game state10-pre '[24 25] internals)) (list i10))
 
-  (check-equal? (cadr (referee (list 10-1 10-2 10-3 10-4) #:observers `(,show-turn))) `(,10-3 ,10-4)))
+  (check-equal? (second (referee (list 10-1 10-2 10-3 10-4))) `(,10-4 ,10-3)))
 
 #;
 (module+ picts
