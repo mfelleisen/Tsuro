@@ -5,21 +5,17 @@
 ;; first-placed or not (boolean)
 
 (require Tsuro/Code/Admin/basics)
+(require Tsuro/Code/Admin/observer-interfaces)
 (require (only-in Tsuro/Code/Common/player-interface player/c))
 
 (define player*/c [listof player/c])
+(define results/c (list/c (listof player*/c) player*/c))
 
-(require Tsuro/Code/Admin/observer-interfaces)
-
-;; ---------------------------------------------------------------------------------------------------
 (provide
+ results/c
  (contract-out
   [administrator
-   (->* [(and/c player*/c cons? distinct?)] [#:observers (listof tournament-observer/c)]
-        ;; yields 
-        (list/c (listof player*/c) player*/c))]))
-
-
+   (->* [(and/c player*/c cons? distinct?)] [#:observers (listof tournament-observer/c)] results/c)]))
 
 ;                                                                                      
 ;       ;                                  ;                                           
