@@ -21,6 +21,7 @@
    (->* (player#/c secs/c port/c) (#:names [listof string?]) (or/c results/c named-results/c))]))
 
 ;; ---------------------------------------------------------------------------------------------------
+(require Tsuro/Code/Remote/player)
 (require (except-in Tsuro/Code/Admin/administrator results/c))
 
 (require SwDev/Testing/communication)
@@ -30,12 +31,6 @@
   (require rackunit))
 
 ;; ---------------------------------------------------------------------------------------------------
-;; TODO
-
-(define (make-remote-player% in out)
-  0)
-
-;; ---------------------------------------------------------------------------------------------------
 (define LOCAL     "127.0.0.1")
 (define MAX-TCP   30)
 (define REOPEN    #t)
@@ -43,8 +38,9 @@
 
 (define test-run?  (make-parameter #false))
 
-;; for error runs, #:names is 'abused' to sneak in a result channel
-(define (server min-players time-limit port #:names [names '[]])
+;; if names is given, assume that there are at most as many sign-ups as players
+;; for test runs, #:names is 'abused' to sneak in a result channel
+(define (server min-players time-limit port #:names [names #false])
   (define send-players (make-channel))
   (define time-s-up    (make-channel))
   (define custodian    (make-custodian))
@@ -85,13 +81,24 @@
 (define (add-player players listener)
   (with-handlers ((exn:fail:network? (lambda (xn) (log-error (~a (exn-message xn))) players)))
     (define-values (in out) (tcp-accept listener))
-    (define next (if (test-run?) (add1 (length players)) (new (make-remote-player% in out))))
+    (define next (if (test-run?) (add1 (length players)) (new (make-remote-player in out))))
     (cons next players)))
 
-#; ([Listof ExternalPlayer] [Listof Names] -> Results)
+#; ([Listof ExternalPlayer] (U False [Listof String]) -> Results)
 (define (run-administrator players names)
-  (match-define [list ranked cheaters] (administrator players))
-  (first ranked))
+  (define result (administrator players))
+  (cond
+    [(boolean? names) result]
+    [else
+     (when (> (length players) (length names))
+       (error 'server "naming convention violated"))
+     (define named-players (for/list ((p players) (n names)) (list p n)))
+     [list (map (mapper named-players) (first result)) [(mapper named-players) (second result)]]]))
+
+#; {[Listof [List Player String]] -> [Listof Player] -> [Listof String]}
+;; map players back to names, then sort 
+(define ((mapper named-players) players)
+  (sort (for/list ((p players)) (second (assoc p named-players))) string<?))
 
 ;; ---------------------------------------------------------------------------------------------------
 (module+ test
