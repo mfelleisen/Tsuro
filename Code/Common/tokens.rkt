@@ -9,3 +9,13 @@
 ;; -----------------------------------------------------------------------------
 (define AVATAR-COLORS '("white" "black" "red" "green" "blue")) ;; colors only
 (define (avatar? x) (cons? (member x AVATAR-COLORS)))
+
+(module+ json
+  (provide avatar->jsexpr jsexpr->avatar)
+
+  (define (avatar->jsexpr a) a)
+  (define (jsexpr->avatar s)
+    (match s
+      [(? string? s) s]
+      [else #false])))
+  

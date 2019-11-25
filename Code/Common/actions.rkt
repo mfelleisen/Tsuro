@@ -19,6 +19,9 @@
 
 (module+ json
   (provide
+   turn-action->jsexpr
+   jsexpr->turn-action 
+
    init-action->jsexpr
    jsexpr->init-action)
 
@@ -30,4 +33,10 @@
   (define (jsexpr->init-action a)
     (match a
       [(list (list idx deg) port x y)
-       (list (list idx deg) (jsexpr->port port) x y)])))
+       (list (list idx deg) (jsexpr->port port) x y)]))
+
+  (define (turn-action->jsexpr a) a)
+
+  (define (jsexpr->turn-action a)
+    (match a
+      [(list idx deg) a])))
