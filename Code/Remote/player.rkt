@@ -17,6 +17,8 @@
 (require (submod Tsuro/Code/Common/tokens json))
 (require (submod Tsuro/Code/Common/board json))
 
+(require Tsuro/Code/Common/port)
+
 (require Tsuro/Code/Players/player)
 (require SwDev/Testing/communication)
 (require (for-syntax syntax/parse))
@@ -68,8 +70,7 @@ end-of-tournament  ["end-of-tournament", [Boolean]] "void"
 
 (define (jsexpr->void j)
   (match j
-    ["void" (void)]
-    [_ #f]))
+    ["void" (void)]))
 
 (define tile-index->jsexpr values)
 
@@ -77,15 +78,31 @@ end-of-tournament  ["end-of-tournament", [Boolean]] "void"
 (module+ test 
   (define (ci) (open-input-string "\"void\""))
   (define (bd) (open-input-string "\"not-void\""))
-  (define (rp) (make-remote-player (ci) (current-output-port)))
-  (define-syntax-rule (mp method args ...)
+  (define (rp ci) (make-remote-player (ci) (current-output-port)))
+  (define-syntax-rule (mp ci method args ...)
     (let* ([result (gensym)]
-           [output (with-output-to-string (λ () (set! result (send (rp) method args ...))))])
+           [output (with-output-to-string (λ () (set! result (send (rp ci) method args ...))))])
       (list (read-message (open-input-string output)) result)))
+  
+  (check-equal? (mp ci playing-as "red") [list `["playing-as" ["red"]] (void)])
+  (check-equal? (mp ci playing-with `["red" "blue"]) [list `["others" [["red" "blue"]]] (void)])  
+  (check-equal? (mp ci end-of-tournament #t) (list `["end-of-tournament" [,true]] (void)))
 
-  (check-equal? (mp playing-as "red") [list `["playing-as" ["red"]] (void)])
-  (check-equal? (mp playing-with `["red" "blue"]) [list `["others" [["red" "blue"]]] (void)])  
-  (check-equal? (mp end-of-tournament #t) (list `["end-of-tournament" [,true]] (void)))
+  (check-exn exn? (λ () (mp bd playing-as "red")))
+  (check-exn exn? (λ () (mp bd playing-with `["red"])))
+  (check-exn exn? (λ () (mp bd end-of-tournament #false)))
 
-  (check-exn exn? (λ () (send (make-remote-player (bd) (current-output-port)) playing-as "red"))))
+  (define init0  `[[0 90] ,(index->port 4) 0 0])
+  (define (i0) (open-input-string (jsexpr->string (init-action->jsexpr init0))))
+  (check-equal? (mp i0 initial '[] 0 1 2) (list `["initial" [[] 0 1 2]] init0))
+
+  (define a0 `[,(jsexpr->tile '[0 90]) "red" ,(index->port 2) 0 0])
+  (define j0 (intermediate*->jsexpr `[,a0]))
+  (check-equal? (mp i0 initial (list a0) 0 1 2) (list `["initial" [,j0 0 1 2]] init0))
+
+  ;; TODO:
+  ;; -- exn JSON for initial 
+  ;; -- take-turn 
+  
+  )
   
