@@ -18,11 +18,13 @@
 (require (except-in SwDev/Testing/make-client port/c))
 (require SwDev/Debugging/spy)
 
+(require Tsuro/Code/Lib/xsend)
+
 (module+ test
   (require rackunit))
 
 ;; ---------------------------------------------------------------------------------------------------
-(define LOCAL     "127.0.0.1")
+(define LOCAL "127.0.0.1")
 
 (define (client players (ip LOCAL) (port 45678))
   (struct result [name value] #:transparent)
@@ -32,5 +34,10 @@
       (match-define [list name behavior] p)
       (define-values (receiver _) (connect-to-server-as-receiver ip port))
       (define admin (make-remote-administrator receiver))
-      (thread (λ () (channel-put done (result name (admin behavior)))))))
+      (thread (λ () (channel-put done (result name (xcall (admin behavior) 20)))))))
+
+  ;; what to do here:
+  ;; -- this waits for at most one survivor
+  ;; -- all may crash in which case this will hang 
+
   (sync (handle-evt done displayln)))
