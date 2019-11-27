@@ -3,6 +3,7 @@
 ;; a tournament server that signs up players over TCP and runs a tournament 
 
 (require (only-in Tsuro/Code/Admin/administrator results/c))
+(require (only-in Tsuro/Code/Common/player-interface player/c))
 
 (define port/c (and/c natural-number/c (</c 60000) (>/c 10000)))
 (define player#/c natural-number/c)
@@ -16,9 +17,8 @@
    ;; runs a server that waits for at least player connections on port#
    ;; or wait-for-msec seconds and then invokes the tournament manager
    ;; on the connected proxy-players that communicate via the tcp connection
-   ;; if #:names is specified, it connects the players with these names 
    ;; (unless no players signed up)
-   (->* (player#/c secs/c port/c) (#:names [listof string?]) (or/c results/c named-results/c))]))
+   (-> player#/c secs/c port/c (list/c (listof player/c) results/c))]))
 
 ;; ---------------------------------------------------------------------------------------------------
 (require Tsuro/Code/Remote/player)
@@ -28,6 +28,7 @@
 (require SwDev/Debugging/spy)
 
 (module+ test
+  (require (submod ".."))
   (require rackunit))
 
 ;; ---------------------------------------------------------------------------------------------------
@@ -35,12 +36,11 @@
 (define MAX-TCP   30)
 (define REOPEN    #t)
 (define MIN-ERROR "server did not sign up any players")
+(define DEFAULT-RESULT '[[] [[][]]]) 
 
 (define test-run?  (make-parameter #false))
 
-;; if names is given, assume that there are at most as many sign-ups as players
-;; for test runs, #:names is 'abused' to sneak in a result channel
-(define (server min-players time-limit port #:names [names #false])
+(define (server min-players time-limit port)
   (define send-players (make-channel))
   (define time-s-up    (make-channel))
   (define custodian    (make-custodian))
@@ -49,9 +49,9 @@
   (define players (receive-players time-limit send-players time-s-up))
   (begin0
     (cond
-      [(empty? players) (displayln MIN-ERROR (current-error-port)) '[[] []]]
-      [(test-run?) (channel-put names players)]
-      [else (run-administrator players names)])
+      [(empty? players) (displayln MIN-ERROR (current-error-port)) DEFAULT-RESULT]
+      [(test-run?) => (λ (result) (channel-put result players) DEFAULT-RESULT)]
+      [else (run-administrator players)])
     (custodian-shutdown-all custodian)))
 
 #; {N Channel Channel -> [Listof (U Players N)]} 
@@ -84,21 +84,10 @@
     (define next (if (test-run?) (add1 (length players)) (new (make-remote-player in out))))
     (cons next players)))
 
-#; ([Listof ExternalPlayer] (U False [Listof String]) -> Results)
-(define (run-administrator players names)
+#; ([Listof ExternalPlayer] (U False [Listof String]) -> [List [Listof ExternalPlayer] Results])
+(define (run-administrator players)
   (define result (administrator players))
-  (cond
-    [(boolean? names) result]
-    [else
-     (when (> (length players) (length names))
-       (error 'server "naming convention violated"))
-     (define named-players (for/list ((p players) (n names)) (list p n)))
-     [list (map (mapper named-players) (first result)) [(mapper named-players) (second result)]]]))
-
-#; {[Listof [List Player String]] -> [Listof Player] -> [Listof String]}
-;; map players back to names, then sort 
-(define ((mapper named-players) players)
-  (sort (for/list ((p players)) (second (assoc p named-players))) string<?))
+  [list players result])
 
 ;; ---------------------------------------------------------------------------------------------------
 (module+ test
@@ -110,10 +99,10 @@
     [define custodian (make-custodian)]
     [define result    (make-channel)]
     [define err-out   (open-output-string)]
-    (parameterize ([test-run?          #true]
+    (parameterize ([test-run?          result]
                    [current-custodian  custodian]
                    [current-error-port err-out])
-      (define th (thread (λ () (server min-players 3 port #:names result))))
+      (define th (thread (λ () (server min-players 3 port))))
       (sleep 1)
       (if (boolean? k) (sync th) (for ([i k]) (define-values (- +) (tcp-connect LOCAL port)) 0)))
     (begin0
