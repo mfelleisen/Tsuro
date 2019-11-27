@@ -1,6 +1,6 @@
 #lang racket
 
-;; =============================================================================
+;; ===================================================================================================
 ;; a library that protects calls from exceptions and overly slow clients 
 
 (provide
@@ -13,7 +13,10 @@
  
  #;(xsend object method args ...)
  ;; returns a failed value of method raises an exception or exceeds time-out-limit 
- xsend)
+ xsend
+
+ #;{ ([X ...] -> Y) X ... #:throw-handler (Z -> W) #:time-out (-> V) #:f-msg-format FmtString -> Y }
+ xcall)
 
 ;; ---------------------------------------------------------------------------------------------------
 (require (for-syntax syntax/parse))
@@ -21,7 +24,7 @@
   (require rackunit))
 
 ;; ---------------------------------------------------------------------------------------------------
-(define EXN:fmt "xdynamic-send: ~a raised an exception for ~a:\n~e")
+(define EXN:fmt "xdynamic-send: ~a raised an exception for ~a:\n")
 
 (struct failed (value) #:transparent)
 
@@ -29,15 +32,26 @@
 
 (define-syntax (xsend stx)
   (syntax-parse stx 
-    [(xsend o m a ...)
-     #'(xdynamic-send o 'm #:thrown failed #:timed-out (λ _ (failed 'time)) a ...)]))
+    [(xsend o m a ...) #'(xdynamic-send o 'm a ...)]))
 
 (define-syntax (xsend-old stx)
   (syntax-parse stx 
     [(xsend o m #:thrown h-thrown #:timed-out h-time-out a ...)
-     #'(xdynamic-send o 'm #:thrown failed #:timed-out failed a ...)]))
+     #'(xdynamic-send o 'm #:thrown h-thrown #:timed-out h-time-out a ...)]))
 
-(define (xdynamic-send target m #:thrown throw-handler #:timed-out time-out-handler  . a)
+(define (xdynamic-send target m
+                       #:thrown [throw-handler failed]
+                       #:timed-out [time-out-handler (λ _ (failed 'time))]
+                       . a)
+  (define fmt (string-append (format EXN:fmt target m) "~e"))
+  (define f (lambda a (apply dynamic-send target m a)))
+  (apply xcall f #:thrown throw-handler #:timed-out time-out-handler #:f-msg-format fmt a))
+
+(define (xcall f
+               #:thrown throw-handler
+               #:timed-out time-out-handler
+               #:f-msg-format (fmt (string-append (format "xcall: ~a:\n" (object-name f)) "~e"))
+               . a)
   (define cust (make-custodian))
   ;; (custodian-limit-memory cust 1048576) ;; memory limit
   (struct okay (value))
@@ -48,7 +62,7 @@
       (thread
        (lambda ()
          (with-handlers ((void (lambda (x) (channel-put results-of-thread (thrw x)))))
-           (define result-of-call (apply dynamic-send target m a))
+           (define result-of-call (apply f a))
            (channel-put results-of-thread (okay result-of-call)))))
       
       (sync/timeout (time-out-limit) results-of-thread)))
@@ -60,7 +74,7 @@
      (time-out-handler)]
     [(thrw? result)
      (define thrown (thrw-value result))
-     (log-error (format EXN:fmt target m (if (exn? thrown) (exn-message thrown) thrown)))
+     (log-error (format fmt (if (exn? thrown) (exn-message thrown) thrown)))
      (throw-handler thrown)]
     [else (error 'xdynamic-send "something went horribly wrong: ~e" result)]))
 
