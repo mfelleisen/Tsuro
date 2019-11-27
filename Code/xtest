@@ -7,7 +7,7 @@ echo "making"
 raco make */*.rkt
 
 echo "testing" 
-time raco test Common/*.rkt Players/*.rkt Admin/*.rkt 2> errors.txt
+time raco test Common/*.rkt Players/*.rkt Admin/*.rkt Remote/*.rkt  2> errors.txt
  
 echo "grepping" 
 if grep --quiet "non-zero exit" errors.txt; then 
