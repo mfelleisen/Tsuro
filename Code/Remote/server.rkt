@@ -14,10 +14,9 @@
  (contract-out
   [server
    #; (server player# wait-for-sec port#)
-   ;; runs a server that waits for at least player connections on port#
-   ;; or wait-for-msec seconds and then invokes the tournament manager
-   ;; on the connected proxy-players that communicate via the tcp connection
-   ;; (unless no players signed up)
+   ;; returns the list of players, sorted in descending order of age, plus rankings from
+   ;; runsning an administrator on the N players that connected on port# in
+   ;; wait-for-msec seconds or N >= player# as soon as that many signed up 
    (-> player#/c secs/c port/c (list/c (listof player/c) results/c))]))
 
 ;; ---------------------------------------------------------------------------------------------------
