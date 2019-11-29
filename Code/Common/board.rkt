@@ -388,6 +388,7 @@
    ;; if JSexpr matches state-pat, it is a candidate for the creation of an intermediate board
    state-pat
 
+   init-pat
    intermediate-pat
 
    ;; if JSExpr matches action-pat, it is a candidate for a add-tile action 
