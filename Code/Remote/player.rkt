@@ -63,6 +63,13 @@
 
     (define-syntax (define/remote stx)
       (syntax-parse stx
+        [(_ (m (~optional (~seq #:name n:string) #:defaults ([n #'(~a 'm)])) [->to] <-from))
+         #'(define/public (m x)
+             (send-message `[,n ,(map ->to x)] out)
+             (define msg (read-message in))
+             (define dec (<-from msg))
+             (unless dec (error 'm "wrong return value received: ~e" msg))
+             dec)]
         [(_ (m (~optional (~seq #:name n:string) #:defaults ([n #'(~a 'm)])) ->to ... <-from))
          #:with (x ...) (generate-temporaries #'(->to ...))
          #'(define/public (m x ...)
@@ -73,7 +80,7 @@
              dec)]))
 
     (define/remote (playing-as avatar->jsexpr jsexpr->void))
-    (define/remote (playing-with #:name "others" (curry map avatar->jsexpr) jsexpr->void))
+    (define/remote (playing-with #:name "others" [avatar->jsexpr] jsexpr->void))
     (define/remote (initial simple tile-index tile-index tile-index action))
     (define/remote (take-turn intermediate tile-index tile-index tile-pat))
     (define/remote (end-of-tournament result->jsexpr jsexpr->void))))
@@ -115,7 +122,7 @@
   ;; the simple functions
   (define (ci) (open-input-string "\"void\""))
   (check-equal? (mp ci playing-as "red") [list `["playing-as" ["red"]] (void)])
-  (check-equal? (mp ci playing-with `["red" "blue"]) [list `["others" [["red" "blue"]]] (void)])  
+  (check-equal? (mp ci playing-with `["red" "blue"]) [list `["others" ["red" "blue"]] (void)])  
   (check-equal? (mp ci end-of-tournament #t) (list `["end-of-tournament" [,true]] (void)))
 
   (define (bd) (open-input-string "\"not-void\""))
