@@ -37,8 +37,10 @@ client(ip,p) : ip for IP address, p for Port
  |        |
  |~~~~~~~~~~~~~~~~~~~~~~~~~~> tcp connection to ip at p
  |        |
- |  new(in,out,p)   remote_admim
+ |  new(in,out)   remote_admim
  |----------------->+
  |        |         |
+ | run(p) |         |
+ |----------------->|
  |        |         |
 ```
