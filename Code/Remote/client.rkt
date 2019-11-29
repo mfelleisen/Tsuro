@@ -33,8 +33,8 @@
     (for/list ((p players))
       (match-define [list name behavior] p)
       (define-values (receiver _) (connect-to-server-as-receiver ip port))
-      (define admin (make-remote-administrator receiver))
-      (thread (λ () (channel-put done (result name (xcall (admin behavior) 20)))))))
+      (define admin (make-remote-administrator behavior receiver))
+      (thread (λ () (channel-put done (result name (parameterize ([time-out-limit 11]) (xcall (admin)))))))))
 
   ;; what to do here:
   ;; -- this waits for at most one survivor
