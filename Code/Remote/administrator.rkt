@@ -7,14 +7,9 @@
 (require (only-in Tsuro/Code/Common/player-interface player/c))
 (require (only-in json jsexpr?))
 
-(define player*/c [listof player/c])
-(define results/c (list/c (listof player*/c) player*/c))
-
 (provide
- results/c
  (contract-out
-  [make-remote-administrator
-   (-> (-> (-> jsexpr? jsexpr?) jsexpr?) (-> player/c any/c))]))
+  [make-remote-administrator (-> (-> (-> jsexpr? jsexpr?) any) (-> player/c any/c))]))
 
 ;                                                                                      
 ;       ;                                  ;                                           
@@ -41,7 +36,8 @@
   (require (submod ".."))
   (require (submod Tsuro/Code/Common/tiles json))
   (require Tsuro/Code/Common/port)
-  (require json)
+  (require Tsuro/Code/Players/player)
+  (require Tsuro/Code/Players/first-s)
   (require rackunit))
 
 ;                                                                               
@@ -107,9 +103,6 @@
 ;                                     
 
 (module+ test
-  (require Tsuro/Code/Players/player)
-  (require Tsuro/Code/Players/first-s)
-
   (define p1 (new player% [strategy (new first-s%)]))
   (define b1 (box (gensym)))
   
