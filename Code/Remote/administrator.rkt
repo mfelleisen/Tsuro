@@ -4,8 +4,6 @@
 ;; and produces the list of first-placed players; it informs all non-cheaters whether they were
 ;; first-placed or not (boolean)
 
-(require Tsuro/Code/Admin/basics)
-(require Tsuro/Code/Admin/observer-interfaces)
 (require (only-in Tsuro/Code/Common/player-interface player/c))
 (require (only-in json jsexpr?))
 
@@ -17,20 +15,6 @@
  (contract-out
   [make-remote-administrator
    (-> (-> (-> jsexpr? jsexpr?) jsexpr?) (-> player/c any/c))]))
-
-(define (make-remote-administrator receiver)
-  0)
-
-
-;; this remote player implements the same interface as the player but conveys its arguments
-;; to the given TCP out stream and receives the results on the TCP in stream
-
-(require Tsuro/Code/Common/player-interface)
-
-(provide
- ;; a contract that describes the player class's interface to the administrator 
- (contract-out
-  (make-remote-player (-> input-port? output-port? player/c))))
 
 ;                                                                                      
 ;       ;                                  ;                                           
@@ -47,67 +31,65 @@
 ;                 ;                                                                    
 ;                 ;                                                                    
 
-(require (submod Tsuro/Code/Common/actions json))
-(require (submod Tsuro/Code/Common/tokens json))
 (require (submod Tsuro/Code/Common/board json))
-(require Tsuro/Code/Common/port)
+(require Tsuro/Code/Common/tokens)
+(require Tsuro/Code/Common/tiles)
 
-(require SwDev/Testing/communication)
-(require (for-syntax syntax/parse))
+(require SwDev/Lib/pattern-matching)
 
 (module+ test
   (require (submod ".."))
   (require (submod Tsuro/Code/Common/tiles json))
+  (require Tsuro/Code/Common/port)
   (require json)
   (require rackunit))
 
-;                                            
-;                                            
-;          ;;;                               
-;            ;                               
-;   ;;;;     ;    ;;;;   ;   ;   ;;;    ;;;; 
-;   ;; ;;    ;        ;  ;   ;  ;;  ;   ;;  ;
-;   ;   ;    ;        ;   ; ;   ;   ;;  ;    
-;   ;   ;    ;     ;;;;   ; ;   ;;;;;;  ;    
-;   ;   ;    ;    ;   ;   ; ;   ;       ;    
-;   ;; ;;    ;    ;   ;   ;;    ;       ;    
-;   ;;;;      ;;   ;;;;    ;     ;;;;   ;    
-;   ;                      ;                 
-;   ;                     ;                  
-;   ;                    ;;                  
+;                                                                               
+;                                                        ;                      
+;                                                        ;            ;         
+;                                                        ;                      
+;   ;;;;    ;;;;   ;;;   ;   ;  ;   ;         ;;;;    ;;;; ;;;;;;   ;;;   ; ;;  
+;   ;; ;;   ;;  ; ;; ;;   ; ;   ;   ;             ;  ;; ;; ;  ;  ;    ;   ;;  ; 
+;   ;   ;   ;     ;   ;   ;;;    ; ;              ;  ;   ; ;  ;  ;    ;   ;   ; 
+;   ;   ;   ;     ;   ;    ;     ; ;           ;;;;  ;   ; ;  ;  ;    ;   ;   ; 
+;   ;   ;   ;     ;   ;   ;;;    ; ;          ;   ;  ;   ; ;  ;  ;    ;   ;   ; 
+;   ;; ;;   ;     ;; ;;   ; ;    ;;           ;   ;  ;; ;; ;  ;  ;    ;   ;   ; 
+;   ;;;;    ;      ;;;   ;   ;    ;            ;;;;   ;;;; ;  ;  ;  ;;;;; ;   ; 
+;   ;                             ;                                             
+;   ;                            ;                                              
+;   ;                           ;;
 
-(define (make-remote-player in out)
-  (new remote-player% [in in] [out out]))
+(define ((make-remote-administrator receiver) player)
+  (define done? (box (gensym)))
+  (define r (dispatcher done? player))
+  (let loop ()
+    (receiver r)
+    (unless (boolean? (unbox done?))
+      (loop)))
+  (unbox done?))
 
-(define remote-player%
-  (class object% [init-field in out]
-    (super-new)
+(def/mp initial
+  (_ i t1 t2 t3) #'`[[,(and i (init-pat _ a p _x _y)) (... ...)] ,(? ti? t1) ,(? ti? t2) ,(? ti? t3)])
+(def/mp intermediate
+  (_ i t1 t2) #'`[,(and i (state-pat)) ,(? ti? t1) ,(? ti? t2)])
 
-    (define-syntax (define/remote stx)
-      (syntax-parse stx
-        [(_ (m (~optional (~seq #:name n:string) #:defaults ([n #'(~a 'm)])) ->to ... <-from))
-         #:with (x ...) (generate-temporaries #'(->to ...))
-         #'(define/public (m x ...)
-             (send-message `[,n [,(->to x) ...]] out)
-             (define msg (read-message in))
-             (define dec (<-from msg))
-             (unless dec (error 'm "wrong return value received: ~e" msg))
-             dec)]))
+(require (submod Tsuro/Code/Common/actions json))
 
-    (define/remote (playing-as avatar->jsexpr jsexpr->void))
-    (define/remote (playing-with #:name "others" (curry map avatar->jsexpr) jsexpr->void))
-    (define/remote (initial simple tile-index tile-index tile-index action))
-    (define/remote (take-turn intermediate tile-index tile-index tile-pat))
-    (define/remote (end-of-tournament result->jsexpr jsexpr->void))))
+#; {[Box Boolean] Player -> [JSexpr -> JSexpr]}
+(define ((dispatcher done? p) input-received)
+  (match input-received
+    [`["playing-as" [,(? avatar? as)]] (send p playing-as as) "void"]
+    [`["others" [,(? avatar? others) ...]] (send p playing-with others) "void"]
+    [`["initial" ,[initial i t1 t2 t3]] (init-action->jsexpr (send p initial (j->i i) t1 t2 t3))]
+    [`["take-turn"  ,(intermediate i t1 t2)] (turn-action->jsexpr (send p take-turn (j->i i) t1 t2))]
+    [`["end-of-tournament" [,(? boolean? result)]]
+     (set-box! done? result)
+     (send p end-of-tournament result)
+     "void"]
+    [other (error 'remote-administrator "the server sent an ill-formed message: ~e" other)]))
 
-(define simple intermediate*->jsexpr)
-(define intermediate intermediate*->jsexpr)
-(define tile-pat jsexpr->turn-action)
-(define tile-index values)
-(define action jsexpr->init-action)
-
-(define (jsexpr->void j) (match j ["void" (void)]))
-(define result->jsexpr values)
+(define j->i jsexpr->intermediate*)
+(define ti? tile-index?)
 
 ;                                     
 ;                                     
@@ -125,63 +107,45 @@
 ;                                     
 
 (module+ test
-  (define emm? exn:misc:match?)
+  (require Tsuro/Code/Players/player)
+  (require Tsuro/Code/Players/first-s)
 
-  (define (rp return-value) (make-remote-player (return-value) (current-output-port)))
-  (define-syntax-rule (mp ci method args ...)
-    (let* ([result (gensym)]
-           [output (with-output-to-string (λ () (set! result (send (rp ci) method args ...))))])
-      (list (read-message (open-input-string output)) result)))
-
-  ;; -------------------------------------------------------------------------------------------------
-  ;; the simple functions
-  (define (ci) (open-input-string "\"void\""))
-  (check-equal? (mp ci playing-as "red") [list `["playing-as" ["red"]] (void)])
-  (check-equal? (mp ci playing-with `["red" "blue"]) [list `["others" [["red" "blue"]]] (void)])  
-  (check-equal? (mp ci end-of-tournament #t) (list `["end-of-tournament" [,true]] (void)))
-
-  (define (bd) (open-input-string "\"not-void\""))
-  (check-exn emm? (λ () (mp bd playing-as "red")))
-  (check-exn emm? (λ () (mp bd playing-with `["red"])))
-  (check-exn emm? (λ () (mp bd end-of-tournament #false)))
-
-  ;; -------------------------------------------------------------------------------------------------
-  ;; initialization 
-
-  (define tile0 `[0 90])
-  (define jile0 (jsexpr->tile '[0 90]))
-  (define two (index->port 2))
+  (define p1 (new player% [strategy (new first-s%)]))
+  (define b1 (box (gensym)))
   
-  (define init0 `[,tile0 ,two 0 0]) ;; init action chosen by "red" player 
-  (define (i0)  (open-input-string (jsexpr->string (init-action->jsexpr init0))))
+  (check-equal? ((dispatcher b1 p1) `["playing-as" ["red"]]) "void")
+  (check-true (symbol? (unbox b1)))
 
+  (check-equal? ((dispatcher b1 p1) `["others" ["red" "blue"]]) "void")
+  (check-true (symbol? (unbox b1)))
+
+  (check-equal? ((dispatcher b1 p1) `["end-of-tournament" [,#true]]) "void")
+  (check-true (unbox b1))
+
+  (set-box! b1 (gensym))
+  (check-equal? ((dispatcher b1 p1) `["end-of-tournament" [,#false]]) "void")
+  (check-false (unbox b1))
+
+  (define two (index->port 2))
   (define a0 '[])
   (define j0 (intermediate*->jsexpr a0))
-  (check-equal? (mp i0 initial a0 0 1 2) (list `["initial" [,j0 0 1 2]] init0) "empty board")
-  
-  (define b0 `[[,jile0 "red" ,two 0 0]])
-  (define k0 (intermediate*->jsexpr b0))
-  (check-equal? (mp i0 initial b0 0 1 2) (list `["initial" [,k0 0 1 2]] init0) "one tile present")
+  (check-equal? ((dispatcher b1 p1) `["initial" [,j0 0 1 2]]) (init-action->jsexpr `[[2 0] ,two 1 0]))
 
-  (check-exn emm? (λ () (mp (λ () (open-input-string "[0 90 80]")) initial b0 0 1 2)) "badly shaped")
-  (check-exn emm? (λ () (mp (λ () (open-input-string "[0")) initial b0 0 1 2)) "incomplete JSON ")
-
-  ;; -------------------------------------------------------------------------------------------------
-  ;; take turn 
-  
-  (define turn0 `[2 0]) ;; turn action chosen by "red" and "black" player (illegal by logic)
-  (define (i*) (open-input-string (jsexpr->string (turn-action->jsexpr turn0))))
-
+  (define tile0 `[0 90])
+  (define jile0 (jsexpr->tile tile0))
   (define c* '("red" "black" "green"))
   (define a* (map (λ (x c) `[,jile0 ,c ,two ,x 0]) '(0 2 4) c*))
   (define j* (intermediate*->jsexpr a*))
-  (check-equal? (mp i* take-turn a* 0 1) [list `["take-turn" [,j* 0 1]] turn0] "first move past init")
+  (check-equal? ((dispatcher b1 p1) `["take-turn" [,j* 0 1]]) (turn-action->jsexpr `[0 0]))
 
-  (define ++ [(jsexpr->tile turn0) (facing-port two)]) ;; compute where red is now 
-  (define b* `[[,jile0 0 0] ,@(map (λ (x c p) `[,jile0 ,c ,p ,x 0]) '(1 2 4) c* `[,++ ,two ,two])])
-  (define k* (intermediate*->jsexpr b*))
-  (check-equal? (mp i* take-turn b* 0 1) [list `["take-turn" [,k* 0 1]] turn0] "intermediate turn")
+  (check-true ((make-remote-administrator (λ (f) (f `["end-of-tournament" [#true]]))) p1))
 
-  (check-exn emm? (λ () (mp (λ () (open-input-string "[0 90 80]")) take-turn b* 0 1)) "bad tt")
-  (check-exn emm? (λ () (mp (λ () (open-input-string "[0 90")) take-turn b* 0 1)) "incomplete tt"))
-  
+  (define b*
+    `[ ["playing-as" ["red"]]
+       ["others" ["red" "blue"]]
+       ["initial" [,j0 0 1 2]]
+       ["take-turn" [,j* 0 1]]
+       ["end-of-tournament" [,#true]] ])
+  (check-true ((make-remote-administrator (λ (f) (begin0 (f (first b*)) (set! b* (rest b*))))) p1))
+
+  (check-exn exn:fail? (λ () ((make-remote-administrator (λ (f) (f `[0 [#true]]))) p1))))
