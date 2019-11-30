@@ -9,9 +9,10 @@
 (provide
  (contract-out
   [client 
-   #; (client players ip port#)
+   #; (client players ip port# wait?)
    ;; runs a client that connects all players to a server at ip on port#
-   (->* ([listof [list/c string? player/c]]) (string? port/c) any)]))
+   ;; waits for all of them if wait?
+   (->* ([listof [list/c string? player/c]]) (string? port/c boolean?) any)]))
 
 ;; ---------------------------------------------------------------------------------------------------
 (require Tsuro/Code/Remote/administrator)
@@ -25,18 +26,37 @@
 
 ;; ---------------------------------------------------------------------------------------------------
 (define LOCAL "127.0.0.1")
-(define TIME-PER-CLIENT 22)
+(define TIME-PER-CLIENT 11)
 
-(define (client players (ip LOCAL) (port 45678))
-  (struct result [name value] #:transparent)
+(define (client players (ip LOCAL) (port 45678) (wait? #false))
+  (define (co) (connect-to-server-as-receiver ip port))
+  (define player-threads (make-players wait? players co))
+  (when wait?
+    (wait-for-all player-threads)
+    (displayln "all done")))
+
+#; {type ChanneledThreads = [Listof [List Channel String  Thread]]}
+
+#; {Boolean [Listof Player] [-> (values InputPort OutputPort)] -> ChanneledThreads}
+(define (make-players wait? players connector)
   (define done (make-channel))
-  (define player-threads
-    (for/list ((p players))
-      (match-define [list name behavior] p)
-      (define-values (receiver _) (connect-to-server-as-receiver ip port))
-      (define admin (make-remote-administrator receiver))
-      (thread
-       (λ ()
-         (define r (parameterize ([time-out-limit TIME-PER-CLIENT]) (xcall admin behavior)))
-         (channel-put done (result name r))))))
-  (sync (handle-evt done displayln)))
+  (for/list ((p players))
+    (match-define [list name behavior] p)
+    (define-values (receiver _) (connector))
+    (define admin (make-remote-administrator receiver))
+    (list done
+          name
+          (thread
+           (λ ()
+             (define r (parameterize ([time-out-limit TIME-PER-CLIENT]) (xcall admin behavior)))
+             (if wait? (channel-put done (list name r)) (void)))))))
+
+#; {ChanneledThreads -> Void}
+;; display the results 
+(define (wait-for-all player-threads)
+  (when (cons? player-threads)
+    (define removes-itself
+      (for/list ((dp player-threads))
+        (match-define [list done name th] dp)
+        (handle-evt done (λ (r) (wait-for-all (remq dp player-threads))))))
+    (apply sync removes-itself)))
