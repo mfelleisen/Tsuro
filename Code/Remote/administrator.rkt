@@ -9,7 +9,8 @@
 
 (provide
  (contract-out
-  [make-remote-administrator (-> (-> (-> jsexpr? jsexpr?) any) (-> player/c any/c))]))
+  [make-remote-administrator
+   (-> (-> (-> (or/c eof-object? jsexpr?) jsexpr?) any) (-> player/c any/c))]))
 
 ;                                                                                      
 ;       ;                                  ;                                           
@@ -74,6 +75,7 @@
 #; {[Box Boolean] Player -> [JSexpr -> JSexpr]}
 (define ((dispatcher done? p) input-received)
   (match input-received
+    [(? eof-object?) (void)]
     [`["playing-as" [,(? avatar? as)]] (send p playing-as as) "void"]
     [`["others" [,(? avatar? others) ...]] (send p playing-with others) "void"]
     [`["initial" ,[initial i t1 t2 t3]] (init-action->jsexpr (send p initial (j->i i) t1 t2 t3))]
@@ -105,7 +107,9 @@
 (module+ test
   (define p1 (new player% [strategy (new first-s%)]))
   (define b1 (box (gensym)))
-  
+
+  (check-equal? ((dispatcher b1 p1) eof) (void))
+
   (check-equal? ((dispatcher b1 p1) `["playing-as" ["red"]]) "void")
   (check-true (symbol? (unbox b1)))
 
