@@ -25,6 +25,7 @@
 
 ;; ---------------------------------------------------------------------------------------------------
 (define LOCAL "127.0.0.1")
+(define TIME-PER-CLIENT 22)
 
 (define (client players (ip LOCAL) (port 45678))
   (struct result [name value] #:transparent)
@@ -33,11 +34,9 @@
     (for/list ((p players))
       (match-define [list name behavior] p)
       (define-values (receiver _) (connect-to-server-as-receiver ip port))
-      (define admin (make-remote-administrator behavior receiver))
-      (thread (λ () (channel-put done (result name (parameterize ([time-out-limit 11]) (xcall (admin)))))))))
-
-  ;; what to do here:
-  ;; -- this waits for at most one survivor
-  ;; -- all may crash in which case this will hang 
-
+      (define admin (make-remote-administrator receiver))
+      (thread
+       (λ ()
+         (define r (parameterize ([time-out-limit TIME-PER-CLIENT]) (xcall admin behavior)))
+         (channel-put done (result name r))))))
   (sync (handle-evt done displayln)))
