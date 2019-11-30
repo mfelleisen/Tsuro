@@ -19,7 +19,21 @@
    ;; wait-for-msec seconds or N >= player# as soon as that many signed up 
    (-> player#/c secs/c port/c (list/c (listof player/c) results/c))]))
 
-;; ---------------------------------------------------------------------------------------------------
+;                                                                                      
+;       ;                                  ;                                           
+;       ;                                  ;                          ;                
+;       ;                                  ;                                           
+;    ;;;;   ;;;   ;;;;    ;;;   ; ;;    ;;;;   ;;;   ; ;;    ;;;    ;;;    ;;;    ;;;  
+;   ;; ;;  ;;  ;  ;; ;;  ;;  ;  ;;  ;  ;; ;;  ;;  ;  ;;  ;  ;;  ;     ;   ;;  ;  ;   ; 
+;   ;   ;  ;   ;; ;   ;  ;   ;; ;   ;  ;   ;  ;   ;; ;   ;  ;         ;   ;   ;; ;     
+;   ;   ;  ;;;;;; ;   ;  ;;;;;; ;   ;  ;   ;  ;;;;;; ;   ;  ;         ;   ;;;;;;  ;;;  
+;   ;   ;  ;      ;   ;  ;      ;   ;  ;   ;  ;      ;   ;  ;         ;   ;          ; 
+;   ;; ;;  ;      ;; ;;  ;      ;   ;  ;; ;;  ;      ;   ;  ;;        ;   ;      ;   ; 
+;    ;;;;   ;;;;  ;;;;    ;;;;  ;   ;   ;;;;   ;;;;  ;   ;   ;;;;   ;;;;;  ;;;;   ;;;  
+;                 ;                                                                    
+;                 ;                                                                    
+;                 ;                                                                    
+
 (require Tsuro/Code/Remote/player)
 (require (except-in Tsuro/Code/Admin/administrator results/c))
 
@@ -30,7 +44,21 @@
   (require (submod ".."))
   (require rackunit))
 
-;; ---------------------------------------------------------------------------------------------------
+;                                            
+;                                            
+;                                            
+;                                            
+;    ;;;    ;;;    ;;;;  ;   ;   ;;;    ;;;; 
+;   ;   ;  ;;  ;   ;;  ; ;   ;  ;;  ;   ;;  ;
+;   ;      ;   ;;  ;      ; ;   ;   ;;  ;    
+;    ;;;   ;;;;;;  ;      ; ;   ;;;;;;  ;    
+;       ;  ;       ;      ; ;   ;       ;    
+;   ;   ;  ;       ;       ;    ;       ;    
+;    ;;;    ;;;;   ;       ;     ;;;;   ;    
+;                                            
+;                                            
+;                                            
+
 (define LOCAL     "127.0.0.1")
 (define MAX-TCP   30)
 (define REOPEN    #t)
@@ -41,11 +69,10 @@
 
 (define (server min-players time-limit port)
   (define send-players (make-channel))
-  (define time-s-up    (make-channel))
   (define custodian    (make-custodian))
   (parameterize ([current-custodian custodian])
-    (thread (sign-up-players min-players time-limit port send-players time-s-up)))
-  (define players (receive-players time-limit send-players time-s-up))
+    (thread (sign-up-players min-players time-limit port send-players)))
+  (define players (receive-players time-limit send-players))
   (begin0
     (cond
       [(empty? players) (displayln MIN-ERROR (current-error-port)) DEFAULT-RESULT]
@@ -53,22 +80,22 @@
       [else (run-administrator players)])
     (custodian-shutdown-all custodian)))
 
-#; {N Channel Channel -> [Listof (U Players N)]} 
-(define (receive-players time-limit send-players time-s-up)
+#; {N Channel -> [Listof (U Players N)]} 
+(define (receive-players time-limit send-players)
   (reverse
    (cond
      [(sync/timeout time-limit send-players) => values]
      [else
-      (channel-put time-s-up 'give-me-the-players)
+      (channel-put send-players 'give-me-the-players)
       (channel-get send-players)])))
 
-#;{N Positive Port-Number Channel Channel -> (-> Void)}
+#;{N Positive Port-Number Channel -> (-> Void)}
 ;; communicate the players the signed up in reverse-chronological order on send-players
-(define ((sign-up-players min-players time-limit port send-players time-s-up))
+(define ((sign-up-players min-players time-limit port send-players))
   (define listener (tcp-listen port MAX-TCP REOPEN))
   (let collect-up-to-min-players ((players '()))
     (sync
-     (handle-evt time-s-up (λ (_false) (channel-put send-players players)))
+     (handle-evt send-players (λ (_false) (channel-put send-players players)))
      (handle-evt listener 
                  (λ (listener)
                    (define players++ (add-player players listener))
@@ -78,7 +105,7 @@
 
 #; (Listener [Listof Player] -> [Listof Player])
 (define (add-player players listener)
-  (with-handlers ((exn:fail:network? (lambda (xn) (log-error (~a (exn-message xn))) players)))
+  (with-handlers ((exn:fail:network? (lambda (x) (log-error "connect: ~a" (exn-message x)) players)))
     (define-values (in out) (tcp-accept listener))
     (define next (if (test-run?) (add1 (length players)) (new (make-remote-player in out))))
     (cons next players)))
