@@ -16,7 +16,7 @@
    #; (server player# wait-for-sec port#)
    ;; returns the list of players, sorted in descending order of age, plus rankings from
    ;; runsning an administrator on the N players that connected on port# in
-   ;; wait-for-msec seconds or N >= player# as soon as that many signed up 
+   ;; wait-for-sec seconds or N >= player# as soon as that many signed up 
    (-> player#/c secs/c port/c (list/c (listof player/c) results/c))]))
 
 ;                                                                                      
@@ -107,7 +107,7 @@
 (define (add-player players listener)
   (with-handlers ((exn:fail:network? (lambda (x) (log-error "connect: ~a" (exn-message x)) players)))
     (define-values (in out) (tcp-accept listener))
-    (define next (if (test-run?) (add1 (length players)) (new (make-remote-player in out))))
+    (define next (if (test-run?) (add1 (length players)) (make-remote-player in out)))
     (cons next players)))
 
 #; ([Listof ExternalPlayer] (U False [Listof String]) -> [List [Listof ExternalPlayer] Results])
@@ -115,8 +115,22 @@
   (define result (administrator players))
   [list players result])
 
-;; ---------------------------------------------------------------------------------------------------
-(module+ test
+;                                                                                      
+;                                                                                      
+;     ;       ;             ;                          ;                    ;          
+;     ;                                                ;                    ;          
+;   ;;;;;   ;;;  ;;;;;;   ;;;   ; ;;    ;;;;         ;;;;;   ;;;    ;;;   ;;;;;   ;;;  
+;     ;       ;  ;  ;  ;    ;   ;;  ;  ;;  ;           ;    ;;  ;  ;   ;    ;    ;   ; 
+;     ;       ;  ;  ;  ;    ;   ;   ;  ;   ;           ;    ;   ;; ;        ;    ;     
+;     ;       ;  ;  ;  ;    ;   ;   ;  ;   ;           ;    ;;;;;;  ;;;     ;     ;;;  
+;     ;       ;  ;  ;  ;    ;   ;   ;  ;   ;           ;    ;          ;    ;        ; 
+;     ;       ;  ;  ;  ;    ;   ;   ;  ;; ;;           ;    ;      ;   ;    ;    ;   ; 
+;     ;;;   ;;;;;;  ;  ;  ;;;;; ;   ;   ;;;;           ;;;   ;;;;   ;;;     ;;;   ;;;  
+;                                          ;                                           
+;                                       ;  ;                                           
+;                                        ;;                                            
+
+(module+ test ;; timing
 
   #; { N Port-Number (U False n:N) -> (U False [Listof 0]: (=/c (length) n))}
   #; (run-server-test m p k)
@@ -138,3 +152,37 @@
   (check-equal? (run-server-test 10 45678 #f) (string-append MIN-ERROR "\n") "no sign ups")
   (check-equal? (run-server-test 10 45679 10) (build-list 10 add1) "sign up enough players")
   (check-equal? (run-server-test 10 45679  9) (build-list  9 add1) "sign up too few players"))
+
+;                                                                 
+;      ;;                                                         
+;     ;           ;;;    ;;;             ;                    ;   
+;     ;             ;      ;             ;                    ;   
+;   ;;;;;  ;   ;    ;      ;           ;;;;;   ;;;    ;;;   ;;;;; 
+;     ;    ;   ;    ;      ;             ;    ;;  ;  ;   ;    ;   
+;     ;    ;   ;    ;      ;             ;    ;   ;; ;        ;   
+;     ;    ;   ;    ;      ;             ;    ;;;;;;  ;;;     ;   
+;     ;    ;   ;    ;      ;             ;    ;          ;    ;   
+;     ;    ;   ;    ;      ;             ;    ;      ;   ;    ;   
+;     ;     ;;;;     ;;     ;;           ;;;   ;;;;   ;;;     ;;; 
+;                                                                 
+;                                                                 
+;                                                                 
+                
+(module+ test
+  (require Tsuro/Code/Remote/client)
+  (require Tsuro/Code/Players/player)
+  (require Tsuro/Code/Players/first-s)
+  
+  (define PLRS 3)
+  (define WAIT 10)
+  (define PORT 45678)
+  (parameterize ([current-custodian (make-custodian)])
+    (define players  (build-list PLRS (λ _ (new player% [strategy (new first-s%)]))))
+    (define named    (map list '["a" "b" "c"] players))
+    (define o*       (open-output-string))
+    (define customer (thread (λ () (parameterize ([current-output-port o*]) (client named)))))
+    (match-define [list all-players rankings] (server PLRS WAIT PORT))
+    (sync customer)
+    (begin0 (check-true (= (length (first rankings)) 1))
+            (check-true (= (length (second rankings)) 2))
+            (custodian-shutdown-all (current-custodian)))))
