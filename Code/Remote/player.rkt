@@ -61,23 +61,23 @@
   (class object% [init-field in out]
     (super-new)
 
+    (define/private (send-json tag json <-from)
+      (send-message json out)
+      (define msg (read-message in))
+      (with-handlers ([exn:misc:match?
+                       (λ (xn)
+                         (log-error "~a: wrong return value: ~e" tag msg)
+                         (log-error (exn-message xn))
+                         (raise xn))])
+        (<-from msg)))
+
     (define-syntax (define/remote stx)
       (syntax-parse stx
         [(_ (m (~optional (~seq #:name n:string) #:defaults ([n #'(~a 'm)])) [->to] <-from))
-         #'(define/public (m x)
-             (send-message `[,n ,(map ->to x)] out)
-             (define msg (read-message in))
-             (define dec (<-from msg))
-             (unless dec (error 'm "wrong return value received: ~e" msg))
-             dec)]
+         #'(define/public (m x) (send-json 'm `[,n ,(map ->to x)] <-from))]
         [(_ (m (~optional (~seq #:name n:string) #:defaults ([n #'(~a 'm)])) ->to ... <-from))
          #:with (x ...) (generate-temporaries #'(->to ...))
-         #'(define/public (m x ...)
-             (send-message `[,n [,(->to x) ...]] out)
-             (define msg (read-message in))
-             (define dec (<-from msg))
-             (unless dec (error 'm "wrong return value received: ~e" msg))
-             dec)]))
+         #'(define/public (m x ...) (send-json 'm `[,n [,(->to x) ...]] <-from))]))
 
     (define/remote (playing-as avatar->jsexpr jsexpr->void))
     (define/remote (playing-with #:name "others" [avatar->jsexpr] jsexpr->void))
@@ -111,6 +111,7 @@
 
 (module+ test
   (define emm? exn:misc:match?)
+  (define oos*json (compose open-input-string jsexpr->string))
 
   (define (rp return-value) (make-remote-player (return-value) (current-output-port)))
   (define-syntax-rule (mp ci method args ...)
@@ -138,7 +139,7 @@
   (define two (index->port 2))
   
   (define init0 `[,tile0 ,two 0 0]) ;; init action chosen by "red" player 
-  (define (i0)  (open-input-string (jsexpr->string (init-action->jsexpr init0))))
+  (define (i0)  (oos*json (init-action->jsexpr init0)))
 
   (define a0 '[])
   (define j0 (intermediate*->jsexpr a0))
@@ -148,8 +149,8 @@
   (define k0 (intermediate*->jsexpr b0))
   (check-equal? (mp i0 initial b0 0 1 2) (list `["initial" [,k0 0 1 2]] init0) "one tile present")
 
-  (check-exn emm? (λ () (mp (λ () (open-input-string "[0 90 80]")) initial b0 0 1 2)) "badly shaped")
-  (check-exn emm? (λ () (mp (λ () (open-input-string "[0")) initial b0 0 1 2)) "incomplete JSON ")
+  (check-exn emm? (λ () (mp (λ () (oos*json "[0 90 80]")) initial b0 0 1 2)) "badly shaped")
+  (check-exn emm? (λ () (mp (λ () (oos*json "[0")) initial b0 0 1 2)) "incomplete JSON ")
 
   ;; -------------------------------------------------------------------------------------------------
   ;; take turn 
@@ -167,6 +168,5 @@
   (define k* (intermediate*->jsexpr b*))
   (check-equal? (mp i* take-turn b* 0 1) [list `["take-turn" [,k* 0 1]] turn0] "intermediate turn")
 
-  (check-exn emm? (λ () (mp (λ () (open-input-string "[0 90 80]")) take-turn b* 0 1)) "bad tt")
-  (check-exn emm? (λ () (mp (λ () (open-input-string "[0 90")) take-turn b* 0 1)) "incomplete tt"))
-  
+  (check-exn emm? (λ () (mp (λ () (oos*json "[0 90 80]")) take-turn b* 0 1)) "bad tt")
+  (check-exn emm? (λ () (mp (λ () (oos*json "[0 90")) take-turn b* 0 1)) "incomplete tt"))
