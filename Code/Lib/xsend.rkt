@@ -48,8 +48,8 @@
   (apply xcall f #:thrown throw-handler #:timed-out time-out-handler #:f-msg-format fmt a))
 
 (define (xcall f
-               #:thrown throw-handler
-               #:timed-out time-out-handler
+               #:thrown (throw-handler failed)
+               #:timed-out (time-out-handler (λ _ (failed 'time)))
                #:f-msg-format (fmt (string-append (format "xcall: ~a:\n" (object-name f)) "~e"))
                . a)
   (define cust (make-custodian))
