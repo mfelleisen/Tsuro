@@ -353,7 +353,9 @@
     [(boolean? (member avatar (survivors state))) (values state tiles ranked cheats observers)]
     [else 
      (match-define (list (list tile1 tile2) tiles+1) (split-tiles tiles TURN#))
-     (define choice-failed (xsend external take-turn (state->intermediate* state) tile1 tile2))
+     (define choice-failed
+       (parameterize ([time-out-limit .4])
+         (xsend external take-turn (state->intermediate* state) tile1 tile2)))
      (define potential-turn (list (list avatar age choice-failed) tile1 tile2))
      (cond
        [(failed? choice-failed)
