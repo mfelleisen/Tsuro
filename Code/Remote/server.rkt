@@ -75,7 +75,7 @@
   (define players (receive-players time-limit send-players))
   (begin0
     (cond
-      [(empty? players) (displayln MIN-ERROR (current-error-port)) DEFAULT-RESULT]
+      [(empty? players) DEFAULT-RESULT]
       [(test-run?) => (λ (result) (channel-put result players) DEFAULT-RESULT)]
       [else (run-administrator players)])
     (custodian-shutdown-all custodian)))
