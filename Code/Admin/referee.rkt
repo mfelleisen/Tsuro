@@ -40,7 +40,7 @@
 
 (require Tsuro/Code/Lib/xsend)
 
-(require SwDev/Debugging/spy (submod Tsuro/Code/Common/board picts))
+(require SwDev/Debugging/spy )
 
 (module+ test
   (require (submod ".."))
