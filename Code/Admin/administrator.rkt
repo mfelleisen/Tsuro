@@ -145,7 +145,8 @@
     (for/fold ([losers '()][cheats2 cheats1]) ([ranked losers0])
       (for/fold ([lost '[]][cheats cheats2] #:result (values (cons* lost losers) cheats)) ((r ranked))
         (inform-one r #false lost cheats))))
-  (list (cons winners (reverse losers)) cheaters))
+  (define losers1 (reverse losers))
+  (list (if (empty? winners) losers1 (cons winners losers1)) cheaters))
 
 #; {Player Boolean [Listof Player] [Listof Player] -> (values [Listof Player] [Listof Player])}
 (define (inform-one p msg winners cheats)
