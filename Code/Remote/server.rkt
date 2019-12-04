@@ -73,6 +73,7 @@
   (parameterize ([current-custodian custodian])
     (thread (sign-up-players min-players time-limit port send-players)))
   (define players (receive-players time-limit send-players))
+  (log-errors "~a players are playing a game" (length players))
   (begin0
     (cond
       [(empty? players) DEFAULT-RESULT]
@@ -107,6 +108,7 @@
 (define (add-player players listener)
   (with-handlers ((exn:fail:network? (lambda (x) (log-error "connect: ~a" (exn-message x)) players)))
     (define-values (in out) (tcp-accept listener))
+    (log-error "connection established")
     (define next (if (test-run?) (add1 (length players)) (make-remote-player in out)))
     (cons next players)))
 
