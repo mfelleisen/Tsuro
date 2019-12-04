@@ -26,7 +26,7 @@
 
 ;; ---------------------------------------------------------------------------------------------------
 (define LOCAL "127.0.0.1")
-(define TIME-PER-CLIENT 30)
+(define TIME-PER-CLIENT 60)
 
 (define (client players (ip LOCAL) (port 45678) (wait? #false))
   (define (co) (connect-to-server-as-receiver ip port))

@@ -72,6 +72,7 @@
 ;                                                    ;            
 
 (define TILES (range TILES#))
+(define TIME-PER-CALL .8)
 
 #; {type Tiles* = [Listof TileIndex]}
 
@@ -354,8 +355,9 @@
     [else 
      (match-define (list (list tile1 tile2) tiles+1) (split-tiles tiles TURN#))
      (define choice-failed
-       (parameterize ([time-out-limit .4])
+       (parameterize ([time-out-limit TIME-PER-CALL])
          (xsend external take-turn (state->intermediate* state) tile1 tile2)))
+     (log-error "~a response from player" choice-failed)
      (define potential-turn (list (list avatar age choice-failed) tile1 tile2))
      (cond
        [(failed? choice-failed)
