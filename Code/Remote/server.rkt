@@ -73,7 +73,7 @@
   (parameterize ([current-custodian custodian])
     (thread (sign-up-players min-players time-limit port send-players)))
   (define players (receive-players time-limit send-players))
-  (log-errors "~a players are playing a game" (length players))
+  (log-error "~a players are playing a game" (length players))
   (begin0
     (cond
       [(empty? players) DEFAULT-RESULT]
