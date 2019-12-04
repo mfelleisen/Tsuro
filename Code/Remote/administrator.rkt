@@ -31,6 +31,7 @@
 (require Tsuro/Code/Common/tokens)
 (require Tsuro/Code/Common/tiles)
 
+(require Tsuro/Code/Lib/xsend)
 (require SwDev/Lib/pattern-matching)
 
 (module+ test
@@ -60,6 +61,7 @@
   (define done? (box (gensym)))
   (define r (dispatcher done? player))
   (let loop ()
+    (time-out-limit 33)
     (receiver r)
     (unless (boolean? (unbox done?))
       (loop)))

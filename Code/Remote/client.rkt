@@ -26,7 +26,7 @@
 
 ;; ---------------------------------------------------------------------------------------------------
 (define LOCAL "127.0.0.1")
-(define TIME-PER-CLIENT 60)
+(define TIME-PER-CLIENT 30)
 
 (define (client players (ip LOCAL) (port 45678) (wait? #false))
   (define (co) (connect-to-server-as-receiver ip port))
@@ -58,5 +58,5 @@
     (define removes-itself
       (for/list ((dp player-threads))
         (match-define [list done name th] dp)
-        (handle-evt done (λ (r) (wait-for-all (remq dp player-threads))))))
+        (handle-evt done (λ (r) (log-error "~a" r) (wait-for-all (remq dp player-threads))))))
     (apply sync removes-itself)))
