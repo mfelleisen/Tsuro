@@ -61,6 +61,14 @@
   (class object% [init-field in out]
     (super-new)
 
+    (define-syntax (define/remote stx)
+      (syntax-parse stx
+        [(_ (m (~optional (~seq #:name n:string) #:defaults ([n #'(~a 'm)])) [->to] <-from))
+         #'(define/public (m x) (send-json 'm `[,n ,(map ->to x)] <-from))]
+        [(_ (m (~optional (~seq #:name n:string) #:defaults ([n #'(~a 'm)])) ->to ... <-from))
+         #:with (x ...) (generate-temporaries #'(->to ...))
+         #'(define/public (m x ...) (send-json 'm `[,n [,(->to x) ...]] <-from))]))
+
     (define/private (send-json tag json <-from)
       (send-message json out)
       (define msg (read-message in))
@@ -71,19 +79,14 @@
                          (raise xn))])
         (<-from msg)))
 
-    (define-syntax (define/remote stx)
-      (syntax-parse stx
-        [(_ (m (~optional (~seq #:name n:string) #:defaults ([n #'(~a 'm)])) [->to] <-from))
-         #'(define/public (m x) (send-json 'm `[,n ,(map ->to x)] <-from))]
-        [(_ (m (~optional (~seq #:name n:string) #:defaults ([n #'(~a 'm)])) ->to ... <-from))
-         #:with (x ...) (generate-temporaries #'(->to ...))
-         #'(define/public (m x ...) (send-json 'm `[,n [,(->to x) ...]] <-from))]))
-
+    ;; -----------------------------------------------------------------------------------------------
     (define/remote (playing-as avatar->jsexpr jsexpr->void))
     (define/remote (playing-with #:name "others" [avatar->jsexpr] jsexpr->void))
     (define/remote (initial simple tile-index tile-index tile-index action))
     (define/remote (take-turn intermediate tile-index tile-index tile-pat))
-    (define/remote (end-of-tournament result->jsexpr jsexpr->void))))
+    (define/remote (end-of-tournament result->jsexpr jsexpr->void))
+    ;; -----------------------------------------------------------------------------------------------
+    ))
 
 (define simple intermediate*->jsexpr)
 (define intermediate intermediate*->jsexpr)
