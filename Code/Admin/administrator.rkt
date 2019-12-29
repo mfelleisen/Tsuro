@@ -82,9 +82,10 @@
   (let loop ([lop1 lop0][lop#-previous-round +inf.0][cheats '()][o* o*0])
     (define lop (re-sort lop1 lop0))
     (define lop# (length lop))
+    (log-error "next round with ~a players" lop#)
     (cond
       [(or (= lop# lop#-previous-round) (too-few-for-one-game lop))
-       (when (too-few-for-one-game lop) (log-error "infinite loop detected"))
+       (unless (too-few-for-one-game lop) (log-error "infinite loop detected"))
        (xinform-observers o* (list lop) lop0) ;; final observation
        (values (if (empty? lop) '[] (list lop)) cheats)]
       [(enough-for-one-game lop)
