@@ -1112,17 +1112,22 @@
 
   (define good-state-tiles '(11 12 34))
   (define good-state-actions `[(,player-red (11 0)) (,player-red (12 0)) (,player-red (34 0))])
+
+  
+  (define Eport (index->port 4))
+  (define Dport (index->port 3))
+
   (define good-intermediate-state+
-    (state-from (34 (11 "red" #:on #\E) (34 #:rotate 90 "blue" #:on port-blue))
+    (state-from (34 (11 "red" #:on Eport) (34 #:rotate 90 "blue" #:on port-blue))
                 (33)
                 ((33 #:rotate 180 "white" #:on port-white))))
   (define good-intermediate-state++
     (state-from (34 11                   (34 #:rotate 90 "blue" #:on port-blue))
-                (33 (12 "red" #:on #\E))
+                (33 (12 "red" #:on Eport))
                 ((33 #:rotate 180 "white" #:on port-white))))
   (define good-intermediate-state+++
     (state-from (34 11                   (34 #:rotate 90 "blue" #:on port-blue))
-                (33 (12 "red" #:on #\D))
+                (33 (12 "red" #:on Dport))
                 ((33 #:rotate 180) 34))))
 
 (module+ test ;; add-tile
@@ -1533,7 +1538,7 @@
       (match i
         [`(,t ,x ,y) `(,ti ,x ,y)]
         [`(,t ,name ,port ,x ,y) `(,ti ,name ,(port->jsexpr port) ,x ,y)])))
-
+  
   ;; -------------------------------------------------------------------------------------------------
   (def/mp init-pat
     (_ t n p x y) #'`(,(tile-pat t) ,(? avatar? n) ,(port-pat p) ,(? index? x) ,(? index? y)))
