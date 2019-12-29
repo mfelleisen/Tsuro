@@ -37,7 +37,7 @@
     [(7) 2]))
 
 (def/mp port-pat
-  (_ p) #'(? (λ (s) (and (integer? s) (<= 0 s PORT#))) p))
+  (_ p) #'(? (λ (s) (and (string? s) (= (string-length s) 1) (string->port s))) p))
 
 (define (port->jsexpr p)
   (string (integer->char (+ p charA))))
