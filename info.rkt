@@ -16,6 +16,7 @@
     "pict-lib"
     "htdp-lib"
     "wxme-lib"
+    "json-type-provider"
     ))
 
 ;; json-type-provider
